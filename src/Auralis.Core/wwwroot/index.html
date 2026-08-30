@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auralis Control</title>
+  <link rel="stylesheet" href="/css/lounge.css?v=2" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">AURALIS <span>Control</span></div>
+    <div id="badge" class="badge">Idle</div>
+    <div id="roomChip" class="chip">룸 없음</div>
+    <div class="spacer"></div>
+    <div id="sync" class="sync" title="엔드포인트 클럭 오프셋 · 지터">sync —</div>
+    <button id="btnResync" class="ghost" title="버퍼를 비우고 다시 락">리싱크</button>
+  </header>
+
+  <main>
+    <!-- 좌: 라운지 + 라이브러리 -->
+    <section class="col left">
+      <div class="tabs" data-group="left">
+        <button class="tab on" data-tab="lib">라이브러리</button>
+        <button class="tab" data-tab="rooms">라운지</button>
+      </div>
+
+      <div class="pane on" data-pane="lib">
+        <input id="search" placeholder="트랙 · 앨범 · 아티스트 · 레이블 검색" />
+        <div class="row">
+          <button id="btnScan" class="ghost">라이브러리 스캔</button>
+          <button id="btnTidal" class="ghost">Tidal 연동</button>
+          <button id="btnQobuz" class="ghost">Qobuz 연동</button>
+        </div>
+        <p id="libMeta" class="meta"></p>
+        <div id="grid" class="grid"></div>
+      </div>
+
+      <div class="pane" data-pane="rooms">
+        <label>이름 <input id="roomName" value="Night Lounge" /></label>
+        <label>모드
+          <select id="mode">
+            <option value="0">Open Lounge — 전원 큐 편집</option>
+            <option value="1">Invite — 초대 코드</option>
+            <option value="2">Host Queue — 호스트 선곡</option>
+            <option value="3">Audiophile — Bit-perfect 고정</option>
+          </select>
+        </label>
+        <button id="btnCreate">룸 생성</button>
+        <div class="row">
+          <input id="joinId" placeholder="룸 ID" />
+          <input id="invite" placeholder="코드" />
+        </div>
+        <div class="row">
+          <button id="btnJoin" class="ghost">참여</button>
+          <button id="btnLeave" class="ghost">나가기</button>
+          <button id="btnRooms" class="ghost">새로고침</button>
+        </div>
+        <div id="roomList" class="list"></div>
+      </div>
+    </section>
+
+    <!-- 중앙: 지금 재생 -->
+    <section class="col center">
+      <div id="art" class="art">♪</div>
+      <h1 id="title">트랙을 큐에 넣으세요</h1>
+      <p id="artist" class="sub"></p>
+      <p id="format" class="meta"></p>
+
+      <div id="lyrics" class="lyrics"></div>
+
+      <div class="transport">
+        <button id="btnPrev" title="이전 곡">⏮</button>
+        <button id="btnPlay" class="primary" title="재생">▶</button>
+        <button id="btnPause" title="일시정지">⏸</button>
+        <button id="btnNext" title="다음 곡">⏭</button>
+      </div>
+
+      <div class="seekwrap">
+        <span id="elapsed" class="time">0:00</span>
+        <div id="seekbar" class="seekbar">
+          <div id="seekfill" class="fill"></div>
+          <div id="pinmarks" class="pinmarks"></div>
+        </div>
+        <span id="remain" class="time">0:00</span>
+      </div>
+      <p id="seekNote" class="meta"></p>
+
+      <div class="queuehead">
+        <h2>큐</h2>
+        <div class="row tight">
+          <button id="btnLockQ" class="ghost">큐 잠금</button>
+          <button id="btnClearQ" class="ghost">비우기</button>
+        </div>
+      </div>
+      <ol id="queue" class="queue"></ol>
+      <h2>요청</h2>
+      <ul id="requests" class="list"></ul>
+    </section>
+
+    <!-- 우: 소셜 / 메타 / 호스트 / 보관함 -->
+    <section class="col right">
+      <div class="tabs" data-group="right">
+        <button class="tab on" data-tab="lounge">라운지</button>
+        <button class="tab" data-tab="liner">라이너</button>
+        <button class="tab" data-tab="devices">기기</button>
+        <button class="tab" data-tab="hostset">호스트</button>
+        <button class="tab" data-tab="vault">보관함</button>
+      </div>
+
+      <div class="pane on" data-pane="lounge">
+        <div id="chatlog" class="chatlog"></div>
+        <form id="chatForm" class="row"><input id="chat" placeholder="감상평 / 채팅" /><button>전송</button></form>
+        <form id="pinForm" class="row"><input id="pinText" placeholder="이 구간이 좋았다" /><button>핀</button></form>
+        <div class="row tight">
+          <button id="btnHeart" class="ghost">♥</button>
+          <button data-emoji="🔥" class="ghost react">🔥</button>
+          <button data-emoji="👏" class="ghost react">👏</button>
+          <button data-emoji="🎧" class="ghost react">🎧</button>
+        </div>
+        <h2>타임스탬프 핀</h2>
+        <div id="pins" class="list"></div>
+      </div>
+
+      <div class="pane" data-pane="liner">
+        <article id="liner" class="liner"></article>
+        <h2>수록곡</h2>
+        <div id="albumTracks" class="list"></div>
+        <h2>뮤지션 관계도</h2>
+        <div id="graph" class="list"></div>
+        <div id="graphDetail" class="liner"></div>
+      </div>
+
+      <div class="pane" data-pane="devices">
+        <h2>이 룸의 엔드포인트</h2>
+        <div id="outputs" class="list"></div>
+        <h2>멤버</h2>
+        <div id="members" class="list"></div>
+        <h2>알려진 기기</h2>
+        <button id="btnEndpoints" class="ghost">새로고침</button>
+        <div id="endpoints" class="list"></div>
+      </div>
+
+      <div class="pane" data-pane="hostset">
+        <label>DSP 프리셋
+          <select id="dsp">
+            <option value="0">Off (Bit-perfect)</option>
+            <option value="1">Headphones</option>
+            <option value="2">Speakers</option>
+            <option value="3">Room IR</option>
+            <option value="4">Crossfeed</option>
+          </select>
+        </label>
+        <label>품질 정책
+          <select id="policy">
+            <option value="1">최저 공통 포맷</option>
+            <option value="0">전원 Bit-perfect일 때만</option>
+            <option value="2">불가 시 참관</option>
+          </select>
+        </label>
+        <label>소스 모드
+          <select id="sourceMode">
+            <option value="1">Fan-out (로컬 파일)</option>
+            <option value="0">Clock-sync (스트리밍)</option>
+          </select>
+        </label>
+        <div class="row tight">
+          <button data-flag="seek" class="ghost">시킹 허용</button>
+          <button data-flag="comments" class="ghost">코멘트 허용</button>
+          <button data-flag="chat" class="ghost">채팅 접기</button>
+          <button data-flag="auto_advance" class="ghost">자동 다음곡</button>
+          <button data-flag="dsp_lock" class="ghost">DSP 잠금</button>
+          <button data-flag="follow_host" class="ghost">Follow Host</button>
+        </div>
+        <label>최대 인원 <input id="maxMembers" type="number" min="1" max="128" value="16" /></label>
+        <h2>초대</h2>
+        <div class="row tight">
+          <button id="btnInviteRotate" class="ghost">코드 재발급</button>
+          <button id="btnInviteExtend" class="ghost">1시간 연장</button>
+          <button id="btnInviteRevoke" class="ghost">폐기</button>
+        </div>
+        <p id="inviteMeta" class="meta"></p>
+        <h2>보존 정책</h2>
+        <label>코멘트 보존(일) <input id="retention" type="number" min="0" max="3650" value="90" /></label>
+        <div class="row tight">
+          <button id="btnAnon" class="ghost">아카이브 익명화</button>
+          <button id="btnConsent" class="ghost">기본 저장 동의</button>
+          <button id="btnCloud" class="ghost">클라우드 동기화</button>
+        </div>
+        <h2>세션</h2>
+        <div class="row tight">
+          <button id="btnPair" class="ghost">페어링 코드</button>
+          <button id="btnEndYes">저장하고 종료</button>
+          <button id="btnEndNo" class="ghost">저장 없이 종료</button>
+        </div>
+        <pre id="side"></pre>
+      </div>
+
+      <div class="pane" data-pane="vault">
+        <div class="row tight">
+          <button id="btnArchives" class="ghost">아카이브</button>
+          <button id="btnPlaylists" class="ghost">플레이리스트</button>
+          <button id="btnHist" class="ghost">히스토리</button>
+        </div>
+        <div id="vault" class="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+  <script src="/js/control.js?v=2"></script>
+</body>
+</html>
