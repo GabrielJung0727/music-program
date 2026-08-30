@@ -1,29 +1,39 @@
-# Auralis
+# Mono
 
 하이파이 오디오 라운지. **Core / Control / Output** 3단 구조의 분산 오디오 시스템.
+혼자서 듣든 같이 듣든, 하나의 소리로 최고의 경험을.
 
 - 기획: [`docs/01-기획명세서.md`](docs/01-기획명세서.md)
 - 아키텍처: [`docs/02-아키텍처.md`](docs/02-아키텍처.md)
 - 구현 현황: [`docs/03-구현현황.md`](docs/03-구현현황.md)
 
+## 최근 추가된 기능
+
+- **최다 반응 구간**: 곡당 유저당 최대 3번, ❤️🎉👏🔥로 제한된 반응을 시크바 위 히트맵으로 표시
+- **스마트 선택형 오토플레이**: 큐 마지막 곡 종료 40초 전 후보 3곡 제시, 무응답 시 1번 자동 재생
+- **멀티 디바이스 존**: 여러 출력기기를 묶어 Sync(동시 재생) 또는 Independent(기기별 다른 곡)로 운영 — 싱글 플레이 전용
+- **다국어 아티스트 검색**: "요네즈 켄시"처럼 한국어 표기로 원어(米津玄師) 아티스트 검색
+- **위키백과 아티스트 이력**: ko→en 순으로 요약을 가져와 라이너 패널에 출처와 함께 표시
+- **UI 리디자인**: Roon 참고 화이트/인디고 기본 테마 + 다크모드 토글 (헤더의 🌗 버튼)
+
 ## 빠른 시작
 
 ```powershell
-dotnet build Auralis.slnx
-dotnet run --project src/Auralis.Core
+dotnet build Mono.slnx
+dotnet run --project src/Mono.Core
 ```
 
 | 포트 | 용도 |
 | --- | --- |
 | 7700 | Control 컨트롤 플레인 (TCP, 줄 단위 JSON) |
-| 7701 | AATP 엔드포인트 (컨트롤 + 오디오 데이터 플레인) |
+| 7701 | MATP 엔드포인트 (컨트롤 + 오디오 데이터 플레인) |
 | 7702 | Control 웹 UI · REST API |
 
 Control UI: <http://127.0.0.1:7702> — 화면과 명령만 담당하고 **소리는 내지 않는다.**
 
 ```powershell
-dotnet run --project src/Auralis.Control            # 같은 프로토콜의 CLI (help 로 명령 목록)
-dotnet run --project src/Auralis.Output -- --room=<룸ID>   # DAC 엔드포인트
+dotnet run --project src/Mono.Control            # 같은 프로토콜의 CLI (help 로 명령 목록)
+dotnet run --project src/Mono.Output -- --room=<룸ID>   # DAC 엔드포인트
 ```
 
 Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=<이름 일부>` `--volume=0-100`
@@ -31,11 +41,11 @@ Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=<이름 일�
 
 ## 라이브러리
 
-로컬 음원은 `src/Auralis.Core/bin/Debug/net8.0/data/library` 에 넣고 Control에서 **라이브러리 스캔**.
+로컬 음원은 `src/Mono.Core/bin/Debug/net8.0/data/library` 에 넣고 Control에서 **라이브러리 스캔**.
 `appsettings.json` 또는 환경변수로 경로·주기를 바꿀 수 있다.
 
 ```json
-{ "Auralis": { "LibraryRoot": "D:\\Music", "ScanIntervalMinutes": 30, "ControlUrl": "http://0.0.0.0:7702" } }
+{ "Mono": { "LibraryRoot": "D:\\Music", "ScanIntervalMinutes": 30, "ControlUrl": "http://0.0.0.0:7702" } }
 ```
 
 - 포맷: FLAC / WAV / AIFF / ALAC / M4A / MP3 / AAC / DSF / DFF (태그·커버·트랙번호 인식)
@@ -48,9 +58,9 @@ Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=<이름 일�
 터미널 3개:
 
 ```powershell
-dotnet run --project src/Auralis.Core
-dotnet run --project src/Auralis.Control
-dotnet run --project src/Auralis.Output -- --room=<룸ID>
+dotnet run --project src/Mono.Core
+dotnet run --project src/Mono.Control
+dotnet run --project src/Mono.Output -- --room=<룸ID>
 ```
 
 Control CLI 예시:
@@ -82,9 +92,11 @@ clock offset=-0.16ms jitter=0.33ms rtt=1.96ms target=6ms depth=20ms resync=0 dro
 | `GET /api/art/{trackId}` | 앨범 아트 캐시 |
 | `GET /api/m3u/{playlistId}` | 플레이리스트 M3U 내보내기 |
 | `GET /api/session/{archiveId}` | 세션 요약(트랙 식별자·메타만) |
+| `GET /api/reactions/{trackId}` | 트랙의 전체 반응 히트맵(10초 버킷) |
+| `GET /api/wiki/{artistId}` | 위키백과 아티스트 이력 요약(ko→en 폴백) |
 
 ## 테스트
 
 ```powershell
-dotnet test Auralis.slnx
+dotnet test Mono.slnx
 ```
