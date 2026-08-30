@@ -40,6 +40,35 @@ public sealed class Artist
     public required string Name { get; set; }
     public List<string> RelatedArtistIds { get; init; } = [];
     public string? Bio { get; set; }
+    /// <summary>다국어 검색용 별칭 — 원어 표기, 로마자, 다른 언어권 표기 등 (예: 요네즈 켄시 ↔ 米津玄師).</summary>
+    public List<string> AlternateNames { get; init; } = [];
+}
+
+/// <summary>위키백과에서 가져온 아티스트 이력 요약 — 저작권상 짧은 발췌 + 출처만 보관한다.</summary>
+public sealed record ArtistWikiSummary(
+    string ArtistId,
+    string Title,
+    string Extract,
+    string SourceUrl,
+    string? ThumbnailUrl,
+    string Lang,
+    DateTimeOffset FetchedAt);
+
+/// <summary>
+/// 멀티 디바이스 존 — 한 사용자가 보유한 여러 출력기기를 묶어 싱글 플레이로 관리한다.
+/// Sync면 존의 모든 기기가 같은 방(룸)에 출력되고, Independent면 기기마다 별도 개인 방을 갖는다.
+/// </summary>
+public sealed class Zone
+{
+    public required string Id { get; init; }
+    public required string Name { get; set; }
+    public required string OwnerPeerId { get; init; }
+    public ZoneMode Mode { get; set; } = ZoneMode.Sync;
+    public List<string> MemberPeerIds { get; init; } = [];
+    /// <summary>Sync 모드에서 존 전원이 출력되는 공유 개인 방.</summary>
+    public string? SyncRoomId { get; set; }
+    /// <summary>Independent 모드에서 기기별로 배정된 개인 방.</summary>
+    public Dictionary<string, string> IndependentRoomIds { get; init; } = [];
 }
 
 public sealed class QueueItem

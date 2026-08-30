@@ -90,6 +90,96 @@ public class RoomAndClockTests
     }
 
     [Fact]
+    public void ReactionsAreCappedAndRestrictedToAllowedEmoji()
+    {
+        var (rooms, _, _, _) = NewStack();
+        var room = rooms.Create("host", "Night", RoomMode.OpenLounge, "H");
+        rooms.Enqueue(room.Id, "host", "tr-blue-train");
+        rooms.Play(room.Id, "host");
+
+        Assert.NotNull(rooms.React(room.Id, "host", "😡").Error);
+
+        for (var i = 0; i < RoomManager.MaxReactionsPerUserPerTrack; i++)
+        {
+            Assert.Null(rooms.React(room.Id, "host", "❤️").Error);
+        }
+
+        var over = rooms.React(room.Id, "host", "🔥");
+        Assert.NotNull(over.Error);
+        Assert.Equal(RoomManager.MaxReactionsPerUserPerTrack, rooms.Get(room.Id)!.Reactions.Count);
+    }
+
+    [Fact]
+    public void SearchMatchesArtistAliasAcrossScripts()
+    {
+        var (_, catalog, _, _) = NewStack();
+        var byAlias = catalog.Search("요네즈 켄시");
+        Assert.Contains(byAlias, t => t.Id == "tr-kanden");
+        var byNative = catalog.Search("米津玄師");
+        Assert.Contains(byNative, t => t.Id == "tr-kanden");
+    }
+
+    [Fact]
+    public void SmartAutoplayProposesCandidatesAndAutoAdvancesOnDeadline()
+    {
+        var (rooms, _, _, _) = NewStack();
+        var room = rooms.Create("host", "Solo", RoomMode.OpenLounge, "H");
+        rooms.Enqueue(room.Id, "host", "tr-blue-train"); // duration 180_000ms, only queue item
+        rooms.Play(room.Id, "host");
+        rooms.Seek(room.Id, "host", 170_000); // 10s left — inside the 40s lead window
+
+        var proposed = rooms.ProposeAutoplayCandidates();
+        Assert.Contains(proposed, r => r.Id == room.Id);
+        var afterPropose = rooms.Get(room.Id)!;
+        Assert.NotEmpty(afterPropose.AutoplayCandidateIds);
+        Assert.DoesNotContain("tr-blue-train", afterPropose.AutoplayCandidateIds);
+
+        var chosenId = afterPropose.AutoplayCandidateIds[0];
+        Assert.Null(rooms.ChooseAutoplay(room.Id, "host", chosenId).Error);
+
+        rooms.Seek(room.Id, "host", 180_000); // track finished
+        var advanced = rooms.AdvanceFinished();
+        Assert.Contains(advanced, r => r.Id == room.Id);
+
+        var final = rooms.Get(room.Id)!;
+        Assert.True(final.Playing);
+        Assert.Equal(chosenId, final.Queue[final.QueueIndex].TrackId);
+        Assert.Empty(final.AutoplayCandidateIds); // 다음 트랙 시작과 함께 초기화됨
+    }
+
+    [Fact]
+    public void ZoneMembershipMovesConnectedOutputIntoSyncRoom()
+    {
+        var (rooms, catalog, history, streaming) = NewStack();
+        var dir = Path.Combine(Path.GetTempPath(), "mono-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        var endpoints = new EndpointRegistry(Path.Combine(dir, "e.db"));
+        var zones = new ZoneRegistry(Path.Combine(dir, "z.db"));
+
+        var soloRoom = rooms.Create("owner", "solo-desk", RoomMode.OpenLounge, "Owner");
+        var cap = new OutputCapability { PeerId = "dac-1", DisplayName = "Desk DAC" };
+        rooms.Join(soloRoom.Id, "dac-1", PeerRole.Output, null, "Desk DAC");
+        rooms.RegisterOutput(soloRoom.Id, cap);
+        Assert.Contains("dac-1", soloRoom.Outputs.Keys);
+
+        var zone = zones.Create("owner", "Study");
+        zones.AddMember(zone.Id, "dac-1");
+        var moved = rooms.LeaveCurrentRoomAsOutput("dac-1"); // 존 배정 전, 실제 배정은 CommandProcessor가 orchestrate
+        Assert.NotNull(moved);
+        Assert.DoesNotContain("dac-1", soloRoom.Outputs.Keys);
+
+        var created = rooms.Create(zone.OwnerPeerId, zone.Name, RoomMode.OpenLounge, null);
+        zones.SetSyncRoom(zone.Id, created.Id);
+        rooms.Join(created.Id, "dac-1", PeerRole.Output, null, cap.DisplayName);
+        rooms.RegisterOutput(created.Id, cap);
+
+        var stored = zones.Get(zone.Id)!;
+        Assert.Equal(created.Id, stored.SyncRoomId);
+        Assert.Contains("dac-1", stored.MemberPeerIds);
+        Assert.Contains("dac-1", rooms.Get(created.Id)!.Outputs.Keys);
+    }
+
+    [Fact]
     public void AnonymizedArchiveDropsAuthorsAndChat()
     {
         var (rooms, _, _, _) = NewStack();

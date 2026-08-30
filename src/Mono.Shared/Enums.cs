@@ -68,3 +68,12 @@ public enum StreamingQuality
     Max,
     Studio
 }
+
+/// <summary>멀티 디바이스 존의 재생 방식 — 싱글 플레이 전용.</summary>
+public enum ZoneMode
+{
+    /// <summary>존에 속한 모든 기기가 같은 음원을 동시 재생한다.</summary>
+    Sync,
+    /// <summary>기기마다 각자 다른 음원을 독립적으로 재생한다.</summary>
+    Independent
+}

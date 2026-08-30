@@ -188,5 +188,14 @@ public sealed class MonoMessage
     [JsonPropertyName("trackIds")]
     public List<string>? TrackIds { get; set; }
 
+    [JsonPropertyName("zoneId")]
+    public string? ZoneId { get; set; }
+
+    [JsonPropertyName("zoneMode")]
+    public ZoneMode? ZoneMode { get; set; }
+
+    [JsonPropertyName("deadlineUnixMs")]
+    public long? DeadlineUnixMs { get; set; }
+
     public static MonoMessage Event(string type) => new() { Type = type };
 }

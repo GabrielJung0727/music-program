@@ -34,6 +34,11 @@ public sealed class TransportService : BackgroundService
                     await _broadcaster.PublishAsync(room, stoppingToken);
                 }
 
+                foreach (var room in _rooms.ProposeAutoplayCandidates())
+                {
+                    await _broadcaster.PublishAsync(room, stoppingToken);
+                }
+
                 if (DateTimeOffset.UtcNow - _lastTimeline > TimeSpan.FromSeconds(2))
                 {
                     _lastTimeline = DateTimeOffset.UtcNow;

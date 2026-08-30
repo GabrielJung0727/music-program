@@ -163,6 +163,18 @@ public sealed class RoomManager
         lock (_gate)
         {
             _endpoints?.Offline(peerId);
+            return LeaveCurrentRoomAsOutput(peerId);
+        }
+    }
+
+    /// <summary>
+    /// Output을 지금 있는 방에서만 빼낸다 — 소켓은 계속 연결돼 있으므로 엔드포인트 레지스트리의
+    /// 온라인 상태는 건드리지 않는다. 존(Zone) 재배정처럼 살아있는 기기를 다른 방으로 옮길 때 쓴다.
+    /// </summary>
+    public ListeningRoom? LeaveCurrentRoomAsOutput(string peerId)
+    {
+        lock (_gate)
+        {
             var room = _rooms.Values.FirstOrDefault(r => r.Outputs.ContainsKey(peerId) || r.OutputPeerIds.Contains(peerId));
             if (room is null)
             {
@@ -671,8 +683,16 @@ public sealed class RoomManager
                 }
 
                 MarkComplete(room, forceComplete: true);
-                if (room.AutoAdvance && room.QueueIndex + 1 < room.Queue.Count)
+                var isLastQueued = room.QueueIndex + 1 >= room.Queue.Count;
+                if (room.AutoAdvance && !isLastQueued)
                 {
+                    room.QueueIndex++;
+                    StartTrackTimeline(room, 0);
+                    NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
+                }
+                else if (room.AutoAdvance && isLastQueued && PickAutoplayNext(room) is { } nextTrackId)
+                {
+                    room.Queue.Add(new QueueItem { Id = Guid.NewGuid().ToString("n")[..8], TrackId = nextTrackId, AddedByPeerId = "autoplay" });
                     room.QueueIndex++;
                     StartTrackTimeline(room, 0);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
@@ -688,6 +708,92 @@ public sealed class RoomManager
             }
 
             return changed;
+        }
+    }
+
+    private static string? PickAutoplayNext(ListeningRoom room)
+    {
+        if (room.AutoplayCandidateIds.Count == 0)
+        {
+            return null;
+        }
+
+        return room.AutoplayChosenId is { } chosen && room.AutoplayCandidateIds.Contains(chosen)
+            ? chosen
+            : room.AutoplayCandidateIds[0];
+    }
+
+    /// <summary>
+    /// 스마트 선택형 오토플레이 — 곡이 끝나기 40초 전, 큐의 마지막 곡이면 후보 3곡을 제시한다.
+    /// 무응답이면 1번 후보가 자동 재생되고, 선택하면 그 곡이 재생된다. 변경된 룸만 돌려준다.
+    /// </summary>
+    public const long AutoplayLeadTimeMs = 40_000;
+
+    public IReadOnlyList<ListeningRoom> ProposeAutoplayCandidates()
+    {
+        lock (_gate)
+        {
+            var changed = new List<ListeningRoom>();
+            foreach (var room in _rooms.Values)
+            {
+                if (!room.Playing || !room.SmartAutoplay)
+                {
+                    continue;
+                }
+
+                var track = room.CurrentTrack(_catalog.Tracks);
+                if (track is null || room.QueueIndex + 1 < room.Queue.Count)
+                {
+                    continue;
+                }
+
+                if (room.AutoplayProposedForTrackId == track.Id)
+                {
+                    continue;
+                }
+
+                var duration = EffectiveDuration(track);
+                var remaining = duration - room.CurrentMediaTimeMs();
+                if (remaining > AutoplayLeadTimeMs || remaining <= 0)
+                {
+                    continue;
+                }
+
+                var exclude = room.PlayedTrackIds.Concat(room.Queue.Select(q => q.TrackId)).Append(track.Id);
+                var candidates = _catalog.Recommend(track.Id, exclude, 3);
+                if (candidates.Count == 0)
+                {
+                    continue;
+                }
+
+                room.AutoplayProposedForTrackId = track.Id;
+                room.AutoplayCandidateIds.Clear();
+                room.AutoplayCandidateIds.AddRange(candidates.Select(t => t.Id));
+                room.AutoplayDeadlineUnixMs = ClockSync.UnixMs() + remaining;
+                room.AutoplayChosenId = null;
+                changed.Add(room);
+            }
+
+            return changed;
+        }
+    }
+
+    public (ListeningRoom? Room, string? Error) ChooseAutoplay(string roomId, string peerId, string trackId)
+    {
+        lock (_gate)
+        {
+            if (!TryRoom(roomId, out var room, out var err))
+            {
+                return (null, err);
+            }
+
+            if (!room.AutoplayCandidateIds.Contains(trackId))
+            {
+                return (null, "이 곡은 오토플레이 후보가 아닙니다");
+            }
+
+            room.AutoplayChosenId = trackId;
+            return (room, null);
         }
     }
 
@@ -771,6 +877,15 @@ public sealed class RoomManager
         }
     }
 
+    /// <summary>
+    /// 허용된 긍정 반응 이모지만 받는다 — 혐오·불쾌 표현을 막기 위한 화이트리스트.
+    /// 하트/축포/박수/불꽃으로 제한해 "가장 좋았던 구간" 집계가 오염되지 않게 한다.
+    /// </summary>
+    public static readonly IReadOnlyList<string> AllowedReactionEmoji = ["❤️", "🎉", "👏", "🔥"];
+
+    /// <summary>곡당 유저당 반응 상한 — 진짜 좋았던 구간만 남도록 3개로 제한한다.</summary>
+    public const int MaxReactionsPerUserPerTrack = 3;
+
     public (ListeningRoom? Room, string? Error) React(string roomId, string peerId, string emoji)
     {
         lock (_gate)
@@ -780,14 +895,64 @@ public sealed class RoomManager
                 return (null, err);
             }
 
+            if (!AllowedReactionEmoji.Contains(emoji))
+            {
+                return (null, "허용되지 않은 이모지입니다 (❤️ 🎉 👏 🔥 만 가능)");
+            }
+
             var track = room.CurrentTrack(_catalog.Tracks);
             if (track is null)
             {
                 return (null, "nothing is queued");
             }
 
+            var used = room.Reactions.Count(r => r.PeerId == peerId && r.TrackId == track.Id);
+            if (used >= MaxReactionsPerUserPerTrack)
+            {
+                return (null, $"이 곡에는 이미 {MaxReactionsPerUserPerTrack}번 반응했습니다");
+            }
+
             room.Reactions.Add(new Reaction(peerId, track.Id, emoji, DateTimeOffset.UtcNow, room.CurrentMediaTimeMs()));
             return (room, null);
+        }
+    }
+
+    /// <summary>
+    /// 유튜브 "가장 많이 다시 본 구간"처럼, 현재 트랙에서 반응·핀이 몰린 구간을 10초 버킷으로 집계한다.
+    /// 지금 룸의 반응뿐 아니라 과거 세션 아카이브까지 합쳐 트랙 전체 히스토리를 반영한다.
+    /// </summary>
+    public IReadOnlyList<SegmentHit> ReactionHeatmap(ListeningRoom room, IEnumerable<SegmentHit> archivedHits)
+    {
+        lock (_gate)
+        {
+            var track = room.CurrentTrack(_catalog.Tracks);
+            if (track is null)
+            {
+                return [];
+            }
+
+            const long bucket = 10_000;
+            var hits = new Dictionary<long, int>();
+            foreach (var reaction in room.Reactions.Where(r => r.TrackId == track.Id))
+            {
+                var key = reaction.MediaTimeMs / bucket * bucket;
+                hits[key] = hits.GetValueOrDefault(key) + 1;
+            }
+
+            foreach (var pin in room.Pins.Where(p => p.TrackId == track.Id))
+            {
+                var key = pin.MediaTimeMs / bucket * bucket;
+                hits[key] = hits.GetValueOrDefault(key) + 1;
+            }
+
+            foreach (var hit in archivedHits.Where(h => h.TrackId == track.Id))
+            {
+                hits[hit.BucketMs] = hits.GetValueOrDefault(hit.BucketMs) + hit.Count;
+            }
+
+            return hits.OrderBy(kv => kv.Key)
+                .Select(kv => new SegmentHit(track.Id, kv.Key, kv.Value))
+                .ToList();
         }
     }
 
@@ -1287,6 +1452,20 @@ public sealed class RoomManager
                 onCurrentTrack = track is not null && p.TrackId == track.Id
             }),
             reactions = room.Reactions.TakeLast(50),
+            reactionCounts = track is null
+                ? []
+                : room.Reactions.Where(r => r.TrackId == track.Id)
+                    .GroupBy(r => r.Emoji)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+            allowedReactionEmoji = AllowedReactionEmoji,
+            heatmap = track is null ? [] : ReactionHeatmap(room, []),
+            smartAutoplay = room.SmartAutoplay,
+            autoplay = room.AutoplayCandidateIds.Count == 0 ? null : new
+            {
+                candidates = room.AutoplayCandidateIds.Select(id => tracks.GetValueOrDefault(id)).Where(t => t is not null).Select(t => TrackView(t!)),
+                deadlineUnixMs = room.AutoplayDeadlineUnixMs,
+                chosenId = room.AutoplayChosenId
+            },
             chat = room.Chat.TakeLast(60).Select(c => new
             {
                 c.PeerId,
@@ -1412,6 +1591,10 @@ public sealed class RoomManager
         room.MediaTimeAtOriginMs = Math.Max(0, mediaTimeMs);
         room.MediaOriginUnixMs = ClockSync.UnixMs();
         room.ResyncEpoch++;
+        room.AutoplayProposedForTrackId = null;
+        room.AutoplayCandidateIds.Clear();
+        room.AutoplayDeadlineUnixMs = null;
+        room.AutoplayChosenId = null;
         var track = room.CurrentTrack(_catalog.Tracks);
         if (track is not null)
         {

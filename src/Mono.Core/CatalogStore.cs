@@ -21,7 +21,7 @@ public sealed class CatalogStore : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
         using var con = Open();
         con.Execute("""
-            CREATE TABLE IF NOT EXISTS artists (id TEXT PRIMARY KEY, name TEXT, related TEXT, bio TEXT);
+            CREATE TABLE IF NOT EXISTS artists (id TEXT PRIMARY KEY, name TEXT, related TEXT, bio TEXT, aliases TEXT);
             CREATE TABLE IF NOT EXISTS albums (id TEXT PRIMARY KEY, title TEXT, artist_id TEXT, liner TEXT, label TEXT, year INT, credits TEXT, art TEXT);
             CREATE TABLE IF NOT EXISTS tracks (
               id TEXT PRIMARY KEY, title TEXT, album_id TEXT, artist_id TEXT,
@@ -82,6 +82,7 @@ public sealed class CatalogStore : IDisposable
             }
 
             var q = query.Trim();
+            var qNorm = NormalizeForSearch(q);
             return _tracks.Values.Where(t =>
             {
                 var album = _albums.GetValueOrDefault(t.AlbumId);
@@ -90,8 +91,94 @@ public sealed class CatalogStore : IDisposable
                     || (album?.Title.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (album?.Label?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (album?.Credits?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (artist?.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false);
+                    || (artist?.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || MatchesAlias(artist, qNorm);
             }).ToList();
+        }
+    }
+
+    /// <summary>
+    /// 다국어 아티스트 검색 — 한국어 표기로 원어(가나·한자·로마자) 아티스트를 찾을 수 있도록
+    /// 별칭 목록(Artist.AlternateNames)을 함께 매칭한다. 공백/대소문자 차이를 무시한다.
+    /// 완전한 자동 음역(발음 변환) 엔진이 아니라, 등록된 별칭 기반 매칭이다.
+    /// </summary>
+    private static bool MatchesAlias(Artist? artist, string qNorm)
+    {
+        if (artist is null || qNorm.Length == 0)
+        {
+            return false;
+        }
+
+        if (NormalizeForSearch(artist.Name).Contains(qNorm, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return artist.AlternateNames.Any(a => NormalizeForSearch(a).Contains(qNorm, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeForSearch(string s)
+        => new string(s.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
+
+    /// <summary>
+    /// 아티스트에 다국어 별칭을 추가/치환한다. 라이브러리 스캔이나 관리자 도구에서 호출한다.
+    /// </summary>
+    public bool SetArtistAliases(string artistId, IEnumerable<string> aliases)
+    {
+        lock (_gate)
+        {
+            if (!_artists.TryGetValue(artistId, out var artist))
+            {
+                return false;
+            }
+
+            using var con = Open();
+            var updated = new Artist
+            {
+                Id = artist.Id,
+                Name = artist.Name,
+                RelatedArtistIds = artist.RelatedArtistIds,
+                Bio = artist.Bio,
+                AlternateNames = aliases.Select(a => a.Trim()).Where(a => a.Length > 0).Distinct().ToList()
+            };
+            UpsertArtist(con, updated);
+            _artists[artistId] = updated;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 스마트 오토플레이용 다음 곡 후보. 같은 아티스트 → 연관 아티스트 → 그 외 순으로
+    /// 이미 재생한 트랙을 피해 최대 count개를 고른다.
+    /// </summary>
+    public IReadOnlyList<Track> Recommend(string? seedTrackId, IEnumerable<string> excludeTrackIds, int count)
+    {
+        lock (_gate)
+        {
+            var exclude = new HashSet<string>(excludeTrackIds);
+            var seed = seedTrackId is null ? null : _tracks.GetValueOrDefault(seedTrackId);
+            var picks = new List<Track>();
+
+            if (seed is not null)
+            {
+                picks.AddRange(_tracks.Values
+                    .Where(t => t.ArtistId == seed.ArtistId && !exclude.Contains(t.Id))
+                    .OrderBy(_ => Random.Shared.Next()));
+
+                if (_artists.TryGetValue(seed.ArtistId, out var artist))
+                {
+                    var relatedIds = new HashSet<string>(artist.RelatedArtistIds);
+                    picks.AddRange(_tracks.Values
+                        .Where(t => relatedIds.Contains(t.ArtistId) && !exclude.Contains(t.Id))
+                        .OrderBy(_ => Random.Shared.Next()));
+                }
+            }
+
+            picks.AddRange(_tracks.Values
+                .Where(t => !exclude.Contains(t.Id))
+                .OrderBy(_ => Random.Shared.Next()));
+
+            return picks.DistinctBy(t => t.Id).Take(Math.Max(0, count)).ToList();
         }
     }
 
@@ -192,6 +279,15 @@ public sealed class CatalogStore : IDisposable
         {
             // 이미 있는 컬럼.
         }
+
+        try
+        {
+            con.Execute("ALTER TABLE artists ADD COLUMN aliases TEXT");
+        }
+        catch (SqliteException)
+        {
+            // 이미 있는 컬럼.
+        }
     }
 
     private void Load(SqliteConnection con)
@@ -201,17 +297,19 @@ public sealed class CatalogStore : IDisposable
         _tracks.Clear();
         using (var cmd = con.CreateCommand())
         {
-            cmd.CommandText = "SELECT id,name,related,bio FROM artists";
+            cmd.CommandText = "SELECT id,name,related,bio,aliases FROM artists";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
                 var related = r.IsDBNull(2) ? [] : r.GetString(2).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+                var aliases = r.IsDBNull(4) ? [] : r.GetString(4).Split(';', StringSplitOptions.RemoveEmptyEntries).ToList();
                 _artists[r.GetString(0)] = new Artist
                 {
                     Id = r.GetString(0),
                     Name = r.GetString(1),
                     RelatedArtistIds = related,
-                    Bio = r.IsDBNull(3) ? null : r.GetString(3)
+                    Bio = r.IsDBNull(3) ? null : r.GetString(3),
+                    AlternateNames = aliases
                 };
             }
         }
@@ -271,8 +369,11 @@ public sealed class CatalogStore : IDisposable
     {
         var coltrane = new Artist { Id = "ar-coltrane", Name = "John Coltrane", RelatedArtistIds = ["ar-miles"], Bio = "Saxophone, modal and sheets of sound." };
         var miles = new Artist { Id = "ar-miles", Name = "Miles Davis", RelatedArtistIds = ["ar-coltrane"], Bio = "Trumpet, Kind of Blue through fusion." };
+        // 다국어 검색 예시: 한국어 표기(요네즈 켄시)로 원어 아티스트(米津玄師)를 찾을 수 있다.
+        var yonezu = new Artist { Id = "ar-yonezu", Name = "米津玄師", AlternateNames = ["요네즈 켄시", "Kenshi Yonezu", "よねづ けんし"], Bio = "Singer-songwriter and vocaloid producer (Hachi)." };
         UpsertArtist(con, coltrane);
         UpsertArtist(con, miles);
+        UpsertArtist(con, yonezu);
         var blue = new Album
         {
             Id = "al-blue-train",
@@ -293,8 +394,18 @@ public sealed class CatalogStore : IDisposable
             Year = 1959,
             Credits = "Davis, Coltrane, Adderley, Evans, Chambers, Cobb"
         };
+        var stray = new Album
+        {
+            Id = "al-stray-sheep",
+            Title = "STRAY SHEEP",
+            ArtistId = yonezu.Id,
+            Label = "Sony Music",
+            Year = 2020,
+            Credits = "米津玄師"
+        };
         UpsertAlbum(con, blue);
         UpsertAlbum(con, kob);
+        UpsertAlbum(con, stray);
         SeedTrack(con, "tr-blue-train", "Blue Train", blue, coltrane, 96000, 24, false, 180000, 1,
             "[00:00.00]Piano figure\n[00:12.00]Horn entrance — the room leans in\n[00:48.00]Head, full band\n[01:30.00]Tenor solo");
         SeedTrack(con, "tr-moment-notice", "Moment's Notice", blue, coltrane, 96000, 24, false, 160000, 2,
@@ -302,6 +413,7 @@ public sealed class CatalogStore : IDisposable
         SeedTrack(con, "tr-so-what", "So What", kob, miles, 44100, 16, false, 200000, 1,
             "[00:00.00]Bass riff\n[00:18.00]Piano answer\n[00:32.00]Horns, So What");
         SeedTrack(con, "tr-dsd-demo", "DSD Demo (native)", kob, miles, 2822400, 1, true, 120000, 2, null);
+        SeedTrack(con, "tr-kanden", "感電", stray, yonezu, 44100, 16, false, 208000, 1, null);
     }
 
     private static void SeedTrack(SqliteConnection con, string id, string title, Album album, Artist artist, int sr, int bd, bool dsd, long dur, int no, string? lrc)
@@ -316,8 +428,9 @@ public sealed class CatalogStore : IDisposable
 
     private static void UpsertArtist(SqliteConnection con, Artist artist)
         => con.Execute(
-            "INSERT INTO artists(id,name,related,bio) VALUES($id,$n,$r,$b) ON CONFLICT(id) DO UPDATE SET name=$n, related=$r, bio=$b",
-            ("$id", artist.Id), ("$n", artist.Name), ("$r", string.Join(',', artist.RelatedArtistIds)), ("$b", artist.Bio));
+            "INSERT INTO artists(id,name,related,bio,aliases) VALUES($id,$n,$r,$b,$al) ON CONFLICT(id) DO UPDATE SET name=$n, related=$r, bio=$b, aliases=$al",
+            ("$id", artist.Id), ("$n", artist.Name), ("$r", string.Join(',', artist.RelatedArtistIds)), ("$b", artist.Bio),
+            ("$al", string.Join(';', artist.AlternateNames)));
 
     private static void UpsertAlbum(SqliteConnection con, Album album)
         => con.Execute(

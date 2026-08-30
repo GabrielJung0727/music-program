@@ -52,12 +52,27 @@ public static class MessageTypes
     public const string FollowHost = "follow_host";
     public const string LinerPage = "liner_page";
 
+    // 스마트 오토플레이
+    public const string AutoplayCandidates = "autoplay_candidates";
+    public const string ChooseAutoplay = "choose_autoplay";
+
     // 카탈로그 · 라이브러리
     public const string Catalog = "catalog";
     public const string Search = "search";
     public const string Graph = "graph";
     public const string ScanLibrary = "scan_library";
     public const string LinkStreaming = "link_streaming";
+    public const string ReactionHeatmap = "reaction_heatmap";
+    public const string WikiBio = "wiki_bio";
+
+    // 멀티 디바이스 존 (싱글 플레이)
+    public const string CreateZone = "create_zone";
+    public const string RenameZone = "rename_zone";
+    public const string SetZoneMode = "set_zone_mode";
+    public const string ZoneAddMember = "zone_add_member";
+    public const string ZoneRemoveMember = "zone_remove_member";
+    public const string DeleteZone = "delete_zone";
+    public const string ListZones = "list_zones";
 
     // 아카이브 · 개인 라이브러리
     public const string EndSession = "end_session";

@@ -18,6 +18,8 @@ public sealed class CommandProcessor
     private readonly PairingService _pairing;
     private readonly HistoryStore _history;
     private readonly EndpointRegistry _endpoints;
+    private readonly ZoneRegistry _zones;
+    private readonly WikipediaService _wiki;
     private readonly string _libraryRoot;
     private readonly ConcurrentDictionary<string, string> _peerRoom = new();
 
@@ -29,6 +31,8 @@ public sealed class CommandProcessor
         PairingService pairing,
         HistoryStore history,
         EndpointRegistry endpoints,
+        ZoneRegistry zones,
+        WikipediaService wiki,
         string libraryRoot)
     {
         _rooms = rooms;
@@ -38,6 +42,8 @@ public sealed class CommandProcessor
         _pairing = pairing;
         _history = history;
         _endpoints = endpoints;
+        _zones = zones;
+        _wiki = wiki;
         _libraryRoot = libraryRoot;
     }
 
@@ -174,6 +180,10 @@ public sealed class CommandProcessor
             case MessageTypes.LinerPage:
                 return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r => r.LinerPage = msg.Index ?? 0));
 
+            // ── 스마트 오토플레이 ────────────────────────────────
+            case MessageTypes.ChooseAutoplay:
+                return From(_rooms.ChooseAutoplay(NeedRoom(peerId, msg), peerId, msg.TrackId ?? ""));
+
             // ── 호스트 설정 ─────────────────────────────────────
             case MessageTypes.SetDsp:
                 return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
@@ -263,6 +273,93 @@ public sealed class CommandProcessor
                     Type = MessageTypes.Graph,
                     Body = JsonSerializer.Serialize(_catalog.Graph(msg.Text ?? ""), LineFraming.JsonOptions)
                 });
+
+            // ── 반응 히트맵 · 위키백과 ────────────────────────────
+            case MessageTypes.ReactionHeatmap:
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.ReactionHeatmap,
+                    TrackId = msg.TrackId,
+                    Body = JsonSerializer.Serialize(_history.TrackHeatmap(msg.TrackId ?? ""), LineFraming.JsonOptions)
+                });
+
+            case MessageTypes.WikiBio:
+            {
+                var wikiArtist = _catalog.Artists.GetValueOrDefault(msg.Text ?? "");
+                if (wikiArtist is null)
+                {
+                    return Fail("unknown artist");
+                }
+
+                // 위키 API 호출은 이 커맨드 처리 스레드에서만 블로킹된다 — 오디오 경로(FanOut/DSP)와 분리되어 있어 안전하다.
+                var summary = _wiki.GetSummaryAsync(wikiArtist.Id, wikiArtist.Name).GetAwaiter().GetResult();
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.WikiBio,
+                    Text = wikiArtist.Id,
+                    Ok = summary is not null,
+                    Body = summary is null ? null : JsonSerializer.Serialize(summary, LineFraming.JsonOptions)
+                });
+            }
+
+            // ── 멀티 디바이스 존 (싱글 플레이) ────────────────────
+            case MessageTypes.CreateZone:
+                _zones.Create(peerId, string.IsNullOrWhiteSpace(msg.Text) ? "My Zone" : msg.Text);
+                return Direct(ZonesMessage(peerId));
+
+            case MessageTypes.RenameZone:
+                if (msg.ZoneId is null) return Fail("zoneId required");
+                _zones.Rename(msg.ZoneId, msg.Text ?? "Zone");
+                return Direct(ZonesMessage(peerId));
+
+            case MessageTypes.SetZoneMode:
+                if (msg.ZoneId is null) return Fail("zoneId required");
+                _zones.SetMode(msg.ZoneId, msg.ZoneMode ?? Mono.Shared.ZoneMode.Sync);
+                return Direct(ZonesMessage(peerId));
+
+            case MessageTypes.ZoneAddMember:
+            {
+                if (msg.ZoneId is null || string.IsNullOrWhiteSpace(msg.TargetPeerId))
+                {
+                    return Fail("zoneId and targetPeerId required");
+                }
+
+                var zone = _zones.Get(msg.ZoneId);
+                if (zone is null || zone.OwnerPeerId != peerId)
+                {
+                    return Fail("zone not found");
+                }
+
+                _zones.AddMember(zone.Id, msg.TargetPeerId);
+                var (movedRoom, moveErr) = MoveDeviceIntoZone(zone, msg.TargetPeerId);
+                return moveErr is not null
+                    ? new CommandResult(movedRoom, ZonesMessage(peerId), null)
+                    : new CommandResult(movedRoom, ZonesMessage(peerId));
+            }
+
+            case MessageTypes.ZoneRemoveMember:
+            {
+                if (msg.ZoneId is null || string.IsNullOrWhiteSpace(msg.TargetPeerId))
+                {
+                    return Fail("zoneId and targetPeerId required");
+                }
+
+                _zones.RemoveMember(msg.ZoneId, msg.TargetPeerId);
+                var leftRoom = _rooms.LeaveCurrentRoomAsOutput(msg.TargetPeerId);
+                return new CommandResult(leftRoom, ZonesMessage(peerId));
+            }
+
+            case MessageTypes.DeleteZone:
+                if (msg.ZoneId is null) return Fail("zoneId required");
+                foreach (var member in _zones.Get(msg.ZoneId)?.MemberPeerIds ?? [])
+                {
+                    _rooms.LeaveCurrentRoomAsOutput(member);
+                }
+                _zones.Delete(msg.ZoneId);
+                return Direct(ZonesMessage(peerId));
+
+            case MessageTypes.ListZones:
+                return Direct(ZonesMessage(peerId));
 
             case MessageTypes.ScanLibrary:
             {
@@ -483,6 +580,92 @@ public sealed class CommandProcessor
             default:
                 return Fail($"unknown type {msg.Type}");
         }
+    }
+
+    private MonoMessage ZonesMessage(string ownerPeerId) => new()
+    {
+        Type = MessageTypes.ListZones,
+        Body = JsonSerializer.Serialize(_zones.ForOwner(ownerPeerId).Select(z => new
+        {
+            z.Id,
+            z.Name,
+            z.Mode,
+            z.SyncRoomId,
+            members = z.MemberPeerIds.Select(id => new
+            {
+                peerId = id,
+                name = _endpoints.All().FirstOrDefault(e => e.PeerId == id)?.DisplayName ?? id,
+                online = _endpoints.All().FirstOrDefault(e => e.PeerId == id)?.Online ?? false,
+                roomId = z.Mode == Mono.Shared.ZoneMode.Sync ? z.SyncRoomId : z.IndependentRoomIds.GetValueOrDefault(id)
+            })
+        }), LineFraming.JsonOptions)
+    };
+
+    /// <summary>
+    /// 존 멤버 기기를 존이 관리하는 방으로 옮긴다. Sync면 존 전체가 공유하는 개인 방으로,
+    /// Independent면 그 기기만의 개인 방으로 — 필요하면 방을 새로 만든다.
+    /// 기기가 지금 연결돼 있지 않으면(캐패빌리티를 모르면) 구성만 저장해두고 다음 접속 때 반영한다.
+    /// </summary>
+    private (ListeningRoom? Room, string? Error) MoveDeviceIntoZone(Zone zone, string devicePeerId)
+    {
+        var cap = _rooms.List().SelectMany(r => r.Outputs.Values).FirstOrDefault(c => c.PeerId == devicePeerId);
+        if (cap is null)
+        {
+            var record = _endpoints.All().FirstOrDefault(e => e.PeerId == devicePeerId);
+            if (record is null || !record.Online)
+            {
+                return (null, null); // 아직 연결되지 않은 기기 — 등록만 해 두고 다음 접속 때 반영
+            }
+
+            cap = new OutputCapability
+            {
+                PeerId = record.PeerId,
+                DisplayName = record.DisplayName,
+                MaxSampleRate = record.MaxSampleRate,
+                MaxBitDepth = record.MaxBitDepth,
+                SupportsDsd = record.SupportsDsd,
+                ExclusiveMode = record.ExclusiveMode,
+                ReportedLatencyMs = record.LatencyMs,
+                HardwareVolume = record.HardwareVolume,
+                VolumePercent = record.VolumePercent,
+                Device = record.Device
+            };
+        }
+
+        _rooms.LeaveCurrentRoomAsOutput(devicePeerId);
+
+        string targetRoomId;
+        if (zone.Mode == Mono.Shared.ZoneMode.Sync)
+        {
+            if (zone.SyncRoomId is null || _rooms.Get(zone.SyncRoomId) is null)
+            {
+                var created = _rooms.Create(zone.OwnerPeerId, zone.Name, RoomMode.OpenLounge, null);
+                _zones.SetSyncRoom(zone.Id, created.Id);
+                targetRoomId = created.Id;
+            }
+            else
+            {
+                targetRoomId = zone.SyncRoomId;
+            }
+        }
+        else
+        {
+            var existing = zone.IndependentRoomIds.GetValueOrDefault(devicePeerId);
+            if (existing is null || _rooms.Get(existing) is null)
+            {
+                var created = _rooms.Create(zone.OwnerPeerId, $"{zone.Name} · {cap.DisplayName}", RoomMode.OpenLounge, null);
+                _zones.SetIndependentRoom(zone.Id, devicePeerId, created.Id);
+                targetRoomId = created.Id;
+            }
+            else
+            {
+                targetRoomId = existing;
+            }
+        }
+
+        _rooms.Join(targetRoomId, devicePeerId, PeerRole.Output, null, cap.DisplayName);
+        var (room, error) = _rooms.RegisterOutput(targetRoomId, cap);
+        return (room, error);
     }
 
     public MonoMessage CatalogMessage() => new()

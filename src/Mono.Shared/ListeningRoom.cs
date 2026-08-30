@@ -17,6 +17,13 @@ public sealed class ListeningRoom
     public bool QueueLocked { get; set; }
     public bool FollowHostView { get; set; }
     public bool AutoAdvance { get; set; } = true;
+    /// <summary>큐가 끝나갈 때 후보 3곡을 제시하는 스마트 오토플레이. 무응답이면 1번 후보를 재생한다.</summary>
+    public bool SmartAutoplay { get; set; } = true;
+    /// <summary>이번에 후보를 제시한 트랙 — 같은 트랙에 중복 제시하지 않기 위한 표식.</summary>
+    public string? AutoplayProposedForTrackId { get; set; }
+    public List<string> AutoplayCandidateIds { get; } = [];
+    public long? AutoplayDeadlineUnixMs { get; set; }
+    public string? AutoplayChosenId { get; set; }
     public int LinerPage { get; set; }
     public int MaxMembers { get; set; } = 16;
     public string? InviteCode { get; set; }

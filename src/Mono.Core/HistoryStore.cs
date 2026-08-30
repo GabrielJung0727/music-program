@@ -138,6 +138,21 @@ public sealed class HistoryStore
 
     public SessionArchive? Archive(string id) => Archives.FirstOrDefault(a => a.Id == id);
 
+    /// <summary>
+    /// 한 트랙의 전체 재생 이력에 걸친 "가장 반응 많은 구간" — 유튜브 하이라이트 그래프처럼
+    /// 과거 세션 전부의 핀·반응을 10초 버킷으로 합산한다. 온디맨드로만 호출한다(스냅샷마다 X).
+    /// </summary>
+    public IReadOnlyList<SegmentHit> TrackHeatmap(string trackId)
+    {
+        var buckets = new Dictionary<long, int>();
+        foreach (var hit in Archives.SelectMany(a => a.Hits).Where(h => h.TrackId == trackId))
+        {
+            buckets[hit.BucketMs] = buckets.GetValueOrDefault(hit.BucketMs) + hit.Count;
+        }
+
+        return buckets.OrderBy(kv => kv.Key).Select(kv => new SegmentHit(trackId, kv.Key, kv.Value)).ToList();
+    }
+
     public IReadOnlyList<UserPlaylist> Playlists
     {
         get

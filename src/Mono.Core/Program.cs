@@ -15,6 +15,8 @@ Directory.CreateDirectory(art);
 builder.Services.AddSingleton(new CatalogStore(Path.Combine(data, "catalog.db")));
 builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db")));
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
+builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
+builder.Services.AddSingleton(new WikipediaService(new HttpClient { Timeout = TimeSpan.FromSeconds(6) }, Path.Combine(data, "wiki")));
 builder.Services.AddSingleton(new ArtworkService(art));
 builder.Services.AddSingleton<LibraryScanner>();
 builder.Services.AddSingleton<StreamingHub>();
@@ -33,6 +35,8 @@ builder.Services.AddSingleton(sp => new CommandProcessor(
     sp.GetRequiredService<PairingService>(),
     sp.GetRequiredService<HistoryStore>(),
     sp.GetRequiredService<EndpointRegistry>(),
+    sp.GetRequiredService<ZoneRegistry>(),
+    sp.GetRequiredService<WikipediaService>(),
     library));
 builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSignalR().AddJsonProtocol(o =>
@@ -113,6 +117,20 @@ app.MapGet("/api/m3u/{playlistId}", (string playlistId, HistoryStore history, Ca
     var body = history.ExportM3u(playlist, catalog);
     var name = new string(playlist.Title.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
     return Results.File(System.Text.Encoding.UTF8.GetBytes(body), "audio/x-mpegurl", $"{name}.m3u");
+});
+
+app.MapGet("/api/reactions/{trackId}", (string trackId, HistoryStore history) => history.TrackHeatmap(trackId));
+
+app.MapGet("/api/wiki/{artistId}", async (string artistId, CatalogStore catalog, WikipediaService wiki) =>
+{
+    var artist = catalog.Artists.GetValueOrDefault(artistId);
+    if (artist is null)
+    {
+        return Results.NotFound();
+    }
+
+    var summary = await wiki.GetSummaryAsync(artist.Id, artist.Name);
+    return summary is null ? Results.NotFound() : Results.Ok(summary);
 });
 
 app.MapGet("/api/session/{archiveId}", (string archiveId, HistoryStore history, CatalogStore catalog) =>
