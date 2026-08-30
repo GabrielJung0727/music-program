@@ -21,6 +21,56 @@ function cycleTheme() {
 }
 initTheme();
 
+// ── 첫 실행 온보딩 ───────────────────────────────────
+const OB_STEPS = 6;
+let obIndex = 0;
+
+function obShow(i) {
+  obIndex = i;
+  document.querySelectorAll(".ob-step").forEach(s => s.hidden = Number(s.dataset.step) !== i);
+  document.querySelectorAll("[data-dot]").forEach(d => d.classList.toggle("on", Number(d.dataset.dot) <= i));
+}
+
+function initOnboarding(force) {
+  if (!force && localStorage.getItem("mono.onboarded")) return;
+  document.getElementById("onboarding").hidden = false;
+  const nameInput = document.getElementById("obName");
+  if (nameInput && !nameInput.value) nameInput.value = localStorage.getItem("mono.name") || "";
+  obShow(0);
+}
+
+function closeOnboarding() {
+  localStorage.setItem("mono.onboarded", "1");
+  document.getElementById("onboarding").hidden = true;
+}
+
+function wireOnboarding() {
+  document.querySelectorAll(".ob-next").forEach(b => b.onclick = () => {
+    if (obIndex === 1) {
+      localStorage.setItem("mono.name", $("obName").value.trim() || "listener");
+    }
+    obShow(Math.min(OB_STEPS - 1, obIndex + 1));
+  });
+  document.querySelectorAll(".ob-skip").forEach(b => b.onclick = () => obShow(Math.min(OB_STEPS - 1, obIndex + 1)));
+  document.querySelector(".ob-finish").onclick = closeOnboarding;
+
+  $("obScan").onclick = () => {
+    if (!hub) return note("연결 중입니다. 잠시 후 다시 시도하세요");
+    send({ type: "scan_library", path: $("obLibPath").value.trim() || null });
+  };
+  $("obZoneCreate").onclick = () => {
+    const name = $("obZoneName").value.trim();
+    if (!name) return;
+    if (!hub) return note("연결 중입니다. 잠시 후 다시 시도하세요");
+    send({ type: "create_zone", text: name });
+    $("obZoneName").value = "";
+  };
+  $("obTidal").onclick = () => hub && send({ type: "link_streaming", provider: 1, token: "demo-token", displayName: "Tidal" });
+  $("obQobuz").onclick = () => hub && send({ type: "link_streaming", provider: 2, token: "demo-token", displayName: "Qobuz" });
+  $("obOutputCmd").textContent = "dotnet run --project src/Mono.Output -- --room=<룸ID>";
+  $("btnOnboard").onclick = () => initOnboarding(true);
+}
+
 let hub = null;
 let state = null;          // 마지막 room_state 스냅샷
 let roomId = null;
@@ -36,6 +86,9 @@ const mmss = (ms) => {
   const total = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
+
+wireOnboarding();
+initOnboarding();
 
 async function start() {
   hub = new signalR.HubConnectionBuilder()
@@ -83,11 +136,14 @@ function onMsg(msg) {
         duration: msg.durationMs ?? clock.duration
       };
       break;
-    case "catalog":
+    case "catalog": {
       try { catalog = JSON.parse(msg.body); } catch { catalog = []; }
-      $("libMeta").textContent = `${catalog.length}곡 · 로컬 ${catalog.filter(t => t.hasLocal).length} · 스트리밍 ${catalog.filter(t => t.source !== 0).length}`;
+      const libSummary = `${catalog.length}곡 · 로컬 ${catalog.filter(t => t.hasLocal).length} · 스트리밍 ${catalog.filter(t => t.source !== 0).length}`;
+      $("libMeta").textContent = libSummary;
+      $("obLibMeta").textContent = libSummary;
       renderCatalog();
       break;
+    }
     case "list_rooms":
       renderRooms(JSON.parse(msg.body || "[]"));
       break;
@@ -391,12 +447,14 @@ function renderRooms(rooms) {
 }
 
 function renderEndpoints(list) {
-  $("endpoints").innerHTML = list.map(e => `
+  const html = list.map(e => `
     <div class="card ${e.online ? "" : "dim"}">
       <b>${esc(e.displayName)}</b> <span class="tag">${e.online ? "온라인" : "오프라인"}</span>
       <small>${e.maxBitDepth}/${e.maxSampleRate}${e.supportsDsd ? " · DSD" : ""} · ${e.exclusiveMode ? "Exclusive" : "Shared"} · ${e.latencyMs}ms</small>
       <small class="dim">${esc(e.device || "")} · ${new Date(e.lastSeen).toLocaleString()}</small>
     </div>`).join("") || `<p class="dim">등록된 기기 없음</p>`;
+  $("endpoints").innerHTML = html;
+  $("obEndpoints").innerHTML = html;
 }
 
 // ── 반응 히트맵 · 스마트 오토플레이 · 존 · 위키 ─────────

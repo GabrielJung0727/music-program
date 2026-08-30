@@ -254,6 +254,29 @@ button.link, .btnlink {
 .liner.wiki .source { display: block; margin-top: 8px; font-size: 11px; color: var(--dim); }
 pre { background: var(--panel2); padding: 12px; border-radius: var(--radius); white-space: pre-wrap; color: var(--dim); font-size: 12px; max-height: 240px; overflow: auto; }
 
+/* 첫 실행 온보딩 */
+.onboarding-overlay {
+  position: fixed; inset: 0; z-index: 50; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.onboarding-overlay[hidden] { display: none; }
+.onboarding-card {
+  width: 100%; max-width: 480px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 36px 32px; box-shadow: var(--shadow);
+}
+.onboarding-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 24px; }
+.onboarding-dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--line); display: block; }
+.onboarding-dots i.on { background: var(--point); }
+.ob-step { text-align: left; }
+.ob-step[data-step="0"], .ob-step[data-step="5"] { text-align: center; }
+.ob-logo { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin-bottom: 18px; }
+.ob-step h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; margin: 0 0 8px; line-height: 1.35; }
+.ob-sub { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0 0 18px; }
+.ob-step .primary { width: auto; padding: 10px 22px; }
+.ob-step[data-step="0"] .primary, .ob-step[data-step="5"] .primary { display: inline-block; }
+.ob-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.ob-actions .ghost { width: auto; }
+
 @media (max-width: 1100px) {
   main { grid-template-columns: 1fr; }
   .col { max-height: none; border-right: 0; border-bottom: 1px solid var(--line); }
