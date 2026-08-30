@@ -11,6 +11,7 @@
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+dist/
 
 *.dll
 *.exe
