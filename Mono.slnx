@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mono.Control/Mono.Control.csproj" />
+    <Project Path="src/Mono.Core/Mono.Core.csproj" />
+    <Project Path="src/Mono.Output/Mono.Output.csproj" />
+    <Project Path="src/Mono.Protocol/Mono.Protocol.csproj" />
+    <Project Path="src/Mono.Shared/Mono.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mono.Tests/Mono.Tests.csproj" />
+  </Folder>
+</Solution>
