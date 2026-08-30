@@ -16,7 +16,10 @@ builder.Services.AddSingleton(new CatalogStore(Path.Combine(data, "catalog.db"))
 builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db")));
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
 builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
-builder.Services.AddSingleton(new WikipediaService(new HttpClient { Timeout = TimeSpan.FromSeconds(6) }, Path.Combine(data, "wiki")));
+var wikiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+// 위키미디어 API 정책상 User-Agent 없는 요청은 403으로 거부된다.
+wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi lounge app; https://github.com/mono-audio)");
+builder.Services.AddSingleton(new WikipediaService(wikiHttp, Path.Combine(data, "wiki")));
 builder.Services.AddSingleton(new ArtworkService(art));
 builder.Services.AddSingleton<LibraryScanner>();
 builder.Services.AddSingleton<StreamingHub>();
@@ -129,7 +132,9 @@ app.MapGet("/api/wiki/{artistId}", async (string artistId, CatalogStore catalog,
         return Results.NotFound();
     }
 
-    var summary = await wiki.GetSummaryAsync(artist.Id, artist.Name);
+    var candidates = new List<string> { artist.Name };
+    candidates.AddRange(artist.AlternateNames);
+    var summary = await wiki.GetSummaryAsync(artist.Id, candidates);
     return summary is null ? Results.NotFound() : Results.Ok(summary);
 });
 

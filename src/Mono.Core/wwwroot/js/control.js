@@ -1,13 +1,34 @@
-// Auralis Control — 화면과 명령만. 오디오는 Output 노드에서 난다.
-const peerId = localStorage.getItem("auralis.peer") || ("web-" + Math.random().toString(16).slice(2, 8));
-localStorage.setItem("auralis.peer", peerId);
-const displayName = localStorage.getItem("auralis.name") || "listener";
+// Mono Control — 화면과 명령만. 오디오는 Output 노드에서 난다.
+const peerId = localStorage.getItem("mono.peer") || ("web-" + Math.random().toString(16).slice(2, 8));
+localStorage.setItem("mono.peer", peerId);
+const displayName = localStorage.getItem("mono.name") || "listener";
+const ALLOWED_EMOJI = ["❤️", "🎉", "👏", "🔥"];
+
+function initTheme() {
+  const saved = localStorage.getItem("mono.theme");
+  if (saved) document.documentElement.dataset.theme = saved;
+}
+function cycleTheme() {
+  const cur = localStorage.getItem("mono.theme") || "system";
+  const next = cur === "system" ? "light" : cur === "light" ? "dark" : "system";
+  if (next === "system") {
+    localStorage.removeItem("mono.theme");
+    delete document.documentElement.dataset.theme;
+  } else {
+    localStorage.setItem("mono.theme", next);
+    document.documentElement.dataset.theme = next;
+  }
+}
+initTheme();
 
 let hub = null;
 let state = null;          // 마지막 room_state 스냅샷
 let roomId = null;
 let catalog = [];
 let clock = { baseMedia: 0, baseLocal: Date.now(), playing: false, duration: 0 };
+let zones = [];
+let knownEndpoints = [];
+let currentArtistId = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -25,6 +46,8 @@ async function start() {
   await hub.start();
   await send({ type: "hello", peerId, role: "control", displayName });
   wire();
+  send({ type: "list_zones" });
+  send({ type: "endpoints" });
   setInterval(tick, 120);
 }
 
@@ -99,7 +122,16 @@ function onMsg(msg) {
       })));
       break;
     case "endpoints":
-      renderEndpoints(JSON.parse(msg.body || "[]"));
+      knownEndpoints = JSON.parse(msg.body || "[]");
+      renderEndpoints(knownEndpoints);
+      renderZoneMemberPicker();
+      break;
+    case "list_zones":
+      zones = JSON.parse(msg.body || "[]");
+      renderZones();
+      break;
+    case "wiki_bio":
+      renderWikiBio(msg);
       break;
     case "graph":
       renderGraphDetail(JSON.parse(msg.body || "{}"));
@@ -138,6 +170,14 @@ function tick() {
   $("remain").textContent = "-" + mmss(Math.max(0, duration - media));
   highlightLyrics(media);
   state.mediaTimeMs = media;
+  tickAutoplayCountdown();
+}
+
+function tickAutoplayCountdown() {
+  const card = $("autoplayCard");
+  if (card.hidden || !card.dataset.deadline) return;
+  const remaining = Math.max(0, Math.round((Number(card.dataset.deadline) - Date.now()) / 1000));
+  $("autoplayCountdown").textContent = remaining + "s";
 }
 
 function highlightLyrics(media) {
@@ -159,6 +199,10 @@ function highlightLyrics(media) {
 function render() {
   if (!state) return;
   const track = state.currentTrack;
+  if (track?.artistId !== currentArtistId) {
+    currentArtistId = track?.artistId || null;
+    $("wikiBio").innerHTML = "";
+  }
   $("badge").textContent = state.pathBadge || "Idle";
   $("badge").classList.toggle("warn", !!state.srcApplied);
   $("roomChip").textContent = `${state.name} · ${modeName(state.mode)} · ${state.sourceMode === 0 ? "Clock-sync" : "Fan-out"}`;
@@ -211,6 +255,9 @@ function render() {
     </div>`).join("") || `<p class="dim">핀 없음</p>`;
   $("pinmarks").innerHTML = (state.pins || []).filter(p => p.onCurrentTrack).map(p =>
     `<i style="left:${Math.min(100, 100 * p.mediaTimeMs / (state.durationMs || 1))}%" title="${esc(p.text)}"></i>`).join("");
+  renderHeatmap(state.heatmap || [], state.durationMs || 0);
+  renderReactionCounts(state.reactionCounts || {});
+  renderAutoplay(state.autoplay);
 
   // 라이너 · 관계도
   $("liner").innerHTML = [
@@ -240,7 +287,7 @@ function render() {
         <span class="tag">${o.volumePercent}%</span>
         <span class="tag">${o.hardwareVolume ? "HW" : "SW"}</span>
       </div>
-    </div>`).join("") || `<p class="dim">붙어 있는 엔드포인트 없음 — dotnet run --project src/Auralis.Output -- --room=${state.id}</p>`;
+    </div>`).join("") || `<p class="dim">붙어 있는 엔드포인트 없음 — dotnet run --project src/Mono.Output -- --room=${state.id}</p>`;
 
   $("members").innerHTML = (state.members || []).map(m => `
     <div class="card">
@@ -266,6 +313,7 @@ function render() {
   toggleFlag("comments", state.commentsAllowed);
   toggleFlag("chat", state.chatCollapsed);
   toggleFlag("auto_advance", state.autoAdvance);
+  toggleFlag("smart_autoplay", state.smartAutoplay);
   toggleFlag("dsp_lock", state.dspLocked);
   toggleFlag("follow_host", state.followHostView);
   $("btnAnon").classList.toggle("on", !!state.anonymizeArchive);
@@ -311,7 +359,8 @@ function bindRoomActions() {
 
 function renderCatalog() {
   const q = ($("search").value || "").toLowerCase();
-  const items = catalog.filter(t => !q || `${t.title} ${t.artist} ${t.album} ${t.label || ""}`.toLowerCase().includes(q));
+  const items = catalog.filter(t => !q ||
+    `${t.title} ${t.artist} ${t.album} ${t.label || ""} ${(t.artistAliases || []).join(" ")}`.toLowerCase().includes(q));
   $("grid").innerHTML = items.slice(0, 400).map(t => `
     <div class="tile" data-id="${t.id}" title="${esc(t.badge)}">
       <div class="cover">${t.artUrl ? `<img src="${t.artUrl}" loading="lazy" alt="">` : "♪"}</div>
@@ -348,6 +397,94 @@ function renderEndpoints(list) {
       <small>${e.maxBitDepth}/${e.maxSampleRate}${e.supportsDsd ? " · DSD" : ""} · ${e.exclusiveMode ? "Exclusive" : "Shared"} · ${e.latencyMs}ms</small>
       <small class="dim">${esc(e.device || "")} · ${new Date(e.lastSeen).toLocaleString()}</small>
     </div>`).join("") || `<p class="dim">등록된 기기 없음</p>`;
+}
+
+// ── 반응 히트맵 · 스마트 오토플레이 · 존 · 위키 ─────────
+function renderHeatmap(hits, durationMs) {
+  const el = $("heatmap");
+  if (!durationMs || hits.length === 0) { el.innerHTML = ""; return; }
+  const bucket = 10_000;
+  const bucketCount = Math.max(1, Math.ceil(durationMs / bucket));
+  const byBucket = new Map(hits.map(h => [Math.floor(h.bucketMs / bucket), h.count]));
+  const max = Math.max(1, ...hits.map(h => h.count));
+  let bars = "";
+  for (let i = 0; i < bucketCount; i++) {
+    const count = byBucket.get(i) || 0;
+    const pct = Math.max(6, Math.round((count / max) * 100));
+    bars += `<i style="height:${pct}%;opacity:${count ? 0.35 + 0.65 * (count / max) : .12}" title="${count ? count + "회 반응" : ""}"></i>`;
+  }
+  el.innerHTML = bars;
+}
+
+function renderReactionCounts(counts) {
+  ALLOWED_EMOJI.forEach(emoji => {
+    const b = document.querySelector(`[data-count="${emoji}"]`);
+    if (b) b.textContent = counts[emoji] || 0;
+  });
+  $("reactMeta").textContent = "곡당 최대 3번";
+}
+
+function renderAutoplay(autoplay) {
+  const card = $("autoplayCard");
+  if (!autoplay) { card.hidden = true; return; }
+  card.hidden = false;
+  card.dataset.deadline = autoplay.deadlineUnixMs || "";
+  $("autoplayChoices").innerHTML = autoplay.candidates.map(t => `
+    <button data-choose="${t.id}" class="${autoplay.chosenId === t.id ? "chosen" : ""}">
+      <b>${esc(t.title)}</b>
+      <small>${esc(t.artistName || "")}</small>
+    </button>`).join("");
+  document.querySelectorAll("[data-choose]").forEach(el =>
+    el.onclick = () => send({ type: "choose_autoplay", trackId: el.dataset.choose }));
+}
+
+function renderZones() {
+  $("zones").innerHTML = zones.map(z => `
+    <div class="card">
+      <b>${esc(z.name)}</b>
+      <span class="qbtns">
+        <button data-zone-mode="${z.id}" data-mode="${z.mode === 0 ? 1 : 0}">${z.mode === 0 ? "Sync" : "Independent"}</button>
+        <button data-zone-del="${z.id}" class="ghost">삭제</button>
+      </span>
+      <div class="list">
+        ${z.members.map(m => `
+          <div class="row tight">
+            <span class="tag ${m.online ? "gold" : ""}">${esc(m.name)}</span>
+            <button data-zone-rm="${z.id}" data-peer="${m.peerId}" class="ghost">빼기</button>
+          </div>`).join("") || `<p class="dim">기기 없음</p>`}
+      </div>
+      <div class="row tight">
+        <select data-zone-add="${z.id}">
+          <option value="">+ 기기 추가</option>
+          ${knownEndpoints.filter(e => !z.members.some(m => m.peerId === e.peerId))
+            .map(e => `<option value="${e.peerId}">${esc(e.displayName)}${e.online ? "" : " (오프라인)"}</option>`).join("")}
+        </select>
+      </div>
+    </div>`).join("") || `<p class="dim">존이 없습니다 — 여러 출력기기를 묶어 함께 재생하세요</p>`;
+
+  document.querySelectorAll("[data-zone-mode]").forEach(el =>
+    el.onclick = () => send({ type: "set_zone_mode", zoneId: el.dataset.zoneMode, zoneMode: Number(el.dataset.mode) }));
+  document.querySelectorAll("[data-zone-del]").forEach(el =>
+    el.onclick = () => send({ type: "delete_zone", zoneId: el.dataset.zoneDel }));
+  document.querySelectorAll("[data-zone-rm]").forEach(el =>
+    el.onclick = () => send({ type: "zone_remove_member", zoneId: el.dataset.zoneRm, targetPeerId: el.dataset.peer }));
+  document.querySelectorAll("[data-zone-add]").forEach(el =>
+    el.onchange = () => { if (el.value) send({ type: "zone_add_member", zoneId: el.dataset.zoneAdd, targetPeerId: el.value }); });
+}
+
+function renderZoneMemberPicker() { renderZones(); }
+
+function renderWikiBio(msg) {
+  if (!msg.ok || !msg.body) {
+    $("wikiBio").innerHTML = `<p class="dim">위키백과에서 이력을 찾지 못했습니다</p>`;
+    return;
+  }
+  const w = JSON.parse(msg.body);
+  $("wikiBio").innerHTML = `
+    ${w.thumbnailUrl ? `<img src="${w.thumbnailUrl}" alt="" />` : ""}
+    <h3>${esc(w.title)}</h3>
+    <p>${esc(w.extract)}</p>
+    <a class="source" href="${w.sourceUrl}" target="_blank" rel="noopener">출처: 위키백과 (${w.lang})</a>`;
 }
 
 function renderGraphDetail(g) {
@@ -421,8 +558,18 @@ function wire() {
     if (text) send({ type: "pin", mediaTimeMs: Math.round(state?.mediaTimeMs || 0), text });
     $("pinText").value = "";
   };
-  $("btnHeart").onclick = () => send({ type: "react", emoji: "♥" });
   document.querySelectorAll(".react").forEach(b => b.onclick = () => send({ type: "react", emoji: b.dataset.emoji }));
+  $("btnTheme").onclick = cycleTheme;
+  $("btnWiki").onclick = () => {
+    if (!currentArtistId) return note("먼저 곡을 재생하세요");
+    send({ type: "wiki_bio", text: currentArtistId });
+  };
+  $("btnZoneCreate").onclick = () => {
+    const name = $("zoneName").value.trim();
+    if (!name) return;
+    send({ type: "create_zone", text: name });
+    $("zoneName").value = "";
+  };
 
   $("dsp").onchange = (e) => send({ type: "set_dsp", dsp: Number(e.target.value) });
   $("policy").onchange = (e) => send({ type: "set_policy", policy: Number(e.target.value) });
@@ -436,7 +583,8 @@ function wire() {
     const key = b.dataset.flag;
     const current = {
       seek: state?.seekingAllowed, comments: state?.commentsAllowed, chat: state?.chatCollapsed,
-      auto_advance: state?.autoAdvance, dsp_lock: state?.dspLocked, follow_host: state?.followHostView
+      auto_advance: state?.autoAdvance, smart_autoplay: state?.smartAutoplay,
+      dsp_lock: state?.dspLocked, follow_host: state?.followHostView
     }[key];
     send({ type: "set_room_flags", text: key, flag: !current });
   });

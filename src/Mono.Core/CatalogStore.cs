@@ -198,6 +198,7 @@ public sealed class CatalogStore : IDisposable
                     t.AlbumId,
                     t.ArtistId,
                     artist = _artists.GetValueOrDefault(t.ArtistId)?.Name,
+                    artistAliases = _artists.GetValueOrDefault(t.ArtistId)?.AlternateNames ?? [],
                     album = _albums.GetValueOrDefault(t.AlbumId)?.Title,
                     year = _albums.GetValueOrDefault(t.AlbumId)?.Year,
                     label = _albums.GetValueOrDefault(t.AlbumId)?.Label,

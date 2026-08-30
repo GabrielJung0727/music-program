@@ -242,6 +242,7 @@ public sealed class CommandProcessor
                         case "queue_lock": r.QueueLocked = msg.Flag ?? !r.QueueLocked; break;
                         case "follow_host": r.FollowHostView = msg.Flag ?? r.FollowHostView; break;
                         case "auto_advance": r.AutoAdvance = msg.Flag ?? !r.AutoAdvance; break;
+                        case "smart_autoplay": r.SmartAutoplay = msg.Flag ?? !r.SmartAutoplay; break;
                         case "cloud": r.CloudSyncOptIn = msg.Flag ?? false; break;
                         case "dsp_lock": r.DspLocked = msg.Flag ?? !r.DspLocked; break;
                         case "max": r.MaxMembers = Math.Clamp(msg.Index ?? r.MaxMembers, 1, 128); break;
@@ -292,7 +293,9 @@ public sealed class CommandProcessor
                 }
 
                 // 위키 API 호출은 이 커맨드 처리 스레드에서만 블로킹된다 — 오디오 경로(FanOut/DSP)와 분리되어 있어 안전하다.
-                var summary = _wiki.GetSummaryAsync(wikiArtist.Id, wikiArtist.Name).GetAwaiter().GetResult();
+                var candidates = new List<string> { wikiArtist.Name };
+                candidates.AddRange(wikiArtist.AlternateNames);
+                var summary = _wiki.GetSummaryAsync(wikiArtist.Id, candidates).GetAwaiter().GetResult();
                 return Direct(new MonoMessage
                 {
                     Type = MessageTypes.WikiBio,

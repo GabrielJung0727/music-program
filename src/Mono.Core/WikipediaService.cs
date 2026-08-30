@@ -27,7 +27,15 @@ public sealed class WikipediaService
         Directory.CreateDirectory(cacheDir);
     }
 
-    public async Task<ArtistWikiSummary?> GetSummaryAsync(string artistId, string artistName, CancellationToken ct = default)
+    /// <summary>
+    /// <paramref name="nameCandidates"/>는 표제어 후보들이다 — 아티스트의 정식 이름과 다국어 별칭
+    /// (예: "米津玄師", "요네즈 켄시", "Kenshi Yonezu")을 함께 넘기면, 한국어 위키가 원어 표기가
+    /// 아니라 현지어 표기(요네즈 켄시)를 표제어로 쓰는 경우에도 찾아낼 수 있다.
+    /// </summary>
+    public Task<ArtistWikiSummary?> GetSummaryAsync(string artistId, string artistName, CancellationToken ct = default)
+        => GetSummaryAsync(artistId, [artistName], ct);
+
+    public async Task<ArtistWikiSummary?> GetSummaryAsync(string artistId, IReadOnlyList<string> nameCandidates, CancellationToken ct = default)
     {
         if (_memCache.TryGetValue(artistId, out var cached) && IsFresh(cached))
         {
@@ -44,7 +52,15 @@ public sealed class WikipediaService
         ArtistWikiSummary? summary = null;
         foreach (var lang in LangPreference)
         {
-            summary = await FetchAsync(lang, artistName, artistId, ct);
+            foreach (var candidate in nameCandidates)
+            {
+                summary = await FetchAsync(lang, candidate, artistId, ct);
+                if (summary is not null)
+                {
+                    break;
+                }
+            }
+
             if (summary is not null)
             {
                 break;

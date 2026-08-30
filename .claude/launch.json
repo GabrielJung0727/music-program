@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mono-core",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Mono.Core"],
+      "port": 7702
+    }
+  ]
+}
