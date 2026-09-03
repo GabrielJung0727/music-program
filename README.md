@@ -6,6 +6,7 @@
 - 기획: [`docs/01-기획명세서.md`](docs/01-기획명세서.md)
 - 아키텍처: [`docs/02-아키텍처.md`](docs/02-아키텍처.md)
 - 구현 현황: [`docs/03-구현현황.md`](docs/03-구현현황.md)
+- UI/UX·exe 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md)
 
 ## 최근 추가된 기능
 
