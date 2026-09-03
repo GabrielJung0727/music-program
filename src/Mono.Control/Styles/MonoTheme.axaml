@@ -1,0 +1,144 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Window.mono">
+    <Setter Property="Background" Value="{DynamicResource Mono.Bg}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Mono.Text}"/>
+    <Setter Property="FontFamily" Value="Inter, Segoe UI, Malgun Gothic"/>
+  </Style>
+
+  <Style Selector="Border.sidebar">
+    <Setter Property="Background" Value="{DynamicResource Mono.Sidebar}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
+    <Setter Property="BorderThickness" Value="0,0,1,0"/>
+    <Setter Property="Width" Value="220"/>
+  </Style>
+
+  <Style Selector="Border.playerbar">
+    <Setter Property="Background" Value="{DynamicResource Mono.Surface}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+    <Setter Property="Height" Value="88"/>
+  </Style>
+
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource Mono.Panel}"/>
+    <Setter Property="CornerRadius" Value="12"/>
+  </Style>
+
+  <Style Selector="Border.artslot">
+    <Setter Property="Background" Value="{DynamicResource Mono.Art}"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="ClipToBounds" Value="True"/>
+  </Style>
+
+  <Style Selector="Border.roomcard">
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="Padding" Value="12"/>
+    <Setter Property="Margin" Value="0,0,0,8"/>
+  </Style>
+
+  <Style Selector="Button.nav">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource Mono.Text}"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Padding" Value="14,10"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Margin" Value="8,1"/>
+  </Style>
+  <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Mono.Hover}"/>
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="#6D6DF6"/>
+    <Setter Property="Foreground" Value="White"/>
+    <Setter Property="CornerRadius" Value="20"/>
+    <Setter Property="Padding" Value="18,10"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource Mono.GhostFg}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="20"/>
+    <Setter Property="Padding" Value="14,8"/>
+  </Style>
+
+  <Style Selector="TextBlock.brand">
+    <Setter Property="FontSize" Value="22"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="LetterSpacing" Value="1"/>
+    <Setter Property="Margin" Value="16,20,16,8"/>
+    <Setter Property="Foreground" Value="{DynamicResource Mono.Text}"/>
+  </Style>
+
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="36"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Margin" Value="0,0,0,4"/>
+    <Setter Property="Foreground" Value="{DynamicResource Mono.Text}"/>
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Mono.Muted}"/>
+    <Setter Property="FontSize" Value="13"/>
+  </Style>
+
+  <Style Selector="Border.trackcard">
+    <Setter Property="Background" Value="{DynamicResource Mono.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="10"/>
+    <Setter Property="Margin" Value="6"/>
+    <Setter Property="Width" Value="160"/>
+  </Style>
+
+  <Style Selector="Border.onboarding">
+    <Setter Property="Background" Value="{DynamicResource Mono.Onboarding}"/>
+  </Style>
+
+  <Style Selector="Border.obcard">
+    <Setter Property="Background" Value="{DynamicResource Mono.Card}"/>
+    <Setter Property="CornerRadius" Value="16"/>
+    <Setter Property="Padding" Value="32"/>
+    <Setter Property="Width" Value="480"/>
+    <Setter Property="BoxShadow" Value="0 12 40 0 #33000000"/>
+  </Style>
+
+  <Style Selector="Button.genretile">
+    <Setter Property="Width" Value="200"/>
+    <Setter Property="Height" Value="110"/>
+    <Setter Property="CornerRadius" Value="14"/>
+    <Setter Property="Margin" Value="6"/>
+    <Setter Property="Padding" Value="16"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="VerticalContentAlignment" Value="Bottom"/>
+  </Style>
+
+  <Style Selector="Image.icon">
+    <Setter Property="Width" Value="18"/>
+    <Setter Property="Height" Value="18"/>
+    <Setter Property="Stretch" Value="Uniform"/>
+  </Style>
+
+  <Style Selector="Image.icon-lg">
+    <Setter Property="Width" Value="22"/>
+    <Setter Property="Height" Value="22"/>
+    <Setter Property="Stretch" Value="Uniform"/>
+  </Style>
+
+  <Style Selector="Image.artph">
+    <Setter Property="Width" Value="48"/>
+    <Setter Property="Height" Value="48"/>
+    <Setter Property="Stretch" Value="Uniform"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="Opacity" Value="0.95"/>
+  </Style>
+</Styles>

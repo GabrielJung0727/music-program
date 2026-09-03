@@ -1,0 +1,45 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:svc="using:Mono.Control.Services"
+             x:Class="Mono.Control.App"
+             RequestedThemeVariant="Light">
+  <Application.Resources>
+    <ResourceDictionary>
+      <svc:SvgAssetConverter x:Key="SvgIcon"/>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Mono.Bg" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="Mono.Sidebar" Color="#F7F7FA"/>
+          <SolidColorBrush x:Key="Mono.Surface" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="Mono.Panel" Color="#F7F7FA"/>
+          <SolidColorBrush x:Key="Mono.Border" Color="#E6E7EC"/>
+          <SolidColorBrush x:Key="Mono.Hover" Color="#ECECF8"/>
+          <SolidColorBrush x:Key="Mono.Text" Color="#1A1A1E"/>
+          <SolidColorBrush x:Key="Mono.Muted" Color="#6B6F7A"/>
+          <SolidColorBrush x:Key="Mono.Art" Color="#ECECF8"/>
+          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CCFFFFFF"/>
+          <SolidColorBrush x:Key="Mono.Card" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="Mono.GhostFg" Color="#1A1A1E"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Mono.Bg" Color="#121214"/>
+          <SolidColorBrush x:Key="Mono.Sidebar" Color="#18181C"/>
+          <SolidColorBrush x:Key="Mono.Surface" Color="#1C1C22"/>
+          <SolidColorBrush x:Key="Mono.Panel" Color="#22222A"/>
+          <SolidColorBrush x:Key="Mono.Border" Color="#2E2E38"/>
+          <SolidColorBrush x:Key="Mono.Hover" Color="#2A2A38"/>
+          <SolidColorBrush x:Key="Mono.Text" Color="#F2F2F6"/>
+          <SolidColorBrush x:Key="Mono.Muted" Color="#9A9AA8"/>
+          <SolidColorBrush x:Key="Mono.Art" Color="#2A2A38"/>
+          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC121214"/>
+          <SolidColorBrush x:Key="Mono.Card" Color="#1C1C22"/>
+          <SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F6"/>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://Mono.Control/Styles/MonoTheme.axaml" />
+  </Application.Styles>
+</Application>

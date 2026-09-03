@@ -12,6 +12,7 @@ public sealed class ArtworkService
     {
         _root = root;
         Directory.CreateDirectory(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "thumbs"));
     }
 
     /// <summary>태그에 박힌 커버를 꺼내 캐시에 쓰고 경로를 돌려준다.</summary>
@@ -19,9 +20,7 @@ public sealed class ArtworkService
     {
         var picture = file.Tag.Pictures.FirstOrDefault();
         if (picture is null || picture.Data.Count == 0)
-        {
             return null;
-        }
 
         var ext = picture.MimeType switch
         {
@@ -41,25 +40,40 @@ public sealed class ArtworkService
         }
     }
 
+    /// <summary>
+    /// 그리드용 사본. 픽셀 축소는 Control ArtCache DecodeToWidth가 담당한다.
+    /// </summary>
+    public string? EnsureThumbnail(string sourcePath, int width)
+    {
+        if (!System.IO.File.Exists(sourcePath) || width <= 0)
+            return sourcePath;
+        try
+        {
+            var name = Sanitize(Path.GetFileNameWithoutExtension(sourcePath)) + $"_w{width}" + Path.GetExtension(sourcePath);
+            var dest = Path.Combine(_root, "thumbs", name);
+            if (!System.IO.File.Exists(dest))
+                System.IO.File.Copy(sourcePath, dest, overwrite: false);
+            return dest;
+        }
+        catch
+        {
+            return sourcePath;
+        }
+    }
+
     /// <summary>앨범 폴더에 놓인 cover.jpg / folder.jpg 류를 찾는다.</summary>
     public static string? SidecarFor(string audioPath)
     {
         var dir = Path.GetDirectoryName(audioPath);
-        if (dir is null)
-        {
-            return null;
-        }
+        if (dir is null) return null;
 
         string[] names = ["cover.jpg", "cover.png", "folder.jpg", "front.jpg", "album.jpg"];
         foreach (var name in names)
         {
             var candidate = Path.Combine(dir, name);
             if (System.IO.File.Exists(candidate))
-            {
                 return candidate;
-            }
         }
-
         return null;
     }
 

@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Mono.Cli/Mono.Cli.csproj" />
     <Project Path="src/Mono.Control/Mono.Control.csproj" />
     <Project Path="src/Mono.Core/Mono.Core.csproj" />
     <Project Path="src/Mono.Output/Mono.Output.csproj" />

@@ -4,7 +4,7 @@
 참고: 원본 「프로그램 기획 및 기능 구체화 명세서」, Roon 화면(아래 임베드), 기능 정의는 [`01-기획명세서.md`](01-기획명세서.md).
 
 **제품 결정 (확정): 사용자는 브라우저·터미널 없이 네이티브 `.exe`만으로 실행·관리한다.**  
-`wwwroot` 웹 UI와 콘솔창(`OutputType=Exe`)은 개발용 프로토타입이며, 출시 UX가 아니다.
+`wwwroot` 웹 UI는 **삭제됨**. 콘솔창(`OutputType=Exe`) CLI는 개발용이며, 출시 UX는 Avalonia `Mono.Control.exe`만이다.
 
 ---
 
@@ -432,9 +432,9 @@ dotnet publish src/Mono.Output  -c Release -r win-x64 --self-contained true -p:P
 
 | 우선 | 항목 |
 | --- | --- |
-| **P0** | Avalonia Control 셸(사이드바·하단바·온보딩), Core/Output `WinExe`, Control이 Core·Output 수명 관리, 콘솔·브라우저 제거 |
-| **P1** | Now Playing 몰입, Easy EQ UI, 시그널 패스, Home 레일, 트레이 종료 정책 |
-| **P2** | Device EQ, Convolution/REW, Speaker Setup, Genres 타일, 레거시 wwwroot 삭제 |
+| **P0** | ~~Avalonia Control 셸 + WinExe Core/Output~~ ✅ |
+| **P1** | ~~Now Playing 몰입, Easy EQ UI, 시그널 패스, Home 레일, 트레이 종료 정책~~ ✅ |
+| **P2** | ~~Device EQ, Convolution IR, Speaker Setup, Genres 타일, 레거시 wwwroot 삭제~~ ✅ (파트너 SDK·LAN 실측은 별도) |
 
 ---
 

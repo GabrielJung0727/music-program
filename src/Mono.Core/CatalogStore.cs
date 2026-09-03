@@ -39,6 +39,7 @@ public sealed class CatalogStore : IDisposable
             Seed(con);
             Load(con);
         }
+        ImportAliasFile();
     }
 
     public IReadOnlyDictionary<string, Track> Tracks { get { lock (_gate) return _tracks; } }
@@ -372,9 +373,17 @@ public sealed class CatalogStore : IDisposable
         var miles = new Artist { Id = "ar-miles", Name = "Miles Davis", RelatedArtistIds = ["ar-coltrane"], Bio = "Trumpet, Kind of Blue through fusion." };
         // 다국어 검색 예시: 한국어 표기(요네즈 켄시)로 원어 아티스트(米津玄師)를 찾을 수 있다.
         var yonezu = new Artist { Id = "ar-yonezu", Name = "米津玄師", AlternateNames = ["요네즈 켄시", "Kenshi Yonezu", "よねづ けんし"], Bio = "Singer-songwriter and vocaloid producer (Hachi)." };
+        var utada = new Artist { Id = "ar-utada", Name = "宇多田ヒカル", AlternateNames = ["우타다 히카루", "Hikaru Utada", "うただ ひかる"], Bio = "J-pop songwriter." };
+        var yoasobi = new Artist { Id = "ar-yoasobi", Name = "YOASOBI", AlternateNames = ["요아소비", "YOASOBI", "よあそび"], Bio = "Ayase × ikura." };
+        var radwimps = new Artist { Id = "ar-radwimps", Name = "RADWIMPS", AlternateNames = ["라드윔프스", "래드윔프스"], Bio = "Japanese rock band." };
+        var iu = new Artist { Id = "ar-iu", Name = "아이유", AlternateNames = ["IU", "이지은", "Lee Ji-eun"], Bio = "K-pop singer-songwriter." };
         UpsertArtist(con, coltrane);
         UpsertArtist(con, miles);
         UpsertArtist(con, yonezu);
+        UpsertArtist(con, utada);
+        UpsertArtist(con, yoasobi);
+        UpsertArtist(con, radwimps);
+        UpsertArtist(con, iu);
         var blue = new Album
         {
             Id = "al-blue-train",
@@ -415,6 +424,128 @@ public sealed class CatalogStore : IDisposable
             "[00:00.00]Bass riff\n[00:18.00]Piano answer\n[00:32.00]Horns, So What");
         SeedTrack(con, "tr-dsd-demo", "DSD Demo (native)", kob, miles, 2822400, 1, true, 120000, 2, null);
         SeedTrack(con, "tr-kanden", "感電", stray, yonezu, 44100, 16, false, 208000, 1, null);
+    }
+
+    /// <summary>
+    /// data/aliases.json — [{ "id":"ar-yonezu", "aliases":["…"] }] 또는 [{ "name":"米津玄師", "aliases":["…"] }]
+    /// </summary>
+    private void ImportAliasFile()
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetDirectoryName(_dbPath) ?? "data", "aliases.json");
+            if (!File.Exists(path))
+            {
+                var seed = """
+                [
+                  { "id": "ar-yonezu", "aliases": ["요네즈 켄시", "Kenshi Yonezu", "米津玄師", "よねず けんし"] },
+                  { "id": "ar-utada", "aliases": ["우타다 히카루", "Hikaru Utada", "宇多田ヒカル"] },
+                  { "name": "John Coltrane", "aliases": ["존 콜트레인", "콜트레인", "ジョン・コルトレーン", "John William Coltrane"] },
+                  { "name": "Miles Davis", "aliases": ["마일스 데이비스", "마일즈 데이비스", "マイルス・デイビス", "Miles Dewey Davis"] },
+                  { "name": "Dave Brubeck", "aliases": ["데이브 브루벡", "デイブ・ブルーベック"] },
+                  { "name": "Hiromi", "aliases": ["히로미", "上原ひろみ", "Hiromi Uehara", "우에하라 히로미"] },
+                  { "mbid": "b625448e-bf4a-41c3-a997-987a97342e02", "name": "John Coltrane", "aliases": ["Trane"] }
+                ]
+                """;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, seed);
+            }
+
+            var rows = System.Text.Json.JsonSerializer.Deserialize<List<AliasRow>>(File.ReadAllText(path),
+                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+            lock (_gate)
+            {
+                using var con = Open();
+                foreach (var row in rows)
+                {
+                    Artist? artist = null;
+                    if (!string.IsNullOrWhiteSpace(row.Id) && _artists.TryGetValue(row.Id, out var byId))
+                        artist = byId;
+                    else if (!string.IsNullOrWhiteSpace(row.Name))
+                        artist = _artists.Values.FirstOrDefault(a =>
+                            a.Name.Equals(row.Name, StringComparison.OrdinalIgnoreCase));
+                    if (artist is null) continue;
+                    var aliases = row.Aliases ?? [];
+                    var merged = artist.AlternateNames.Concat(aliases).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    var updated = new Artist
+                    {
+                        Id = artist.Id,
+                        Name = artist.Name,
+                        RelatedArtistIds = artist.RelatedArtistIds,
+                        Bio = artist.Bio,
+                        AlternateNames = merged
+                    };
+                    UpsertArtist(con, updated);
+                    _artists[updated.Id] = updated;
+                    if (!string.IsNullOrWhiteSpace(row.Mbid))
+                        _mbidByArtist[updated.Id] = row.Mbid!;
+                }
+            }
+
+            // MusicBrainz 원격 수집은 opt-in: MONO_MUSICBRAINZ=1
+            if (string.Equals(Environment.GetEnvironmentVariable("MONO_MUSICBRAINZ"), "1", StringComparison.OrdinalIgnoreCase))
+                _ = Task.Run(() => EnrichAliasesFromMusicBrainzAsync(CancellationToken.None));
+        }
+        catch
+        {
+            // 별칭 파일 오류는 시드를 막지 않는다.
+        }
+    }
+
+    private readonly Dictionary<string, string> _mbidByArtist = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>aliases.json의 mbid·아티스트명으로 MusicBrainz aliases를 가져와 병합한다.</summary>
+    public async Task<int> EnrichAliasesFromMusicBrainzAsync(CancellationToken ct = default)
+    {
+        List<(string ArtistId, string? Mbid, string Name)> jobs;
+        lock (_gate)
+        {
+            jobs = _artists.Values
+                .Select(a => (a.Id, _mbidByArtist.GetValueOrDefault(a.Id), a.Name))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Item2))
+                .Take(12)
+                .ToList();
+            // mbid 없으면 이름 검색은 상위 3명만 (rate limit)
+            if (jobs.Count == 0)
+            {
+                jobs = _artists.Values
+                    .Select(a => (a.Id, (string?)null, a.Name))
+                    .Take(3)
+                    .ToList();
+            }
+        }
+
+        var updatedCount = 0;
+        foreach (var (artistId, mbid, name) in jobs)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var remote = await MusicBrainzClient.FetchAliasesAsync(mbid, name, ct).ConfigureAwait(false);
+                if (remote.Count == 0) continue;
+                if (SetArtistAliases(artistId, remote.Concat(GetAliases(artistId))))
+                    updatedCount++;
+            }
+            catch
+            {
+                // 네트워크 실패는 무시
+            }
+        }
+        return updatedCount;
+    }
+
+    private IEnumerable<string> GetAliases(string artistId)
+    {
+        lock (_gate)
+            return _artists.TryGetValue(artistId, out var a) ? a.AlternateNames.ToList() : [];
+    }
+
+    private sealed class AliasRow
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Mbid { get; set; }
+        public List<string>? Aliases { get; set; }
     }
 
     private static void SeedTrack(SqliteConnection con, string id, string title, Album album, Artist artist, int sr, int bd, bool dsd, long dur, int no, string? lrc)

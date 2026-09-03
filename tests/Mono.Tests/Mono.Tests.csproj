@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Mono.Core\Mono.Core.csproj" />
+    <ProjectReference Include="..\..\src\Mono.Output\Mono.Output.csproj" />
     <ProjectReference Include="..\..\src\Mono.Protocol\Mono.Protocol.csproj" />
     <ProjectReference Include="..\..\src\Mono.Shared\Mono.Shared.csproj" />
   </ItemGroup>

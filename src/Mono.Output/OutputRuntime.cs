@@ -78,11 +78,27 @@ public sealed class ClockState
     }
 }
 
+/// <summary>WASAPI / ASIO 공통 출력 백엔드.</summary>
+public interface IAudioRenderer : IDisposable
+{
+    string DeviceName { get; }
+    int MaxSampleRate { get; }
+    int MaxBitDepth { get; }
+    bool HardwareVolume { get; }
+    long LatencyMs { get; }
+    bool Exclusive { get; }
+    bool Playing { get; }
+    double BufferedMs { get; }
+    void Push(byte[] pcm, int rate, int depth, int channels, int volumePercent);
+    void Flush();
+    void SetHardwareVolume(int percent);
+}
+
 /// <summary>
 /// WASAPI 렌더러. Exclusive를 먼저 시도하고 실패하면 Shared로 내려간다.
 /// 볼륨은 가능하면 하드웨어 엔드포인트 볼륨을 쓴다(디지털 감쇠 회피).
 /// </summary>
-public sealed class Renderer : IDisposable
+public sealed class Renderer : IAudioRenderer, IDisposable
 {
     private readonly bool _forceShared;
     private readonly MMDevice? _device;
@@ -282,7 +298,7 @@ public sealed class Renderer : IDisposable
 /// Clock-sync 모드에서 이 엔드포인트가 자기 로컬 파일을 직접 여는 경로.
 /// (파일은 네트워크로 오지 않는다 — 라이선스 분기 A)
 /// </summary>
-public sealed class LocalFileRenderer : IDisposable
+public sealed class LocalFileRenderer : ILocalChunkSource
 {
     private readonly FileStream _fs;
     private readonly long _dataPos;
@@ -292,7 +308,7 @@ public sealed class LocalFileRenderer : IDisposable
     private readonly int _channels;
     private long _cursorMs = -1;
 
-    private LocalFileRenderer(FileStream fs, long dataPos, long dataSize, int rate, int depth, int channels)
+    internal LocalFileRenderer(FileStream fs, long dataPos, long dataSize, int rate, int depth, int channels)
     {
         _fs = fs;
         _dataPos = dataPos;
@@ -302,12 +318,20 @@ public sealed class LocalFileRenderer : IDisposable
         _channels = channels;
     }
 
-    public static LocalFileRenderer? TryOpen(string path)
+    public static ILocalChunkSource? TryOpen(string path)
     {
-        if (!File.Exists(path) || !path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-        {
+        if (!File.Exists(path))
             return null;
-        }
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext is ".flac" or ".mp3" or ".m4a" or ".aac" or ".aiff" or ".aif" or ".wma" or ".mp4" or ".alac")
+            return MfStreamingLocalRenderer.TryOpen(path);
+
+        if (ext is ".dsf")
+            return DsfLocalRenderer.TryOpen(path);
+
+        if (!ext.Equals(".wav", StringComparison.OrdinalIgnoreCase))
+            return null;
 
         try
         {
@@ -328,9 +352,7 @@ public sealed class LocalFileRenderer : IDisposable
                     br.ReadInt16();
                     depth = br.ReadInt16();
                     if (size > 16)
-                    {
                         br.ReadBytes((int)size - 16);
-                    }
                 }
                 else if (id == "data")
                 {
@@ -361,9 +383,7 @@ public sealed class LocalFileRenderer : IDisposable
         var startByte = Math.Clamp(start * _rate / 1000 * bpf, 0, _dataSize);
         var want = (int)Math.Min((long)durationMs * _rate / 1000 * bpf, _dataSize - startByte);
         if (want <= 0)
-        {
             return [];
-        }
 
         var buffer = new byte[want];
         _fs.Position = _dataPos + startByte;
@@ -373,4 +393,155 @@ public sealed class LocalFileRenderer : IDisposable
     }
 
     public void Dispose() => _fs.Dispose();
+}
+
+/// <summary>FLAC/MP3 등 Media Foundation 구간 디코드 (Clock-sync 로컬). 전량 RAM 적재 없음.</summary>
+file sealed class MfStreamingLocalRenderer : ILocalChunkSource
+{
+    private readonly AudioFileReader _reader;
+    private readonly object _gate = new();
+    private readonly int _rate;
+    private readonly int _channels;
+    private long _cursorMs = -1;
+
+    private MfStreamingLocalRenderer(AudioFileReader reader)
+    {
+        _reader = reader;
+        _rate = reader.WaveFormat.SampleRate;
+        _channels = Math.Max(reader.WaveFormat.Channels, 1);
+    }
+
+    public static MfStreamingLocalRenderer? TryOpen(string path)
+    {
+        try { return new MfStreamingLocalRenderer(new AudioFileReader(path)); }
+        catch { return null; }
+    }
+
+    public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
+    {
+        format = (_rate, 24, _channels);
+        lock (_gate)
+        {
+            var target = Math.Max(0, mediaTimeMs);
+            if (_cursorMs < 0 || Math.Abs(_cursorMs - target) > 80)
+            {
+                try { _reader.CurrentTime = TimeSpan.FromMilliseconds(target); }
+                catch { /* approx */ }
+            }
+
+            var frames = Math.Max(1, durationMs * _rate / 1000);
+            var samplesNeeded = frames * _channels;
+            var floatBuf = new float[samplesNeeded];
+            var n = _reader.Read(floatBuf, 0, samplesNeeded);
+            _cursorMs = target + durationMs;
+            if (n <= 0) return [];
+            if (n < samplesNeeded) Array.Resize(ref floatBuf, n);
+            return FloatToPcm24(floatBuf);
+        }
+    }
+
+    private static byte[] FloatToPcm24(float[] samples)
+    {
+        var bytes = new byte[samples.Length * 3];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var v = (int)Math.Clamp(samples[i] * 8388607f, -8388608, 8388607);
+            bytes[i * 3] = (byte)v;
+            bytes[i * 3 + 1] = (byte)(v >> 8);
+            bytes[i * 3 + 2] = (byte)(v >> 16);
+        }
+        return bytes;
+    }
+
+    public void Dispose()
+    {
+        lock (_gate) _reader.Dispose();
+    }
+}
+
+/// <summary>DSF → DoP 로컬 Clock-sync 경로 (채널 인터리브 검증용).</summary>
+file sealed class DsfLocalRenderer : ILocalChunkSource
+{
+    private readonly FileStream _fs;
+    private readonly long _dataPos;
+    private readonly long _dataSize;
+    private readonly int _blockSize;
+    private readonly int _dsdRate;
+    private readonly int _channels;
+    private long _cursorMs = -1;
+
+    private DsfLocalRenderer(FileStream fs, long dataPos, long dataSize, int blockSize, int dsdRate, int channels)
+    {
+        _fs = fs;
+        _dataPos = dataPos;
+        _dataSize = dataSize;
+        _blockSize = blockSize;
+        _dsdRate = dsdRate;
+        _channels = channels;
+    }
+
+    public static DsfLocalRenderer? TryOpen(string path)
+    {
+        try
+        {
+            var fs = File.OpenRead(path);
+            using var br = new BinaryReader(fs, System.Text.Encoding.ASCII, leaveOpen: true);
+            if (new string(br.ReadChars(4)) != "DSD ") { fs.Dispose(); return null; }
+            br.ReadInt64(); br.ReadInt64(); br.ReadInt64();
+            if (new string(br.ReadChars(4)) != "fmt ") { fs.Dispose(); return null; }
+            var fmtSize = br.ReadInt64();
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
+            var channels = br.ReadInt32();
+            var rate = br.ReadInt32();
+            br.ReadInt32();
+            br.ReadInt64();
+            var blockSize = br.ReadInt32();
+            br.ReadInt32();
+            fs.Position = 28 + fmtSize;
+            var dataId = new string(br.ReadChars(4));
+            var dataSize = br.ReadInt64();
+            var dataPos = fs.Position;
+            var size = dataId == "data" ? Math.Min(dataSize - 12, fs.Length - dataPos) : fs.Length - dataPos;
+            return new DsfLocalRenderer(fs, dataPos, size, blockSize, rate, Math.Max(channels, 1));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
+    {
+        var start = _cursorMs < 0 || Math.Abs(_cursorMs - mediaTimeMs) > 500 ? mediaTimeMs : _cursorMs;
+        var bytesPerMsPerChannel = _dsdRate / 8.0 / 1000.0;
+        var blockBytes = (long)_blockSize * _channels;
+        var startByte = (long)(start * bytesPerMsPerChannel * _channels);
+        if (blockBytes > 0) startByte -= startByte % blockBytes;
+        startByte = Math.Clamp(startByte, 0, _dataSize);
+        var want = (long)(durationMs * bytesPerMsPerChannel * _channels);
+        if (blockBytes > 0) want = Math.Max(blockBytes, want - want % blockBytes);
+        want = Math.Min(want, _dataSize - startByte);
+        if (want <= 0)
+        {
+            format = (176400, 24, _channels);
+            return [];
+        }
+
+        var dsd = new byte[want];
+        _fs.Position = _dataPos + startByte;
+        var read = _fs.Read(dsd, 0, (int)want);
+        if (read < want) Array.Resize(ref dsd, Math.Max(read, 0));
+        _cursorMs = start + durationMs;
+        var encoded = DopEncoder.Encode(dsd, _dsdRate, _channels);
+        format = (encoded.Rate, encoded.Depth, encoded.Channels);
+        return encoded.Pcm;
+    }
+
+    public void Dispose() => _fs.Dispose();
+}
+
+/// <summary>Clock-sync 로컬 소스 공용 인터페이스.</summary>
+public interface ILocalChunkSource : IDisposable
+{
+    byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format);
 }

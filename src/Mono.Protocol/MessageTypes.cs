@@ -23,6 +23,12 @@ public static class MessageTypes
     public const string Spectate = "spectate";
     public const string SetPolicy = "set_policy";
     public const string SetDsp = "set_dsp";
+    public const string SetConvolutionIr = "set_convolution_ir";
+    public const string SetEasyEq = "set_easy_eq";
+    public const string SetSpeakerSetup = "set_speaker_setup";
+    public const string SetHeadroom = "set_headroom";
+    public const string SetDeviceEq = "set_device_eq";
+    public const string SyncProbe = "sync_probe";
     public const string SetSourceMode = "set_source_mode";
     public const string SetRoomFlags = "set_room_flags";
 
@@ -51,6 +57,7 @@ public static class MessageTypes
     public const string FollowArtist = "follow_artist";
     public const string FollowHost = "follow_host";
     public const string LinerPage = "liner_page";
+    public const string LinerScroll = "liner_scroll";
 
     // 스마트 오토플레이
     public const string AutoplayCandidates = "autoplay_candidates";
