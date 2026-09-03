@@ -1,7 +1,10 @@
 # Mono — UI/UX 기획서
 
 본 문서는 Mono Control의 화면 구조·시각 체계·설치/배포 UX를 정의한다.  
-참고: 원본 「프로그램 기획 및 기능 구체화 명세서」, Roon 화면(아래 임베드), 현재 Control 웹 UI([`src/Mono.Core/wwwroot`](../src/Mono.Core/wwwroot)), 기능 정의는 [`01-기획명세서.md`](01-기획명세서.md).
+참고: 원본 「프로그램 기획 및 기능 구체화 명세서」, Roon 화면(아래 임베드), 기능 정의는 [`01-기획명세서.md`](01-기획명세서.md).
+
+**제품 결정 (확정): 사용자는 브라우저·터미널 없이 네이티브 `.exe`만으로 실행·관리한다.**  
+`wwwroot` 웹 UI와 콘솔창(`OutputType=Exe`)은 개발용 프로토타입이며, 출시 UX가 아니다.
 
 ---
 
@@ -9,31 +12,25 @@
 
 | 원칙 | 설명 |
 | --- | --- |
+| **exe-only** | 일반 사용 경로에 브라우저·CMD/PowerShell 창·`.bat` 더블클릭을 두지 않는다. 창은 GUI만. |
 | 음질 ↔ 소셜 분리 | 채팅·핀·반응은 컨트롤 채널만 사용. 오디오 콜백·MATP와 UI 스레드를 섞지 않는다. |
-| Control은 소리 없음 | Control(웹/CLI)은 명령·시각화만. 소리는 **Mono.Output.exe**가 DAC로 낸다. |
+| Control은 소리 없음 | **Mono.Control.exe**(Avalonia GUI)는 명령·시각화만. 소리는 **Mono.Output.exe**가 DAC로 낸다. |
+| Core는 백그라운드 | **Mono.Core.exe**는 헤드리스(`WinExe` / 트레이). Control이 없으면 자동 기동, 콘솔 없음. |
 | Roon IA → Mono 재해석 | Roon의 Core/Remote/Output 감성을 Mono의 **Core / Control / Output** 3단에 맞춘다. |
 | 신뢰 UI | Bit-perfect 여부, SRC, 싱크 오프셋, 출력 장치를 상시 노출한다. |
-| 과도기 → 목표 | 현재 3열 웹 UI는 동작하는 프로토타입. **목표 IA**는 Roon형(좌 사이드바 + 본문 + 하단 바)이다. |
+| 목표 IA | Avalonia Control = Roon형(좌 사이드바 + 본문 + 하단 바). 웹 3열 UI는 레거시. |
 
 ```mermaid
 flowchart LR
-  subgraph install [설치_배포]
-    CoreExe[Mono.Core.exe]
-    OutExe[Mono.Output.exe]
-    Bat[Run-Mono-Core.bat]
+  subgraph apps [네이티브_exe]
+    Ctrl[Mono.Control.exe_GUI]
+    CoreExe[Mono.Core.exe_헤드리스]
+    OutExe[Mono.Output.exe_헤드리스]
   end
-  subgraph control [Control_웹UI]
-    Onboard[온보딩]
-    Browse[사이드바_탐색]
-    NowPlay[Now_Playing]
-    Lounge[라운지_소셜]
-  end
-  CoreExe --> Onboard
-  Bat --> CoreExe
-  OutExe --> NowPlay
-  Onboard --> Browse
-  Browse --> NowPlay
-  NowPlay --> Lounge
+  Ctrl -->|"없으면_기동"| CoreExe
+  Ctrl -->|"장치_연결_시_기동"| OutExe
+  Ctrl -->|TCP_7700| CoreExe
+  OutExe -->|MATP_7701| CoreExe
 ```
 
 ---
@@ -53,15 +50,15 @@ flowchart LR
 | Warn | `#D9762F` | `#E39A5C` | 경고·핀 마커 |
 | Bad | `#C44` / `#E88` | 오류·포맷 불가 |
 
-라이트/다크는 `prefers-color-scheme` + 헤더 수동 토글(현재 `🌗`).
+라이트/다크는 OS 테마 연동 + Control 설정에서 수동 토글.
 
 ### 2.2 타이포그래피
 
 | 역할 | 폰트 | 비고 |
 | --- | --- | --- |
 | 브랜드 / 페이지 타이틀 | Fraunces (세리프) | Roon의 큰 세리프 헤더 대응 |
-| UI·본문·메타 | Inter | 가독성, 다국어 |
-| 코드·경로·포트 | ui-monospace | 온보딩 Output 명령, 설정 |
+| UI·본문·메타 | Inter | Avalonia에 임베드 또는 시스템 폴백 |
+| 경로·기술 메타 | ui-monospace | 설정·About만 (온보딩에 터미널 명령 노출 금지) |
 
 ### 2.3 공통 컴포넌트
 
@@ -79,9 +76,9 @@ flowchart LR
 
 ## 3. 정보 구조 (목표 IA)
 
-현재 Control은 **좌(라이브러리/라운지) · 중(Now Playing/큐) · 우(소셜/라이너/기기/호스트/보관함)** 3열이다.  
-목표는 Roon과 같은 **좌 사이드바 + 본문 + 하단 바**, 라운지·라이너는 **우측 드로어/오버레이**.
+**Mono.Control.exe (Avalonia)** 는 Roon과 같은 **좌 사이드바 + 본문 + 하단 바**를 쓴다. 라운지·라이너는 **우측 드로어/오버레이**.
 
+레거시 `wwwroot` 3열 웹 UI는 프로토타입 참고용이며 출시 경로가 아니다.
 ### 3.1 사이드바 매핑 (Roon → Mono)
 
 | Roon | Mono | 비고 |
@@ -96,6 +93,8 @@ flowchart LR
 | Folders | Folders | 스캔 루트별 |
 | Playlists | Playlists | ♥ / 세션 / 스마트 / 믹스 |
 
+현재 레거시 웹 UI의 3열은 **참고용 프로토타입**일 뿐, Avalonia 구현은 위 목표 IA를 따른다.
+
 ### 3.2 하단 바 (항상 노출)
 
 1. 좌: 미니 아트 · 곡명 · 아티스트 · ♥  
@@ -108,7 +107,8 @@ flowchart LR
 
 ## 4. 화면별 스펙 (Roon 참고 이미지)
 
-이미지 경로: [`docs/assets/roon-ui/`](assets/roon-ui/).
+이미지 경로: [`docs/assets/roon-ui/`](assets/roon-ui/).  
+아래 화면은 모두 **Mono.Control.exe (Avalonia)** 에서 렌더링한다.
 
 ### 4.1 온보딩
 
@@ -131,7 +131,7 @@ flowchart LR
 ![Roon audio devices](assets/roon-ui/03-onboarding-audio-devices.png)
 
 - **Roon**: This PC 아래 WASAPI/ASIO 카드 + Enable → Zone.  
-- **Mono** step 3: Output이 광고한 엔드포인트 리스트 + **존 만들기**. 장치 없으면 `dotnet run … Mono.Output` / `Run-Mono-Output.bat` 안내 문구 고정 노출.  
+- **Mono** step 3: Output이 광고한 엔드포인트 리스트 + **존 만들기**. 장치 없으면 Control이 **「이 PC에 출력 연결」** 버튼으로 `Mono.Output.exe`를 백그라운드 기동(콘솔 없음). 터미널 명령어를 사용자에게 보여 주지 않는다.  
   Windows: ASIO/WASAPI Exclusive · Mac: Exclusive — Bit-perfect 가능함을 한 줄로 명시.
 
 #### Mono 온보딩 6단계 (현재 구현과 목표 동일)
@@ -301,82 +301,100 @@ Audiophile 모드: DSP Off 고정, UI는 아트/라이너 중심, 채팅 접힘.
 
 ---
 
-## 5. `.exe` 배포 · 설치 UX
+## 5. `.exe` 전용 배포 · 설치 UX (브라우저·터미널 금지)
+
+### 5.0 확정 규칙
+
+| 금지 | 대체 |
+| --- | --- |
+| 브라우저로 Control 열기 (`:7702` 웹페이지) | **Avalonia `Mono.Control.exe` GUI** |
+| 검은 콘솔/터미널 창 | 세 exe 모두 **`OutputType=WinExe`** (Windows). 로그는 파일·트레이·About |
+| 사용자용 `.bat` / `dotnet run` 안내 | 바로가기 = **Control.exe** 하나. Core·Output은 Control이 자식 프로세스로 기동 |
+| 온보딩에 터미널 명령 노출 | 「이 PC에 출력 연결」GUI 버튼만 |
+
+개발자 전용: CLI·웹·bat은 저장소에 남을 수 있으나 **출시 패키지·사용법에는 넣지 않는다.**
 
 ### 5.1 제품 구성
 
-| 파일 | 역할 | 사용자 인식 |
-| --- | --- | --- |
-| **Mono.Core.exe** | 두뇌·카탈로그·룸·MATP·**Control 웹 UI(:7702)** | “Mono를 켠다” |
-| **Mono.Output.exe** | DAC 출력·클럭 슬레이브 | “소리를 낸다” |
-| Mono.Control.exe | CLI (고급) | 일반 사용자에게 숨김/선택 |
-| Run-Mono-Core.bat | Core 기동 + 브라우저 오픈 | 더블클릭 진입점 |
-| Run-Mono-Output.bat | 룸 ID 입력 후 Output | 소리 연결 |
+| 파일 | `OutputType` | 역할 | 사용자 인식 |
+| --- | --- | --- | --- |
+| **Mono.Control.exe** | WinExe + Avalonia | 유일한 창형 UI. 온보딩·라이브러리·라운지·설정. Core/Output 수명 관리 | “Mono를 연다” (시작 메뉴·바로가기) |
+| **Mono.Core.exe** | WinExe (헤드리스) | 카탈로그·룸·MATP·마스터 클럭. 트레이 아이콘(선택) | 보통 안 보임. Control이 기동 |
+| **Mono.Output.exe** | WinExe (헤드리스) | DAC 출력·클럭 슬레이브. 트레이(선택) | Control 「출력 연결」로 기동 |
 
-Control **화면은 별도 exe가 아니라** Core가 서빙하는 웹 UI다. (장기: Avalonia 네이티브 Control.exe — 로드맵)
+단일 PC 기본: Control 더블클릭 → Core 자동 기동 → GUI. 소리 필요 시 Output 자동/버튼 기동.
 
 ### 5.2 사용자 시나리오 (첫 실행)
 
-1. 배포 폴더에서 **Run-Mono-Core.bat** 더블클릭.  
-2. 콘솔 창이 뜨고 약 3초 후 브라우저가 `http://127.0.0.1:7702` 로 연다.  
-3. 온보딩 6단계.  
-4. 소리가 필요하면 **Run-Mono-Output.bat** → Control **라운지**의 룸 ID 입력.  
-5. 종료: Core 콘솔 창을 닫으면 서버 종료.
+1. **Mono.Control.exe** 더블클릭 (콘솔·브라우저 없음).  
+2. Core가 로컬에 없으면 Control이 같은 폴더의 `Mono.Core.exe`를 백그라운드로 기동하고 `:7700`에 연결.  
+3. Avalonia 온보딩 6단계.  
+4. 「이 PC에 출력 연결」→ `Mono.Output.exe` 백그라운드 기동 + 룸/개인존 자동 배정.  
+5. 창 닫기: 설정에 따라 (A) Control만 종료·Core/Output 유지(트레이) 또는 (B) 관련 프로세스 함께 종료.
 
-복사용 문구(배포 `사용법.txt`와 동일 톤):
+복사용 문구(`사용법.txt`):
 
-- Control 화면은 소리를 내지 않습니다.  
-- .NET을 따로 설치하지 않아도 됩니다 (셀프 Contained 배포 시).  
-- 방화벽이 물으면 **개인 네트워크에서 허용** (포트 7700 / 7701 / 7702).
+- Mono.Control.exe만 실행하세요. 검은 창이나 웹 브라우저가 열리면 잘못된 빌드입니다.  
+- Control은 소리를 내지 않습니다. 출력은 앱 안에서 연결합니다.  
+- .NET 별도 설치 불필요(셀프 Contained).  
+- 방화벽 허용: 포트 **7700**(Control↔Core), **7701**(MATP).
 
 ### 5.3 배포 폴더 규약
 
 ```
 dist/
-  Run-Mono-Core.bat
-  Run-Mono-Output.bat
   사용법.txt
-  Mono.Core/     → Mono.Core.exe + data/ + wwwroot/
-  Mono.Output/   → Mono.Output.exe
-  Mono.Control/  → Mono.Control.exe   (선택)
+  Mono.Control.exe          ← 사용자 진입점 (또는 Mono.Control/ 폴더)
+  Mono.Core.exe             ← 동일 디렉터리 또는 Mono.Core/
+  Mono.Output.exe
+  data/                     ← Core 데이터(첫 실행 시 생성 가능)
 ```
 
-다른 PC로 옮길 때: 위 폴더·bat을 통째로 복사.
+- `wwwroot/`·`Run-*.bat`·CLI 전용 빌드는 **출시 zip에 포함하지 않음**.  
+- 다른 PC로 옮길 때: 위 exe(+data)만 복사.
 
-### 5.4 빌드 방법 (문서 스펙 · 스크립트는 추후)
+### 5.4 프로세스·창 동작
 
-Windows x64, 런타임 포함 단일 파일 예시:
+| 프로세스 | 창 | 실패 시 |
+| --- | --- | --- |
+| Control | 메인 윈도우 1개 | 메시지 박스 (Core 기동 실패, 포트 점유 등) |
+| Core | 없음. 선택적 트레이 | Control이 재시도·로그 경로 안내 |
+| Output | 없음. 선택적 트레이 | Control 「소리 없음」배지 + 재연결 |
+
+Windows: `<OutputType>WinExe</OutputType>`, `PublishSingleFile` + self-contained.  
+macOS/Linux: Avalonia 동일, Core/Output은 데몬·에이전트 스타일(콘솔 숨김).
+
+### 5.5 빌드 방법 (문서 스펙)
 
 ```powershell
-dotnet publish src/Mono.Core    -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/Mono.Core
-dotnet publish src/Mono.Output  -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/Mono.Output
-dotnet publish src/Mono.Control -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/Mono.Control
+dotnet publish src/Mono.Control -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist
+dotnet publish src/Mono.Core    -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist
+dotnet publish src/Mono.Output  -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist
 ```
 
-- `PublishSingleFile=true`: 실행 파일 중심으로 배포.  
-- `--self-contained true`: 대상 PC에 .NET 미설치.  
-- Core의 `wwwroot`·`data`가 출력에 포함되는지 publish 후 확인.
+개발: `dotnet run --project src/Mono.Control` (Avalonia). Core는 Control이 붙이거나 별도 기동.  
+레거시 웹(`:7702`)은 디버그 플래그로만 유지 가능 — **기본 OFF, 출시 OFF**.
 
-개발 중에는 `dotnet run --project src/Mono.Core` 로 동일 UI(`:7702`) 사용.
+### 5.6 포트 · 다중 기기
 
-### 5.5 포트 · 다중 기기
+| 포트 | 용도 | 사용자 노출 |
+| --- | --- | --- |
+| 7700 | Control ↔ Core TCP JSON | About/고급 설정만 |
+| 7701 | MATP | About/고급만 |
+| ~~7702~~ | (레거시 웹·REST) | **출시 UX에서 제거·비활성** |
 
-| 포트 | 용도 |
-| --- | --- |
-| 7700 | Control 컨트롤 플레인 (TCP JSON) |
-| 7701 | MATP (오디오+클럭) |
-| 7702 | Control 웹 UI · REST |
+원격 Control·타 PC Output: Control 설정에서 Core 호스트·페어링. 웹 URL 안내 없음.
 
-원격 Control: 페어링 토큰. LAN의 다른 PC에서 Output만 실행해 같은 Core에 붙는 시나리오를 온보딩/기기 탭에 짧게 안내.
+### 5.7 설치 UX 체크리스트
 
-### 5.6 설치 UX 체크리스트
-
-- [ ] bat 더블클릭만으로 Core+브라우저  
-- [ ] 첫 실행 온보딩 강제(완료 전 메인 흐림/차단)  
-- [ ] Output 미연결 시 “소리 없음” 배지 + bat 안내  
-- [ ] 포트 충돌 시 명확한 오류 문구  
-- [ ] Windows SmartScreen 경고 시 “자세한 정보 → 실행” 안내를 사용법에 기재  
-- [ ] 언인스톨 = 폴더 삭제(선택: data 백업 안내)
+- [ ] Control.exe만으로 시작, **콘솔 창 0개**  
+- [ ] 브라우저가 자동으로 열리지 않음  
+- [ ] Core/Output 자동 기동·종료 정책이 GUI에 있음  
+- [ ] 첫 실행 온보딩(완료 전 메인 차단)  
+- [ ] Output 미연결 시 「소리 없음」+ 연결 버튼  
+- [ ] 포트 충돌 시 메시지 박스(원인·조치)  
+- [ ] SmartScreen: 사용법에 “자세한 정보 → 실행”  
+- [ ] 언인스톨 = 폴더 삭제(+ data 백업 안내)
 
 ---
 
@@ -395,16 +413,18 @@ dotnet publish src/Mono.Control -c Release -r win-x64 --self-contained true -p:P
 
 ---
 
-## 7. 현재 UI → 목표 이행
+## 7. 현재 → 목표 이행
 
-| 영역 | 현재 (프로토타입) | 목표 |
+| 영역 | 현재 (레거시) | 목표 (출시) |
 | --- | --- | --- |
-| 레이아웃 | 3열 탭 | 사이드바 + 본문 + 하단 바 |
+| Control 셸 | 브라우저 + Core `:7702` | **Avalonia Mono.Control.exe** |
+| Core/Output 창 | 콘솔 Exe | **WinExe 헤드리스** (트레이 선택) |
+| 진입점 | bat → 브라우저 | **Control.exe만** |
+| 레이아웃 | 웹 3열 | 사이드바 + 본문 + 하단 바 |
 | Now Playing | 중앙 컬럼 | 몰입 전체화면 + 모드 전환 |
-| 하단 바 | 없음(중앙에 트랜스포트) | 전역 고정 바 |
-| 기기 Enable | 리스트+존 폼 | Roon형 Enable 카드 |
+| 기기 Enable | 웹 리스트 | Roon형 Enable 카드 + Output 자동 기동 |
 | DSP | 프리셋 select | MUSE형 필터 체인 + Easy EQ |
-| 배포 | dist exe+bat 존재 | 본 문서 규약·사용법 공식화 |
+| :7702 웹 | 기본 ON | **기본 OFF / 출시 제거** |
 
 ---
 
@@ -412,9 +432,9 @@ dotnet publish src/Mono.Control -c Release -r win-x64 --self-contained true -p:P
 
 | 우선 | 항목 |
 | --- | --- |
-| **P0** | 온보딩 유지·고도화, 하단 글로벌 바, 라이브러리 아트 그리드, 장치 Enable/존 카드, exe·bat 배포 문구 |
-| **P1** | Now Playing 몰입(아트/가사/위키/크레딧), Easy EQ UI, 시그널 패스 패널, Home 레일 |
-| **P2** | Device EQ, Convolution/REW, Speaker Setup, Avalonia Control.exe, Genres 비주얼 타일 |
+| **P0** | Avalonia Control 셸(사이드바·하단바·온보딩), Core/Output `WinExe`, Control이 Core·Output 수명 관리, 콘솔·브라우저 제거 |
+| **P1** | Now Playing 몰입, Easy EQ UI, 시그널 패스, Home 레일, 트레이 종료 정책 |
+| **P2** | Device EQ, Convolution/REW, Speaker Setup, Genres 타일, 레거시 wwwroot 삭제 |
 
 ---
 

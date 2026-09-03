@@ -6,19 +6,19 @@
 - 기획: [`docs/01-기획명세서.md`](docs/01-기획명세서.md)
 - 아키텍처: [`docs/02-아키텍처.md`](docs/02-아키텍처.md)
 - 구현 현황: [`docs/03-구현현황.md`](docs/03-구현현황.md)
-- UI/UX·exe 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md)
+- UI/UX·**exe-only** 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md) — 브라우저·터미널 없이 `Mono.Control.exe`만으로 실행
 
 ## 최근 추가된 기능
 
-- **첫 실행 온보딩**: Control UI를 처음 열면 6단계 마법사(이름 → 라이브러리 → 출력 장치/존 → 스트리밍 → 완료)가 안내한다. 헤더의 "가이드" 버튼으로 언제든 다시 볼 수 있다
+- **첫 실행 온보딩**: Control을 처음 열면 6단계 마법사(이름 → 라이브러리 → 출력 장치/존 → 스트리밍 → 완료). (현재 레거시 웹에 구현; Avalonia로 이전 예정)
 - **최다 반응 구간**: 곡당 유저당 최대 3번, ❤️🎉👏🔥로 제한된 반응을 시크바 위 히트맵으로 표시
 - **스마트 선택형 오토플레이**: 큐 마지막 곡 종료 40초 전 후보 3곡 제시, 무응답 시 1번 자동 재생
 - **멀티 디바이스 존**: 여러 출력기기를 묶어 Sync(동시 재생) 또는 Independent(기기별 다른 곡)로 운영 — 싱글 플레이 전용
 - **다국어 아티스트 검색**: "요네즈 켄시"처럼 한국어 표기로 원어(米津玄師) 아티스트 검색
 - **위키백과 아티스트 이력**: ko→en 순으로 요약을 가져와 라이너 패널에 출처와 함께 표시
-- **UI 리디자인**: Roon 참고 화이트/인디고 기본 테마 + 다크모드 토글 (헤더의 🌗 버튼)
+- **제품 UX 결정**: 출시는 **네이티브 .exe만** (Avalonia Control + 헤드리스 Core/Output). 웹 UI·콘솔창은 개발용
 
-## 빠른 시작
+## 빠른 시작 (개발)
 
 ```powershell
 dotnet build Mono.slnx
@@ -27,14 +27,16 @@ dotnet run --project src/Mono.Core
 
 | 포트 | 용도 |
 | --- | --- |
-| 7700 | Control 컨트롤 플레인 (TCP, 줄 단위 JSON) |
-| 7701 | MATP 엔드포인트 (컨트롤 + 오디오 데이터 플레인) |
-| 7702 | Control 웹 UI · REST API |
+| 7700 | Control ↔ Core (TCP, 줄 단위 JSON) |
+| 7701 | MATP (오디오 + 클럭) |
+| 7702 | *(레거시)* 웹 UI · REST — 출시 기본 OFF |
 
-Control UI: <http://127.0.0.1:7702> — 화면과 명령만 담당하고 **소리는 내지 않는다.**
+출시 진입점(목표): **`Mono.Control.exe`** — Core/Output을 백그라운드로 기동. 화면만 담당하고 **소리는 내지 않는다.**
+
+개발 중 레거시 웹: <http://127.0.0.1:7702>
 
 ```powershell
-dotnet run --project src/Mono.Control            # 같은 프로토콜의 CLI (help 로 명령 목록)
+dotnet run --project src/Mono.Control            # 현재 CLI (Avalonia GUI로 교체 예정)
 dotnet run --project src/Mono.Output -- --room=<룸ID>   # DAC 엔드포인트
 ```
 
