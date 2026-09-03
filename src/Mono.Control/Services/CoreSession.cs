@@ -163,6 +163,8 @@ public sealed class CoreSession : IAsyncDisposable
     public Task ClearQueueAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ClearQueue });
     public Task EndSessionAsync(bool consent) => SendAsync(new MonoMessage { Type = MessageTypes.EndSession, Consent = consent });
     public Task LinerPageAsync(int page) => SendAsync(new MonoMessage { Type = MessageTypes.LinerPage, Index = page });
+    public Task LinerScrollAsync(double y) => SendAsync(new MonoMessage { Type = MessageTypes.LinerScroll, OffsetMs = y });
+    public Task FollowHostAsync(bool on) => SendAsync(new MonoMessage { Type = MessageTypes.FollowHost, Flag = on });
 
     public async Task DisconnectAsync()
     {

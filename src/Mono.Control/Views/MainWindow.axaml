@@ -43,6 +43,10 @@
         <Grid Grid.Column="1" Margin="28,20,28,12" RowDefinitions="Auto,Auto,*">
           <DockPanel Grid.Row="0">
             <StackPanel Orientation="Horizontal" Spacing="8" DockPanel.Dock="Right">
+              <Button Classes="primary" Command="{Binding ApplyUpdateCommand}"
+                      IsVisible="{Binding UpdateReady}" ToolTip.Tip="새 버전 설치 후 다시 시작">
+                <TextBlock Text="업데이트" VerticalAlignment="Center"/>
+              </Button>
               <Button Classes="ghost" Command="{Binding OpenGuideCommand}" ToolTip.Tip="가이드">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-guide.svg}"/>
@@ -322,7 +326,8 @@
                     <TextBlock Text="{Binding SignalPathText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0"/>
                   </StackPanel>
                 </Border>
-                <TextBlock Text="{Binding SyncText}" Classes="muted"/>
+                <TextBlock Text="{Binding SyncProbeText}" Classes="muted" TextWrapping="Wrap" FontFamily="Consolas, Cascadia Mono"/>
+                <TextBlock Text="{Binding ArtPerfText}" Classes="muted"/>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
                   <Button Classes="ghost" Content="Sync Probe" Command="{Binding SyncProbeCommand}"/>
@@ -442,6 +447,18 @@
                 </Button>
                 <CheckBox Content="다크 모드" IsChecked="{Binding DarkTheme}"/>
                 <CheckBox Content="창 닫기 시 트레이로 최소화 (종료는 트레이 메뉴)" IsChecked="{Binding CloseToTray}"/>
+                <TextBlock Text="앱 업데이트" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <TextBlock Classes="muted" Text="{Binding AppVersion, StringFormat=현재 버전 {0}}"/>
+                <TextBlock Classes="muted" Text="{Binding UpdateStatus}" TextWrapping="Wrap"/>
+                <ProgressBar Maximum="100" Value="{Binding UpdateProgress}" Height="8"
+                             IsVisible="{Binding UpdateBusy}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Content="업데이트 확인" Command="{Binding CheckForUpdatesCommand}"/>
+                  <Button Classes="primary" Content="받고 다시 시작" Command="{Binding ApplyUpdateCommand}"
+                          IsEnabled="{Binding UpdateReady}"/>
+                </StackPanel>
+                <TextBlock Classes="muted" TextWrapping="Wrap"
+                           Text="Claude처럼 버튼을 누르면 창이 닫히고, Core·Output까지 한 세트로 교체한 뒤 다시 실행됩니다. 자동 업데이트는 Velopack 설치본에서만 동작합니다. GitHub Releases에 새 패키지를 올리면 됩니다."/>
                 <TextBlock Classes="muted" TextWrapping="Wrap"
                            Text="출시 UX: Mono.Control.exe만 실행합니다. Core·Output은 백그라운드(WinExe)로 기동됩니다. 레거시 웹 UI는 제거되었습니다."/>
               </StackPanel>
@@ -581,8 +598,10 @@
               <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpArtist}">
                 <TextBlock Text="{Binding ArtistBio}" TextWrapping="Wrap" Foreground="#EEFFFFFF" FontSize="15"/>
               </ScrollViewer>
-              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpCredits}">
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpCredits}"
+                            Offset="{Binding LinerScrollY, Converter={x:Static vm:ScrollOffsetConverter.Instance}, Mode=TwoWay}">
                 <StackPanel Spacing="10">
+                  <CheckBox Content="호스트 보기 따라가기" IsChecked="{Binding FollowHostView}" Foreground="White"/>
                   <TextBlock Text="{Binding CreditsText}" TextWrapping="Wrap" Foreground="#EEFFFFFF"/>
                   <TextBlock Text="{Binding LinerNotes}" TextWrapping="Wrap" Foreground="#CCFFFFFF"/>
                 </StackPanel>

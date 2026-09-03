@@ -36,6 +36,8 @@ public sealed class ListeningRoom
     public long? AutoplayDeadlineUnixMs { get; set; }
     public string? AutoplayChosenId { get; set; }
     public int LinerPage { get; set; }
+    /// <summary>라이너/크레딧 패널 세로 스크롤(px). follow_host 시 게스트가 추종.</summary>
+    public double LinerScrollY { get; set; }
     public int MaxMembers { get; set; } = 16;
     public string? InviteCode { get; set; }
     public DateTimeOffset? InviteExpiresAt { get; set; }

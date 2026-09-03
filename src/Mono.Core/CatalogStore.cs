@@ -464,8 +464,9 @@ public sealed class CatalogStore : IDisposable
                     else if (!string.IsNullOrWhiteSpace(row.Name))
                         artist = _artists.Values.FirstOrDefault(a =>
                             a.Name.Equals(row.Name, StringComparison.OrdinalIgnoreCase));
-                    if (artist is null || row.Aliases is null) continue;
-                    var merged = artist.AlternateNames.Concat(row.Aliases).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (artist is null) continue;
+                    var aliases = row.Aliases ?? [];
+                    var merged = artist.AlternateNames.Concat(aliases).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     var updated = new Artist
                     {
                         Id = artist.Id,
@@ -476,8 +477,14 @@ public sealed class CatalogStore : IDisposable
                     };
                     UpsertArtist(con, updated);
                     _artists[updated.Id] = updated;
+                    if (!string.IsNullOrWhiteSpace(row.Mbid))
+                        _mbidByArtist[updated.Id] = row.Mbid!;
                 }
             }
+
+            // MusicBrainz 원격 수집은 opt-in: MONO_MUSICBRAINZ=1
+            if (string.Equals(Environment.GetEnvironmentVariable("MONO_MUSICBRAINZ"), "1", StringComparison.OrdinalIgnoreCase))
+                _ = Task.Run(() => EnrichAliasesFromMusicBrainzAsync(CancellationToken.None));
         }
         catch
         {
@@ -485,10 +492,59 @@ public sealed class CatalogStore : IDisposable
         }
     }
 
+    private readonly Dictionary<string, string> _mbidByArtist = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>aliases.json의 mbid·아티스트명으로 MusicBrainz aliases를 가져와 병합한다.</summary>
+    public async Task<int> EnrichAliasesFromMusicBrainzAsync(CancellationToken ct = default)
+    {
+        List<(string ArtistId, string? Mbid, string Name)> jobs;
+        lock (_gate)
+        {
+            jobs = _artists.Values
+                .Select(a => (a.Id, _mbidByArtist.GetValueOrDefault(a.Id), a.Name))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Item2))
+                .Take(12)
+                .ToList();
+            // mbid 없으면 이름 검색은 상위 3명만 (rate limit)
+            if (jobs.Count == 0)
+            {
+                jobs = _artists.Values
+                    .Select(a => (a.Id, (string?)null, a.Name))
+                    .Take(3)
+                    .ToList();
+            }
+        }
+
+        var updatedCount = 0;
+        foreach (var (artistId, mbid, name) in jobs)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var remote = await MusicBrainzClient.FetchAliasesAsync(mbid, name, ct).ConfigureAwait(false);
+                if (remote.Count == 0) continue;
+                if (SetArtistAliases(artistId, remote.Concat(GetAliases(artistId))))
+                    updatedCount++;
+            }
+            catch
+            {
+                // 네트워크 실패는 무시
+            }
+        }
+        return updatedCount;
+    }
+
+    private IEnumerable<string> GetAliases(string artistId)
+    {
+        lock (_gate)
+            return _artists.TryGetValue(artistId, out var a) ? a.AlternateNames.ToList() : [];
+    }
+
     private sealed class AliasRow
     {
         public string? Id { get; set; }
         public string? Name { get; set; }
+        public string? Mbid { get; set; }
         public List<string>? Aliases { get; set; }
     }
 

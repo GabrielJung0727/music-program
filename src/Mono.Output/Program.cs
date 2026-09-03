@@ -18,10 +18,13 @@ var peerId = Arg("--peer=") ?? "out-" + Guid.NewGuid().ToString("n")[..6];
 var displayName = Arg("--name=") ?? Environment.MachineName;
 var forceShared = args.Contains("--shared");
 var claimDsd = args.Contains("--dsd");
+var preferAsio = args.Contains("--asio");
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
 const int matpPort = 7701;
 
-var renderer = new Renderer(deviceHint, forceShared);
+var renderer = preferAsio
+    ? (IAudioRenderer)(AsioAudioRenderer.TryCreate(deviceHint) ?? (IAudioRenderer)new Renderer(deviceHint, forceShared))
+    : new Renderer(deviceHint, forceShared);
 var timeline = new Timeline();
 var clock = new ClockState();
 var frames = new ConcurrentQueue<MatpAudio>();
@@ -192,7 +195,7 @@ async Task ClockLoopAsync(CancellationToken ct)
 // 렌더 루프: PTS가 도래한 프레임만 DAC 버퍼로 넘긴다. 소셜/네트워크 처리와 스레드를 나눈다.
 async Task RenderLoopAsync(CancellationToken ct)
 {
-    LocalFileRenderer? local = null;
+    ILocalChunkSource? local = null;
     var lastEpoch = long.MinValue;
     while (!ct.IsCancellationRequested)
     {

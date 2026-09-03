@@ -180,6 +180,10 @@ public sealed class CommandProcessor
             case MessageTypes.LinerPage:
                 return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r => r.LinerPage = msg.Index ?? 0));
 
+            case MessageTypes.LinerScroll:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                    r.LinerScrollY = Math.Max(0, msg.OffsetMs ?? 0)));
+
             // ── 스마트 오토플레이 ────────────────────────────────
             case MessageTypes.ChooseAutoplay:
                 return From(_rooms.ChooseAutoplay(NeedRoom(peerId, msg), peerId, msg.TrackId ?? ""));
@@ -276,9 +280,11 @@ public sealed class CommandProcessor
                                 e.Online,
                                 e.ExclusiveMode,
                                 e.LatencyMs,
-                                e.RoomId
+                                e.RoomId,
+                                e.SupportsDsd
                             }),
-                            clocks = stats
+                            clocks = stats,
+                            verdict = BuildSyncVerdict(stats.ToList())
                         }, LineFraming.JsonOptions)
                     });
             }
@@ -714,6 +720,45 @@ public sealed class CommandProcessor
             })
         }), LineFraming.JsonOptions)
     };
+
+    private static object BuildSyncVerdict(IReadOnlyList<object> clockRows)
+    {
+        // anonymous projections — re-parse via JSON for simplicity
+        var json = JsonSerializer.Serialize(clockRows);
+        using var doc = JsonDocument.Parse(json);
+        var offsets = new List<double>();
+        var rtts = new List<double>();
+        var jitters = new List<double>();
+        var locked = 0;
+        foreach (var el in doc.RootElement.EnumerateArray())
+        {
+            if (el.TryGetProperty("offsetMs", out var o)) offsets.Add(o.GetDouble());
+            if (el.TryGetProperty("rttMs", out var r)) rtts.Add(r.GetDouble());
+            if (el.TryGetProperty("jitterMs", out var j)) jitters.Add(j.GetDouble());
+            if (el.TryGetProperty("locked", out var l) && l.GetBoolean()) locked++;
+        }
+
+        var peerCount = doc.RootElement.GetArrayLength();
+        var offsetSpread = offsets.Count >= 2 ? offsets.Max() - offsets.Min() : offsets.FirstOrDefault();
+        var maxRtt = rtts.Count > 0 ? rtts.Max() : 0;
+        var maxJitter = jitters.Count > 0 ? jitters.Max() : 0;
+        var meets5ms = peerCount >= 2 && Math.Abs(offsetSpread) < 5 && maxRtt < 20;
+        return new
+        {
+            peerCount,
+            lockedCount = locked,
+            offsetSpreadMs = Math.Round(offsetSpread, 3),
+            maxRttMs = Math.Round(maxRtt, 3),
+            maxJitterMs = Math.Round(maxJitter, 3),
+            targetMs = 5,
+            meetsTarget = meets5ms,
+            note = peerCount < 2
+                ? "물리 기기 Output 2대 이상을 같은 룸에 붙인 뒤 sync_probe를 다시 실행하세요."
+                : meets5ms
+                    ? "오프셋 스프레드 < 5ms — 목표 충족."
+                    : "오프셋/RTT가 목표(5ms)를 넘습니다. Exclusive·유선 LAN·동일 스위치를 확인하세요."
+        };
+    }
 
     /// <summary>
     /// 존 멤버 기기를 존이 관리하는 방으로 옮긴다. Sync면 존 전체가 공유하는 개인 방으로,

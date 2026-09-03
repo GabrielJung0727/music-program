@@ -1421,6 +1421,7 @@ public sealed class RoomManager
             room.FollowHostView,
             room.AutoAdvance,
             room.LinerPage,
+            room.LinerScrollY,
             room.MaxMembers,
             room.InviteCode,
             room.InviteExpiresAt,

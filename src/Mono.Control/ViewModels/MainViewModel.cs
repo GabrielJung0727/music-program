@@ -17,6 +17,7 @@ public partial class MainViewModel : ObservableObject
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
     private readonly CoreSession _session;
     private readonly ProcessSupervisor _supervisor;
+    private readonly AppUpdater _updater = new();
     private readonly DispatcherTimer _clockTimer;
     private long _baseMedia;
     private long _baseLocal;
@@ -67,6 +68,8 @@ public partial class MainViewModel : ObservableObject
         LibraryPath = Prefs.Get("library_path", "");
         DarkTheme = Prefs.GetBool("dark_theme");
         ApplyTheme();
+        AppVersion = _updater.CurrentVersion;
+        UpdateStatus = $"현재 버전 {AppVersion}";
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _clockTimer.Tick += (_, _) => TickClock();
@@ -140,6 +143,15 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _headroomDb = -3;
     [ObservableProperty] private string _deviceEqProfile = "harman";
     [ObservableProperty] private string _syncProbeText = "";
+    [ObservableProperty] private string _appVersion = "";
+    [ObservableProperty] private string _updateStatus = "";
+    [ObservableProperty] private bool _updateBusy;
+    [ObservableProperty] private bool _updateReady;
+    [ObservableProperty] private int _updateProgress;
+    [ObservableProperty] private bool _followHostView;
+    [ObservableProperty] private double _linerScrollY;
+    [ObservableProperty] private string _artPerfText = "";
+    private bool _suppressLinerScrollSend;
 
     public bool IsLoungePage => SelectedNav?.Id == "lounge";
     public bool IsDevicesPage => SelectedNav?.Id == "devices";
@@ -151,6 +163,7 @@ public partial class MainViewModel : ObservableObject
     public bool IsContentLibrary => !IsLoungePage && !IsDevicesPage && !IsSettingsPage;
     public string PlayPauseLabel => IsPlaying ? "⏸" : "▶";
     public string ThemeButtonLabel => DarkTheme ? "라이트" : "다크";
+    public string UpdateButtonLabel => UpdateReady ? "업데이트" : "업데이트 확인";
     public bool IsNpLyrics => NowPlayingTab == 0;
     public bool IsNpArtist => NowPlayingTab == 1;
     public bool IsNpCredits => NowPlayingTab == 2;
@@ -168,7 +181,7 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsNpArtist));
         OnPropertyChanged(nameof(IsNpCredits));
     }
-    partial void OnCloseToTrayChanged(bool value) => Prefs.SetBool("close_to_tray", value);
+    partial void OnUpdateReadyChanged(bool value) => OnPropertyChanged(nameof(UpdateButtonLabel));
     partial void OnDarkThemeChanged(bool value)
     {
         Prefs.SetBool("dark_theme", value);
@@ -242,6 +255,7 @@ public partial class MainViewModel : ObservableObject
 
         await Safe(() => _session.CatalogAsync());
         await Safe(() => _session.ListRoomsAsync());
+        _ = CheckForUpdatesAsync();
     }
 
     public async Task ShutdownAsync()
@@ -480,6 +494,60 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ToggleTheme() => DarkTheme = !DarkTheme;
 
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        if (UpdateBusy) return;
+        UpdateBusy = true;
+        UpdateProgress = 0;
+        try
+        {
+            UpdateStatus = "업데이트 확인 중…";
+            UpdateStatus = await _updater.CheckAsync();
+            UpdateReady = _updater.Pending is not null;
+        }
+        catch (Exception ex)
+        {
+            UpdateReady = false;
+            UpdateStatus = "업데이트 확인 실패: " + ex.Message;
+        }
+        finally
+        {
+            UpdateBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyUpdateAsync()
+    {
+        if (UpdateBusy) return;
+        if (_updater.Pending is null)
+        {
+            await CheckForUpdatesAsync();
+            if (_updater.Pending is null) return;
+        }
+
+        UpdateBusy = true;
+        try
+        {
+            UpdateStatus = "업데이트 받는 중…";
+            var progress = new Progress<int>(p =>
+            {
+                UpdateProgress = p;
+                UpdateStatus = $"업데이트 받는 중… {p}%";
+            });
+            await _updater.DownloadAsync(progress);
+            UpdateStatus = "창을 닫고 설치한 뒤 다시 켭니다…";
+            await ShutdownAsync();
+            _updater.ApplyAndRestart();
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus = "업데이트 실패: " + ex.Message;
+            UpdateBusy = false;
+        }
+    }
+
     private void ApplyTheme()
     {
         if (Avalonia.Application.Current is null) return;
@@ -569,10 +637,32 @@ public partial class MainViewModel : ObservableObject
         {
             if (ct.IsCancellationRequested) break;
             if (string.IsNullOrWhiteSpace(t.AbsoluteArtUrl)) continue;
-            var bmp = await ArtCache.GetAsync(t.AbsoluteArtUrl, ct);
+            var bmp = await ArtCache.GetAsync(t.AbsoluteArtUrl, ct, decodeWidth: 160);
             if (bmp is not null)
                 await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
         }
+        ArtPerfText = ArtCache.StatsText();
+    }
+
+    partial void OnFollowHostViewChanged(bool value)
+    {
+        if (_suppressLinerScrollSend) return;
+        _ = Safe(() => _session.FollowHostAsync(value));
+    }
+
+    partial void OnLinerScrollYChanged(double value)
+    {
+        if (_suppressLinerScrollSend) return;
+        // 호스트가 follow를 켠 상태에서 스크롤하면 게스트에게 방송
+        if (FollowHostView)
+            _ = Safe(() => _session.LinerScrollAsync(value));
+    }
+
+    [RelayCommand]
+    private async Task ToggleFollowHostAsync()
+    {
+        FollowHostView = !FollowHostView;
+        await Task.CompletedTask;
     }
 
     private void LoadRooms(string? body)
@@ -622,6 +712,11 @@ public partial class MainViewModel : ObservableObject
 
             LinerNotes = node["linerNotes"]?.GetValue<string>() ?? "";
             CreditsText = node["credits"]?.GetValue<string>() ?? "";
+            _suppressLinerScrollSend = true;
+            FollowHostView = node["followHostView"]?.GetValue<bool>() ?? FollowHostView;
+            if (node["linerScrollY"] is JsonValue scrollNode && scrollNode.TryGetValue<double>(out var scrollY))
+                LinerScrollY = scrollY;
+            _suppressLinerScrollSend = false;
             CurrentLyric = node["currentLyric"]?.GetValue<string>() ?? "";
             LyricLines.Clear();
             if (node["lyrics"] is JsonArray ly)

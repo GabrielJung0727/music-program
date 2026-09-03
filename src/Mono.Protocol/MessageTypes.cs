@@ -57,6 +57,7 @@ public static class MessageTypes
     public const string FollowArtist = "follow_artist";
     public const string FollowHost = "follow_host";
     public const string LinerPage = "liner_page";
+    public const string LinerScroll = "liner_scroll";
 
     // 스마트 오토플레이
     public const string AutoplayCandidates = "autoplay_candidates";

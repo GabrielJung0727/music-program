@@ -462,6 +462,85 @@ public class RoomAndClockTests
         Assert.Contains("\"offsetMs\":1.5", json);
         Assert.Contains("\"bufferMs\":6", json);
     }
+
+    [Fact]
+    public void ZoneIndependentGivesEachDeviceItsOwnRoom()
+    {
+        var (rooms, _, _, _) = NewStack();
+        var dir = Path.Combine(Path.GetTempPath(), "mono-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        var zones = new ZoneRegistry(Path.Combine(dir, "z.db"));
+
+        var zone = zones.Create("owner", "Split");
+        zones.SetMode(zone.Id, ZoneMode.Independent);
+
+        foreach (var peer in new[] { "out-1", "out-2" })
+        {
+            var cap = new OutputCapability { PeerId = peer, DisplayName = peer };
+            var tmp = rooms.Create("owner", "t-" + peer, RoomMode.OpenLounge, null);
+            rooms.Join(tmp.Id, peer, PeerRole.Output, null, peer);
+            rooms.RegisterOutput(tmp.Id, cap);
+            zones.AddMember(zone.Id, peer);
+            rooms.LeaveCurrentRoomAsOutput(peer);
+            var created = rooms.Create("owner", zone.Name + " / " + peer, RoomMode.OpenLounge, null);
+            zones.SetIndependentRoom(zone.Id, peer, created.Id);
+            rooms.Join(created.Id, peer, PeerRole.Output, null, peer);
+            rooms.RegisterOutput(created.Id, cap);
+            rooms.Enqueue(created.Id, "owner", peer == "out-1" ? "tr-blue-train" : "tr-so-what");
+        }
+
+        var stored = zones.Get(zone.Id)!;
+        Assert.Equal(ZoneMode.Independent, stored.Mode);
+        Assert.Equal(2, stored.IndependentRoomIds.Count);
+        Assert.NotEqual(stored.IndependentRoomIds["out-1"], stored.IndependentRoomIds["out-2"]);
+        Assert.Equal("tr-blue-train", rooms.Get(stored.IndependentRoomIds["out-1"])!.Queue[0].TrackId);
+        Assert.Equal("tr-so-what", rooms.Get(stored.IndependentRoomIds["out-2"])!.Queue[0].TrackId);
+    }
+
+    [Fact]
+    public void DopEncoderAlternatesMarkersAndScalesRate()
+    {
+        var dsd = new byte[] { 0xAA, 0x55, 0xF0, 0x0F };
+        var (pcm, rate, depth, ch) = Mono.Output.DopEncoder.Encode(dsd, dsdRate: 2822400, channels: 2);
+        Assert.Equal(24, depth);
+        Assert.Equal(2, ch);
+        Assert.Equal(2822400 / 16, rate);
+        Assert.Equal(12, pcm.Length);
+        Assert.Equal(0x05, pcm[2]);
+        Assert.Equal(0xFA, pcm[8]);
+    }
+
+    [Fact]
+    public void LinerScrollIsStoredOnRoom()
+    {
+        var (rooms, _, _, _) = NewStack();
+        var room = rooms.Create("host", "Read", RoomMode.OpenLounge, "H");
+        rooms.ApplyHostSettings(room.Id, "host", r =>
+        {
+            r.FollowHostView = true;
+            r.LinerScrollY = 240;
+            r.LinerPage = 2;
+        });
+        var live = rooms.Get(room.Id)!;
+        Assert.True(live.FollowHostView);
+        Assert.Equal(240, live.LinerScrollY);
+        Assert.Equal(2, live.LinerPage);
+        var snap = rooms.SnapshotJson(live);
+        Assert.Contains("linerScrollY", snap, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AliasRowAcceptsMbidField()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mono-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "aliases.json"),
+            """[ { "name": "John Coltrane", "mbid": "b625448e-bf4a-41c3-a997-987a97342e02", "aliases": ["Trane", "콜트레인"] } ]""");
+        var catalog = new CatalogStore(Path.Combine(dir, "c.db"));
+        Assert.Contains(catalog.Artists.Values, a =>
+            a.Name.Contains("Coltrane", StringComparison.OrdinalIgnoreCase)
+            && a.AlternateNames.Any(n => n.Contains("콜트레인") || n.Contains("Trane", StringComparison.OrdinalIgnoreCase)));
+    }
 }
 
 public class TransportAndArchiveTests

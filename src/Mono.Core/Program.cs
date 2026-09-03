@@ -91,16 +91,28 @@ app.MapGet("/api/archives", (HistoryStore history) => history.Archives);
 app.MapGet("/api/playlists", (HistoryStore history) => history.Playlists);
 
 // 앨범 아트는 Core가 캐시해 둔 파일만 내보낸다 (Control은 디코드하지 않는다).
-app.MapGet("/api/art/{trackId}", (string trackId, CatalogStore catalog) =>
+app.MapGet("/api/art/{trackId}", (string trackId, CatalogStore catalog, ArtworkService artwork, HttpRequest req) =>
 {
     var track = catalog.Tracks.GetValueOrDefault(trackId);
     var path = track?.ArtworkPath ?? (track is null ? null : catalog.Albums.GetValueOrDefault(track.AlbumId)?.ArtworkPath);
     if (path is null || !File.Exists(path))
-    {
         return Results.NotFound();
+
+    if (int.TryParse(req.Query["w"], out var qw))
+    {
+        var w = Math.Clamp(qw, 32, 1024);
+        var thumb = artwork.EnsureThumbnail(path, w);
+        if (thumb is not null && File.Exists(thumb))
+            return Results.File(thumb, ArtworkService.ContentType(thumb));
     }
 
     return Results.File(path, ArtworkService.ContentType(path));
+});
+
+app.MapPost("/api/aliases/musicbrainz", async (CatalogStore catalog) =>
+{
+    var n = await catalog.EnrichAliasesFromMusicBrainzAsync();
+    return Results.Ok(new { updated = n });
 });
 
 app.MapGet("/api/m3u/{playlistId}", (string playlistId, HistoryStore history, CatalogStore catalog) =>
