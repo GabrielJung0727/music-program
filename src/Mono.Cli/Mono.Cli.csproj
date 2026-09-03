@@ -1,14 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Mono.Output</RootNamespace>
-    <AssemblyName>Mono.Output</AssemblyName>
+    <RootNamespace>Mono.Cli</RootNamespace>
+    <AssemblyName>Mono.Cli</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="2.2.1" />
     <ProjectReference Include="..\Mono.Protocol\Mono.Protocol.csproj" />
+    <ProjectReference Include="..\Mono.Shared\Mono.Shared.csproj" />
   </ItemGroup>
 </Project>
+

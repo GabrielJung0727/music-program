@@ -432,7 +432,7 @@ dotnet publish src/Mono.Output  -c Release -r win-x64 --self-contained true -p:P
 
 | 우선 | 항목 |
 | --- | --- |
-| **P0** | Avalonia Control 셸(사이드바·하단바·온보딩), Core/Output `WinExe`, Control이 Core·Output 수명 관리, 콘솔·브라우저 제거 |
+| **P0** | ~~Avalonia Control 셸 + WinExe Core/Output~~ ✅ 기본 구현. 이어서 실아트·몰입 Now Playing·폴더 피커 |
 | **P1** | Now Playing 몰입, Easy EQ UI, 시그널 패스, Home 레일, 트레이 종료 정책 |
 | **P2** | Device EQ, Convolution/REW, Speaker Setup, Genres 타일, 레거시 wwwroot 삭제 |
 

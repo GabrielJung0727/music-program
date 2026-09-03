@@ -6,98 +6,74 @@
 - 기획: [`docs/01-기획명세서.md`](docs/01-기획명세서.md)
 - 아키텍처: [`docs/02-아키텍처.md`](docs/02-아키텍처.md)
 - 구현 현황: [`docs/03-구현현황.md`](docs/03-구현현황.md)
-- UI/UX·**exe-only** 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md) — 브라우저·터미널 없이 `Mono.Control.exe`만으로 실행
+- UI/UX·**exe-only** 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md)
 
 ## 최근 추가된 기능
 
-- **첫 실행 온보딩**: Control을 처음 열면 6단계 마법사(이름 → 라이브러리 → 출력 장치/존 → 스트리밍 → 완료). (현재 레거시 웹에 구현; Avalonia로 이전 예정)
-- **최다 반응 구간**: 곡당 유저당 최대 3번, ❤️🎉👏🔥로 제한된 반응을 시크바 위 히트맵으로 표시
-- **스마트 선택형 오토플레이**: 큐 마지막 곡 종료 40초 전 후보 3곡 제시, 무응답 시 1번 자동 재생
-- **멀티 디바이스 존**: 여러 출력기기를 묶어 Sync(동시 재생) 또는 Independent(기기별 다른 곡)로 운영 — 싱글 플레이 전용
-- **다국어 아티스트 검색**: "요네즈 켄시"처럼 한국어 표기로 원어(米津玄師) 아티스트 검색
-- **위키백과 아티스트 이력**: ko→en 순으로 요약을 가져와 라이너 패널에 출처와 함께 표시
-- **제품 UX 결정**: 출시는 **네이티브 .exe만** (Avalonia Control + 헤드리스 Core/Output). 웹 UI·콘솔창은 개발용
+- **Avalonia 네이티브 Control**: Roon형 사이드바 + 본문 + 하단 플레이어 바. 브라우저·콘솔 없이 `Mono.Control.exe`
+- **프로세스 수명 관리**: Control이 Core·Output을 `WinExe` 백그라운드로 기동
+- **온보딩**: Avalonia 6단계 (이름 → 라이브러리 → 출력/존 → 스트리밍 → 완료)
+- 반응 히트맵 · 스마트 오토플레이 · 멀티 디바이스 존 · 다국어 검색 · 위키백과 이력
 
-## 빠른 시작 (개발)
+## 빠른 시작
 
 ```powershell
 dotnet build Mono.slnx
-dotnet run --project src/Mono.Core
+dotnet run --project src/Mono.Control
 ```
+
+Control이 Core를 찾아 기동하고 GUI를 엽니다. 소리는 하단 **「출력 연결」** 또는 온보딩에서 Output을 붙입니다.
 
 | 포트 | 용도 |
 | --- | --- |
-| 7700 | Control ↔ Core (TCP, 줄 단위 JSON) |
+| 7700 | Control ↔ Core (TCP JSON) |
 | 7701 | MATP (오디오 + 클럭) |
-| 7702 | *(레거시)* 웹 UI · REST — 출시 기본 OFF |
-
-출시 진입점(목표): **`Mono.Control.exe`** — Core/Output을 백그라운드로 기동. 화면만 담당하고 **소리는 내지 않는다.**
-
-개발 중 레거시 웹: <http://127.0.0.1:7702>
+| 7702 | REST·앨범 아트 API (레거시 웹 SPA는 참고용) |
 
 ```powershell
-dotnet run --project src/Mono.Control            # 현재 CLI (Avalonia GUI로 교체 예정)
-dotnet run --project src/Mono.Output -- --room=<룸ID>   # DAC 엔드포인트
+dotnet run --project src/Mono.Cli                              # 개발용 CLI
+dotnet run --project src/Mono.Output -- --room=<룸ID>          # Output 수동 실행
 ```
 
-Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=<이름 일부>` `--volume=0-100`
-`--shared`(배타 모드 강제 해제) `--dsd`(DSD 네이티브 수신 선언)
+Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=` `--volume=0-100` `--shared` `--dsd`
+
+출시 zip: `Mono.Control.exe` + `Mono.Core.exe` + `Mono.Output.exe` 동일 폴더. 규약은 [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md) §5.
 
 ## 라이브러리
 
-로컬 음원은 `src/Mono.Core/bin/Debug/net8.0/data/library` 에 넣고 Control에서 **라이브러리 스캔**.
-`appsettings.json` 또는 환경변수로 경로·주기를 바꿀 수 있다.
+로컬 음원은 Core `data/library` 또는 설정 경로. Control에서 **라이브러리 스캔**.
 
 ```json
 { "Mono": { "LibraryRoot": "D:\\Music", "ScanIntervalMinutes": 30, "ControlUrl": "http://0.0.0.0:7702" } }
 ```
 
-- 포맷: FLAC / WAV / AIFF / ALAC / M4A / MP3 / AAC / DSF / DFF (태그·커버·트랙번호 인식)
-- 가사: 같은 이름의 `.lrc` 사이드카 또는 태그 내장 가사
-- 커버: 태그 내장 이미지 → `data/art` 캐시, 폴더의 `cover.jpg`/`folder.jpg`도 인식
-- 스트리밍: Tidal / Qobuz 어댑터(현재 데모 카탈로그). 토큰은 Core에만 남고 Control로 나가지 않는다.
+- 포맷: FLAC / WAV / AIFF / ALAC / M4A / MP3 / AAC / DSF / DFF
+- 가사: `.lrc` 또는 태그 내장 · 커버: 태그/`cover.jpg`
+- 스트리밍: Tidal / Qobuz 어댑터(데모 카탈로그)
 
-## 3단 스모크 테스트
-
-터미널 3개:
+## 개발용 CLI 스모크
 
 ```powershell
 dotnet run --project src/Mono.Core
-dotnet run --project src/Mono.Control
+dotnet run --project src/Mono.Cli
 dotnet run --project src/Mono.Output -- --room=<룸ID>
 ```
-
-Control CLI 예시:
 
 ```
 create audiophile Night Lounge
 add tr-blue-train
 play
-pin 12000 horn entrance
-heart
-end yes
 ```
 
-Output은 붙는 즉시 클럭을 맞추고 콘솔에 락 상태를 찍는다.
-
-```
-clock offset=-0.16ms jitter=0.33ms rtt=1.96ms target=6ms depth=20ms resync=0 drop=3 Exclusive
-```
-
-## REST API
+## REST API (Core)
 
 | 경로 | 내용 |
 | --- | --- |
-| `GET /api/health` | 룸·트랙·온라인 엔드포인트 수 |
-| `GET /api/rooms`, `/api/rooms/{id}` | 룸 목록 · 룸 스냅샷 |
-| `GET /api/catalog`, `/api/graph/{artistId}` | 카탈로그 · 메타데이터 그래프 |
-| `GET /api/endpoints` | 알려진 출력 엔드포인트(오프라인 포함) |
-| `GET /api/archives`, `/api/playlists` | 세션 아카이브 · 개인 플레이리스트 |
-| `GET /api/art/{trackId}` | 앨범 아트 캐시 |
-| `GET /api/m3u/{playlistId}` | 플레이리스트 M3U 내보내기 |
-| `GET /api/session/{archiveId}` | 세션 요약(트랙 식별자·메타만) |
-| `GET /api/reactions/{trackId}` | 트랙의 전체 반응 히트맵(10초 버킷) |
-| `GET /api/wiki/{artistId}` | 위키백과 아티스트 이력 요약(ko→en 폴백) |
+| `GET /api/health` | 룸·트랙·엔드포인트 |
+| `GET /api/catalog` | 카탈로그 |
+| `GET /api/art/{trackId}` | 앨범 아트 |
+| `GET /api/reactions/{trackId}` | 반응 히트맵 |
+| `GET /api/wiki/{artistId}` | 위키 요약 |
 
 ## 테스트
 
