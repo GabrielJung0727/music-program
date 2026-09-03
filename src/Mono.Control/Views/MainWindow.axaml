@@ -8,12 +8,12 @@
         MinWidth="960" MinHeight="640"
         Title="mono"
         Classes="mono"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Closing="OnClosing">
 
   <Grid>
     <Grid RowDefinitions="*,Auto">
       <Grid Grid.Row="0" ColumnDefinitions="220,*">
-        <!-- Sidebar -->
         <Border Classes="sidebar">
           <DockPanel>
             <TextBlock Classes="brand" DockPanel.Dock="Top" Text="mono"/>
@@ -33,7 +33,6 @@
           </DockPanel>
         </Border>
 
-        <!-- Main content -->
         <Grid Grid.Column="1" Margin="28,20,28,12" RowDefinitions="Auto,Auto,*">
           <DockPanel Grid.Row="0">
             <StackPanel Orientation="Horizontal" Spacing="8" DockPanel.Dock="Right">
@@ -50,16 +49,119 @@
           <TextBox Grid.Row="1" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
                    Text="{Binding SearchText}" Margin="0,12,0,16" MaxWidth="480" HorizontalAlignment="Left"/>
 
-          <!-- Pages -->
           <Grid Grid.Row="2">
-            <!-- Library / Home grid -->
-            <ScrollViewer IsVisible="{Binding IsContentLibrary}">
+            <!-- Home rails -->
+            <ScrollViewer IsVisible="{Binding IsHomePage}">
+              <StackPanel Spacing="18">
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLibraryToolsVisible}">
+                  <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
+                  <Button Classes="ghost" Content="Tidal OAuth" Command="{Binding LinkTidalCommand}"/>
+                  <Button Classes="ghost" Content="Qobuz OAuth" Command="{Binding LinkQobuzCommand}"/>
+                  <Button Classes="ghost" Content="Tidal 데모" Command="{Binding LinkTidalDemoCommand}"/>
+                  <Button Classes="ghost" Content="Qobuz 데모" Command="{Binding LinkQobuzDemoCommand}"/>
+                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding HomeRails}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:HomeRail">
+                      <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="18" Margin="0,0,0,8"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                          <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="models:CatalogTrack">
+                                <Border Classes="trackcard" Width="148">
+                                  <StackPanel Spacing="6">
+                                    <Border Height="130" CornerRadius="8" ClipToBounds="True" Background="#ECECF8">
+                                      <Panel>
+                                        <TextBlock Text="♪" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"
+                                                   IsVisible="{Binding !HasArt}"/>
+                                        <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                                      </Panel>
+                                    </Border>
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                                    <Button Classes="primary" Content="재생" Padding="10,4"
+                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
+                                            CommandParameter="{Binding}"/>
+                                  </StackPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </ScrollViewer>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Genres tiles -->
+            <ScrollViewer IsVisible="{Binding IsGenresPage}">
+              <StackPanel Spacing="16">
+                <ItemsControl ItemsSource="{Binding GenreTiles}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:GenreTile">
+                      <Button Classes="genretile" Background="{Binding Accent}"
+                              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectGenreCommand}"
+                              CommandParameter="{Binding}">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Label}" FontSize="22" FontWeight="SemiBold" Foreground="White"/>
+                          <TextBlock Text="{Binding Subtitle}" Foreground="#CCFFFFFF" FontSize="12"/>
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding FilteredTracks}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:CatalogTrack">
+                      <Border Classes="trackcard">
+                        <StackPanel Spacing="6">
+                          <Border Height="140" CornerRadius="8" ClipToBounds="True" Background="#ECECF8">
+                            <Panel>
+                              <TextBlock Text="♪" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"
+                                         IsVisible="{Binding !HasArt}"/>
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                            </Panel>
+                          </Border>
+                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                          <Button Classes="primary" Content="재생" Padding="10,4"
+                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
+                                  CommandParameter="{Binding}"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- Library grid -->
+            <ScrollViewer IsVisible="{Binding IsLibraryGrid}">
               <StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12"
                             IsVisible="{Binding IsLibraryToolsVisible}">
                   <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
-                  <Button Classes="ghost" Content="Tidal 연동" Command="{Binding LinkTidalCommand}"/>
-                  <Button Classes="ghost" Content="Qobuz 연동" Command="{Binding LinkQobuzCommand}"/>
+                  <Button Classes="ghost" Content="Tidal 데모" Command="{Binding LinkTidalDemoCommand}"/>
+                  <Button Classes="ghost" Content="Qobuz 데모" Command="{Binding LinkQobuzDemoCommand}"/>
                   <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
                 </StackPanel>
 
@@ -73,8 +175,12 @@
                     <DataTemplate x:DataType="models:CatalogTrack">
                       <Border Classes="trackcard">
                         <StackPanel Spacing="6">
-                          <Border Height="140" CornerRadius="8" Background="#ECECF8">
-                            <TextBlock Text="♪" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"/>
+                          <Border Height="140" CornerRadius="8" ClipToBounds="True" Background="#ECECF8">
+                            <Panel>
+                              <TextBlock Text="♪" FontSize="42" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"
+                                         IsVisible="{Binding !HasArt}"/>
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                            </Panel>
                           </Border>
                           <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
                           <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
@@ -95,7 +201,7 @@
               </StackPanel>
             </ScrollViewer>
 
-            <!-- Lounge page -->
+            <!-- Lounge -->
             <Grid IsVisible="{Binding IsLoungePage}" ColumnDefinitions="*,320">
               <StackPanel>
                 <TextBox Text="{Binding RoomName}" Watermark="룸 이름"/>
@@ -133,7 +239,6 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
                 <TextBlock Text="큐" FontWeight="SemiBold" Margin="0,16,0,6"/>
                 <Button Classes="ghost" Content="큐 비우기" Command="{Binding ClearQueueCommand}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding QueueTracks}">
@@ -165,51 +270,109 @@
               </Border>
             </Grid>
 
-            <!-- Devices / Settings overlay panels -->
+            <!-- Devices / Easy EQ / Signal path -->
             <ScrollViewer IsVisible="{Binding IsDevicesPage}">
-              <StackPanel Spacing="12" MaxWidth="560" HorizontalAlignment="Left">
-                <TextBlock Text="출력 장치는 Mono.Output이 등록합니다. 콘솔 창 없이 Control이 기동합니다." Classes="muted" TextWrapping="Wrap"/>
-                <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}" HorizontalAlignment="Left"/>
+              <StackPanel Spacing="14" MaxWidth="640" HorizontalAlignment="Left">
+                <TextBlock Text="시그널 패스" FontWeight="SemiBold"/>
+                <Border Background="#F7F7FA" CornerRadius="10" Padding="12">
+                  <TextBlock Text="{Binding SignalPathText}" TextWrapping="Wrap"/>
+                </Border>
+                <TextBlock Text="{Binding SyncText}" Classes="muted"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
+                  <Button Classes="ghost" Content="Sync Probe" Command="{Binding SyncProbeCommand}"/>
+                </StackPanel>
+                <TextBox AcceptsReturn="True" Height="80" Text="{Binding SyncProbeText}" Watermark="sync_probe JSON"/>
                 <TextBox Text="{Binding ZoneName}" Watermark="존 이름"/>
                 <Button Classes="ghost" Content="존 만들기" Command="{Binding CreateZoneCommand}" HorizontalAlignment="Left"/>
+
                 <TextBlock Text="DSP 프리셋" FontWeight="SemiBold"/>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="ghost" Content="Off" Command="{Binding SetDspCommand}" CommandParameter="0"/>
                   <Button Classes="ghost" Content="Headphones" Command="{Binding SetDspCommand}" CommandParameter="1"/>
                   <Button Classes="ghost" Content="Speakers" Command="{Binding SetDspCommand}" CommandParameter="2"/>
+                  <Button Classes="ghost" Content="Room IR" Command="{Binding SetDspCommand}" CommandParameter="3"/>
                   <Button Classes="ghost" Content="Crossfeed" Command="{Binding SetDspCommand}" CommandParameter="4"/>
+                  <Button Classes="ghost" Content="Parametric" Command="{Binding SetDspCommand}" CommandParameter="5"/>
+                </StackPanel>
+
+                <TextBlock Text="Easy EQ (Parametric / Graphic)" FontWeight="SemiBold"/>
+                <CheckBox Content="Graphic mode" IsChecked="{Binding EqGraphicMode}"/>
+                <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,4">
+                  <TextBlock Text="60 Hz" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand1}"/>
+                  <TextBlock Grid.Row="1" Text="250 Hz" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand2}"/>
+                  <TextBlock Grid.Row="2" Text="1 kHz" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand3}"/>
+                  <TextBlock Grid.Row="3" Text="4 kHz" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand4}"/>
+                  <TextBlock Grid.Row="4" Text="12 kHz" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand5}"/>
+                </Grid>
+                <Button Classes="primary" Content="EQ 적용" Command="{Binding ApplyEasyEqCommand}" HorizontalAlignment="Left"/>
+
+                <TextBlock Text="룸 IR (WAV/ZIP)" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Width="360" Text="{Binding IrPath}" Watermark="IR 파일 경로"/>
+                  <Button Classes="ghost" Content="찾기…" Click="PickIrClick"/>
+                  <Button Classes="ghost" Content="지우기" Command="{Binding ClearIrCommand}"/>
+                </StackPanel>
+
+                <TextBlock Text="Device EQ / Speaker Setup" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Content="Harman" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="harman"/>
+                  <Button Classes="ghost" Content="Bright" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="bright"/>
+                  <Button Classes="ghost" Content="Warm" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="warm"/>
+                </StackPanel>
+                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Text="Delay L (ms)" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayL}"/>
+                  <TextBlock Grid.Row="1" Text="Delay R (ms)" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayR}"/>
+                  <TextBlock Grid.Row="2" Text="Gain L (dB)" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainL}"/>
+                  <TextBlock Grid.Row="3" Text="Gain R (dB)" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainR}"/>
+                  <TextBlock Grid.Row="4" Text="Headroom" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-24" Maximum="0" Value="{Binding HeadroomDb}"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Content="스피커 적용" Command="{Binding ApplySpeakerSetupCommand}"/>
+                  <Button Classes="ghost" Content="헤드룸 적용" Command="{Binding ApplyHeadroomCommand}"/>
                 </StackPanel>
               </StackPanel>
             </ScrollViewer>
 
+            <!-- Settings -->
             <ScrollViewer IsVisible="{Binding IsSettingsPage}">
               <StackPanel Spacing="10" MaxWidth="520" HorizontalAlignment="Left">
                 <TextBlock Text="표시 이름"/>
                 <TextBox Text="{Binding DisplayName}"/>
                 <TextBlock Text="라이브러리 경로"/>
-                <TextBox Text="{Binding LibraryPath}" Watermark="비우면 Core 기본 폴더"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Width="360" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
+                  <Button Classes="ghost" Content="폴더…" Click="PickLibraryClick"/>
+                </StackPanel>
                 <Button Classes="ghost" Content="스캔" Command="{Binding ScanLibraryCommand}" HorizontalAlignment="Left"/>
+                <CheckBox Content="창 닫기 시 트레이로 최소화 (종료는 트레이 메뉴)" IsChecked="{Binding CloseToTray}"/>
                 <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="출시 UX: Mono.Control.exe만 실행합니다. Core·Output은 백그라운드(WinExe)로 기동되며 브라우저·터미널을 쓰지 않습니다."/>
+                           Text="출시 UX: Mono.Control.exe만 실행합니다. Core·Output은 백그라운드(WinExe)로 기동됩니다. 레거시 웹 UI는 제거되었습니다."/>
               </StackPanel>
             </ScrollViewer>
           </Grid>
         </Grid>
       </Grid>
 
-      <!-- Bottom player bar -->
+      <!-- Bottom player -->
       <Border Grid.Row="1" Classes="playerbar" Padding="16,10">
-        <Grid ColumnDefinitions="280,*,280">
-          <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <Border Width="56" Height="56" CornerRadius="6" Background="#ECECF8">
-              <TextBlock Text="♪" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"/>
-            </Border>
-            <StackPanel VerticalAlignment="Center">
-              <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+        <Grid ColumnDefinitions="300,*,280">
+          <Button Classes="ghost" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left"
+                  Command="{Binding OpenNowPlayingCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <Border Width="56" Height="56" CornerRadius="6" ClipToBounds="True" Background="#ECECF8">
+                <Panel>
+                  <TextBlock Text="♪" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#6D6DF6"/>
+                  <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
+                </Panel>
+              </Border>
+              <StackPanel VerticalAlignment="Center" MaxWidth="200">
+                <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+              </StackPanel>
             </StackPanel>
-          </StackPanel>
+          </Button>
 
           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
@@ -243,43 +406,93 @@
           <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2">
             <TextBlock Text="{Binding RoomChip}" Classes="muted" HorizontalAlignment="Right"/>
             <TextBlock Text="{Binding SyncText}" Classes="muted" FontSize="11" HorizontalAlignment="Right"/>
+            <TextBlock Text="{Binding SignalPathText}" Classes="muted" FontSize="10" HorizontalAlignment="Right" MaxWidth="260" TextTrimming="CharacterEllipsis"/>
             <Button Classes="ghost" Content="출력 연결" Command="{Binding ConnectOutputCommand}" HorizontalAlignment="Right"/>
           </StackPanel>
         </Grid>
       </Border>
     </Grid>
 
-    <!-- Onboarding overlay -->
+    <!-- Immersive Now Playing -->
+    <Border IsVisible="{Binding ShowNowPlaying}" Background="#E6101014">
+      <Grid>
+        <Image Source="{Binding NowArt}" Stretch="UniformToFill" Opacity="0.35">
+          <Image.Effect>
+            <BlurEffect Radius="48"/>
+          </Image.Effect>
+        </Image>
+        <Border Background="#990A0A0C"/>
+        <DockPanel Margin="40">
+          <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="닫기" Command="{Binding CloseNowPlayingCommand}" Foreground="White"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="ghost" Content="가사" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="0"/>
+              <Button Classes="ghost" Content="아티스트" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="1"/>
+              <Button Classes="ghost" Content="크레딧" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="2"/>
+            </StackPanel>
+          </DockPanel>
+          <Grid ColumnDefinitions="320,*" Margin="0,24,0,0">
+            <Border Width="300" Height="300" CornerRadius="12" ClipToBounds="True" Background="#222" VerticalAlignment="Top">
+              <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
+            </Border>
+            <StackPanel Grid.Column="1" Margin="28,0,0,0" Spacing="12">
+              <TextBlock Text="{Binding NowTitle}" FontSize="36" FontWeight="SemiBold" Foreground="White"/>
+              <TextBlock Text="{Binding NowArtist}" Classes="muted" FontSize="18" Foreground="#CCFFFFFF"/>
+              <TextBlock Text="{Binding CurrentLyric}" FontSize="20" Foreground="White" FontWeight="SemiBold" Margin="0,8,0,0"/>
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpLyrics}">
+                <ItemsControl ItemsSource="{Binding LyricLines}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}" Foreground="#DDFFFFFF" Margin="0,4" FontSize="16"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpArtist}">
+                <TextBlock Text="{Binding ArtistBio}" TextWrapping="Wrap" Foreground="#EEFFFFFF" FontSize="15"/>
+              </ScrollViewer>
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpCredits}">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="{Binding CreditsText}" TextWrapping="Wrap" Foreground="#EEFFFFFF"/>
+                  <TextBlock Text="{Binding LinerNotes}" TextWrapping="Wrap" Foreground="#CCFFFFFF"/>
+                </StackPanel>
+              </ScrollViewer>
+            </StackPanel>
+          </Grid>
+        </DockPanel>
+      </Grid>
+    </Border>
+
+    <!-- Onboarding -->
     <Border Classes="onboarding" IsVisible="{Binding ShowOnboarding}">
       <Border Classes="obcard" HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel Spacing="14">
           <TextBlock Classes="brand" Margin="0" Text="mono" HorizontalAlignment="Center"/>
-
           <StackPanel IsVisible="{Binding IsObStep0}" Spacing="10">
             <TextBlock Classes="h1" FontSize="28" Text="혼자서도, 같이서도&#x0a;하나의 소리로." TextWrapping="Wrap"/>
             <TextBlock Classes="muted" Text="브라우저·터미널 없이 Mono.Control.exe만으로 시작합니다." TextWrapping="Wrap"/>
             <Button Classes="primary" Content="시작하기" Command="{Binding NextOnboardingCommand}" HorizontalAlignment="Left"/>
           </StackPanel>
-
           <StackPanel IsVisible="{Binding IsObStep1}" Spacing="10">
             <TextBlock Classes="h1" FontSize="24" Text="어떻게 불러드릴까요?"/>
             <TextBox Text="{Binding DisplayName}" Watermark="표시 이름"/>
             <Button Classes="primary" Content="계속" Command="{Binding NextOnboardingCommand}" HorizontalAlignment="Left"/>
           </StackPanel>
-
           <StackPanel IsVisible="{Binding IsObStep2}" Spacing="10">
             <TextBlock Classes="h1" FontSize="24" Text="음원 라이브러리"/>
-            <TextBox Text="{Binding LibraryPath}" Watermark="예: D:\Music"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBox Width="280" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
+              <Button Classes="ghost" Content="폴더…" Click="PickLibraryClick"/>
+            </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Classes="ghost" Content="스캔 시작" Command="{Binding ScanLibraryCommand}"/>
               <Button Classes="ghost" Content="건너뛰기" Command="{Binding SkipOnboardingCommand}"/>
               <Button Classes="primary" Content="계속" Command="{Binding NextOnboardingCommand}"/>
             </StackPanel>
           </StackPanel>
-
           <StackPanel IsVisible="{Binding IsObStep3}" Spacing="10">
             <TextBlock Classes="h1" FontSize="24" Text="출력 장치"/>
-            <TextBlock Classes="muted" TextWrapping="Wrap" Text="WASAPI/ASIO Exclusive로 Bit-perfect 재생. Output은 백그라운드로 연결됩니다."/>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="WASAPI/ASIO Exclusive · DoP DSD. Output은 백그라운드로 연결됩니다."/>
             <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}" HorizontalAlignment="Left"/>
             <TextBox Text="{Binding ZoneName}" Watermark="존 이름"/>
             <Button Classes="ghost" Content="존 만들기" Command="{Binding CreateZoneCommand}" HorizontalAlignment="Left"/>
@@ -288,19 +501,18 @@
               <Button Classes="primary" Content="계속" Command="{Binding NextOnboardingCommand}"/>
             </StackPanel>
           </StackPanel>
-
           <StackPanel IsVisible="{Binding IsObStep4}" Spacing="10">
             <TextBlock Classes="h1" FontSize="24" Text="스트리밍 연동"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="ghost" Content="Tidal" Command="{Binding LinkTidalCommand}"/>
-              <Button Classes="ghost" Content="Qobuz" Command="{Binding LinkQobuzCommand}"/>
+              <Button Classes="ghost" Content="Tidal OAuth" Command="{Binding LinkTidalCommand}"/>
+              <Button Classes="ghost" Content="Qobuz OAuth" Command="{Binding LinkQobuzCommand}"/>
+              <Button Classes="ghost" Content="데모 토큰" Command="{Binding LinkTidalDemoCommand}"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Classes="ghost" Content="건너뛰기" Command="{Binding SkipOnboardingCommand}"/>
               <Button Classes="primary" Content="계속" Command="{Binding NextOnboardingCommand}"/>
             </StackPanel>
           </StackPanel>
-
           <StackPanel IsVisible="{Binding IsObStep5}" Spacing="10">
             <TextBlock Classes="h1" FontSize="24" Text="준비 완료!"/>
             <TextBlock Classes="muted" Text="설정은 Audio / Settings에서 언제든 바꿀 수 있습니다." TextWrapping="Wrap"/>

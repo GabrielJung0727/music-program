@@ -292,7 +292,7 @@ public sealed class LocalFileRenderer : IDisposable
     private readonly int _channels;
     private long _cursorMs = -1;
 
-    private LocalFileRenderer(FileStream fs, long dataPos, long dataSize, int rate, int depth, int channels)
+    internal LocalFileRenderer(FileStream fs, long dataPos, long dataSize, int rate, int depth, int channels)
     {
         _fs = fs;
         _dataPos = dataPos;
@@ -304,7 +304,18 @@ public sealed class LocalFileRenderer : IDisposable
 
     public static LocalFileRenderer? TryOpen(string path)
     {
-        if (!File.Exists(path) || !path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext is ".flac" or ".mp3" or ".m4a" or ".aac" or ".aiff" or ".aif")
+        {
+            return DecodedLocalRenderer.TryOpen(path);
+        }
+
+        if (!ext.Equals(".wav", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -373,4 +384,64 @@ public sealed class LocalFileRenderer : IDisposable
     }
 
     public void Dispose() => _fs.Dispose();
+}
+
+/// <summary>FLAC/MP3 등 Media Foundation 디코드 후 PCM 슬라이스 (Clock-sync 로컬).</summary>
+file static class DecodedLocalRenderer
+{
+    public static LocalFileRenderer? TryOpen(string path)
+    {
+        try
+        {
+            using var reader = new AudioFileReader(path);
+            var rate = reader.WaveFormat.SampleRate;
+            var ch = reader.WaveFormat.Channels;
+            var samples = new List<float>();
+            var buf = new float[rate * ch / 5];
+            int n;
+            while ((n = reader.Read(buf, 0, buf.Length)) > 0)
+            {
+                for (var i = 0; i < n; i++) samples.Add(buf[i]);
+            }
+
+            var pcm = FloatToPcm24(samples.ToArray());
+            var tmp = Path.Combine(Path.GetTempPath(), "mono-clk-" + Guid.NewGuid().ToString("n") + ".pcm");
+            File.WriteAllBytes(tmp, pcm);
+            var fs = new TempPcmStream(tmp);
+            return new LocalFileRenderer(fs, 0, pcm.Length, rate, 24, ch);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[] FloatToPcm24(float[] samples)
+    {
+        var bytes = new byte[samples.Length * 3];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var v = (int)Math.Clamp(samples[i] * 8388607f, -8388608, 8388607);
+            bytes[i * 3] = (byte)v;
+            bytes[i * 3 + 1] = (byte)(v >> 8);
+            bytes[i * 3 + 2] = (byte)(v >> 16);
+        }
+        return bytes;
+    }
+}
+
+file sealed class TempPcmStream : FileStream
+{
+    private readonly string _path;
+    public TempPcmStream(string path) : base(path, FileMode.Open, FileAccess.Read, FileShare.Read)
+        => _path = path;
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            try { File.Delete(_path); } catch { /* ignore */ }
+        }
+    }
 }

@@ -52,13 +52,7 @@ builder.Services.AddHostedService<RetentionService>();
 builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanScheduler>(sp, library));
 
 var app = builder.Build();
-app.UseDefaultFiles();
-
-// Control UI는 Core가 갱신되면 바로 반영돼야 한다 — ETag로 재검증하게 두고 stale 캐시를 막는다.
-app.UseStaticFiles(new StaticFileOptions
-{
-    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache, must-revalidate"
-});
+// 레거시 wwwroot SPA 제거 — Control은 Avalonia exe. HTTP는 art/REST API만.
 app.MapHub<LoungeHub>("/hub");
 
 app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegistry endpoints) => Results.Ok(new

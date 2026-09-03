@@ -119,15 +119,50 @@ public sealed class CoreSession : IAsyncDisposable
     public Task ListZonesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ListZones });
     public Task CreateZoneAsync(string name) => SendAsync(new MonoMessage { Type = MessageTypes.CreateZone, Text = name });
     public Task LinkStreamingAsync(int provider) => SendAsync(new MonoMessage { Type = MessageTypes.LinkStreaming, Provider = (Mono.Shared.StreamingProvider)provider, Token = "demo-token" });
+    public Task BeginStreamingOAuthAsync(int provider) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.LinkStreaming,
+        Provider = (Mono.Shared.StreamingProvider)provider,
+        Text = "oauth",
+        Token = "oauth"
+    });
     public Task HistoryAsync() => SendAsync(new MonoMessage { Type = MessageTypes.History });
     public Task PlaylistsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Playlists });
     public Task ArchivesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Archives });
     public Task SetDspAsync(int preset) => SendAsync(new MonoMessage { Type = MessageTypes.SetDsp, Dsp = (Mono.Shared.DspPresetKind)preset });
+    public Task SetEasyEqAsync(string json, bool graphic) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.SetEasyEq,
+        Body = json,
+        Flag = graphic
+    });
+    public Task SetConvolutionIrAsync(string? path) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.SetConvolutionIr,
+        Path = path
+    });
+    public Task SetSpeakerSetupAsync(string csv) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.SetSpeakerSetup,
+        Text = csv
+    });
+    public Task SetHeadroomAsync(float db) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.SetHeadroom,
+        Text = db.ToString(System.Globalization.CultureInfo.InvariantCulture)
+    });
+    public Task SetDeviceEqAsync(string profile) => SendAsync(new MonoMessage
+    {
+        Type = MessageTypes.SetDeviceEq,
+        Text = profile
+    });
+    public Task SyncProbeAsync() => SendAsync(new MonoMessage { Type = MessageTypes.SyncProbe });
     public Task ResyncAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Resync });
     public Task ChooseAutoplayAsync(string trackId) => SendAsync(new MonoMessage { Type = MessageTypes.ChooseAutoplay, TrackId = trackId });
     public Task WikiAsync(string artistId) => SendAsync(new MonoMessage { Type = MessageTypes.WikiBio, Text = artistId });
     public Task ClearQueueAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ClearQueue });
     public Task EndSessionAsync(bool consent) => SendAsync(new MonoMessage { Type = MessageTypes.EndSession, Consent = consent });
+    public Task LinerPageAsync(int page) => SendAsync(new MonoMessage { Type = MessageTypes.LinerPage, Index = page });
 
     public async Task DisconnectAsync()
     {

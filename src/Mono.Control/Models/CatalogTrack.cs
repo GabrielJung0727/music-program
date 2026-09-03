@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
+using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Mono.Control.Models;
 
-public sealed class CatalogTrack
+public partial class CatalogTrack : ObservableObject
 {
     [JsonPropertyName("id")] public string Id { get; set; } = "";
     [JsonPropertyName("title")] public string Title { get; set; } = "";
@@ -17,11 +19,30 @@ public sealed class CatalogTrack
     [JsonPropertyName("sampleRate")] public int SampleRate { get; set; }
     [JsonPropertyName("bitDepth")] public int BitDepth { get; set; }
     [JsonPropertyName("isDsd")] public bool IsDsd { get; set; }
+    [JsonPropertyName("source")] public int Source { get; set; }
     [JsonPropertyName("mergedLocalAndStreaming")] public bool MergedLocalAndStreaming { get; set; }
+    [JsonPropertyName("hasLyrics")] public bool HasLyrics { get; set; }
+
+    [ObservableProperty] private Bitmap? _cover;
+
+    partial void OnCoverChanged(Bitmap? value) => OnPropertyChanged(nameof(HasArt));
 
     public string Subtitle => string.Join(" · ", new[] { Artist, Album }.Where(s => !string.IsNullOrWhiteSpace(s)));
     public string DurationText => TimeSpan.FromMilliseconds(DurationMs).ToString(@"m\:ss");
     public string AbsoluteArtUrl => string.IsNullOrWhiteSpace(ArtUrl) ? "" : "http://127.0.0.1:7702" + ArtUrl;
+    public bool HasArt => Cover is not null;
+    public string GenreHint
+    {
+        get
+        {
+            if (IsDsd) return "DSD";
+            if (SampleRate >= 96000) return "Hi-Res";
+            if (Source == 1) return "Tidal";
+            if (Source == 2) return "Qobuz";
+            if (MergedLocalAndStreaming) return "Local+Stream";
+            return "Library";
+        }
+    }
 }
 
 public sealed class RoomListItem
@@ -43,4 +64,32 @@ public sealed class NavItem
     public string Id { get; }
     public string Label { get; }
     public string Section { get; }
+}
+
+public sealed class GenreTile
+{
+    public GenreTile(string id, string label, string accent, string subtitle)
+    {
+        Id = id;
+        Label = label;
+        Accent = accent;
+        Subtitle = subtitle;
+    }
+
+    public string Id { get; }
+    public string Label { get; }
+    public string Accent { get; }
+    public string Subtitle { get; }
+}
+
+public sealed class HomeRail
+{
+    public HomeRail(string title, IEnumerable<CatalogTrack> items)
+    {
+        Title = title;
+        Items = new(items);
+    }
+
+    public string Title { get; }
+    public System.Collections.ObjectModel.ObservableCollection<CatalogTrack> Items { get; }
 }

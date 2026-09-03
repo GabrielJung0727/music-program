@@ -260,6 +260,14 @@ async Task RenderLoopAsync(CancellationToken ct)
 
                 if (frame.IsDsd)
                 {
+                    if (!claimDsd)
+                    {
+                        continue;
+                    }
+
+                    var (dop, rate, depth, ch) = DopEncoder.Encode(frame.Payload, frame.SampleRate, frame.Channels);
+                    if (dop.Length == 0) continue;
+                    renderer.Push(dop, rate, depth, ch, volumePercent);
                     continue;
                 }
 

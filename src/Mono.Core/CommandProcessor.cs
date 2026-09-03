@@ -197,6 +197,92 @@ public sealed class CommandProcessor
                     r.DspEnabled = r.DspPreset != DspPresetKind.Off;
                 }));
 
+            case MessageTypes.SetConvolutionIr:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (r.DspLocked) return;
+                    r.ConvolutionIrPath = msg.Path;
+                    if (!string.IsNullOrWhiteSpace(msg.Path))
+                    {
+                        r.DspPreset = DspPresetKind.RoomIr;
+                        r.DspEnabled = true;
+                    }
+                }));
+
+            case MessageTypes.SetEasyEq:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (r.DspLocked) return;
+                    r.EasyEqJson = msg.Body ?? msg.Text;
+                    r.EasyEqGraphicMode = msg.Flag ?? false;
+                    r.DspPreset = DspPresetKind.Parametric;
+                    r.DspEnabled = true;
+                }));
+
+            case MessageTypes.SetSpeakerSetup:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (r.DspLocked) return;
+                    // text: "delayL,delayR,gainL,gainR"
+                    var parts = (msg.Text ?? "").Split(',', StringSplitOptions.TrimEntries);
+                    if (parts.Length >= 1 && float.TryParse(parts[0], out var dL)) r.SpeakerDelayMsLeft = dL;
+                    if (parts.Length >= 2 && float.TryParse(parts[1], out var dR)) r.SpeakerDelayMsRight = dR;
+                    if (parts.Length >= 3 && float.TryParse(parts[2], out var gL)) r.SpeakerGainLeftDb = gL;
+                    if (parts.Length >= 4 && float.TryParse(parts[3], out var gR)) r.SpeakerGainRightDb = gR;
+                    r.DspPreset = DspPresetKind.Speakers;
+                    r.DspEnabled = true;
+                }));
+
+            case MessageTypes.SetHeadroom:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (r.DspLocked) return;
+                    if (float.TryParse(msg.Text, out var db)) r.HeadroomDb = Math.Clamp(db, -24, 0);
+                }));
+
+            case MessageTypes.SetDeviceEq:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (r.DspLocked) return;
+                    r.DeviceEqProfile = msg.Text;
+                    r.DspPreset = DspPresetKind.Headphones;
+                    r.DspEnabled = true;
+                }));
+
+            case MessageTypes.SyncProbe:
+            {
+                var rooms = _rooms.List();
+                var stats = rooms.SelectMany(r => r.Stats.Select(kv => new
+                {
+                    roomId = r.Id,
+                    peerId = kv.Key,
+                    offsetMs = kv.Value.OffsetMs,
+                    jitterMs = kv.Value.JitterMs,
+                    rttMs = kv.Value.RttMs,
+                    locked = kv.Value.Locked
+                }));
+                return new CommandResult(
+                    null,
+                    new MonoMessage
+                    {
+                        Type = MessageTypes.SyncProbe,
+                        Ok = true,
+                        Body = JsonSerializer.Serialize(new
+                        {
+                            endpoints = _endpoints.All().Select(e => new
+                            {
+                                e.PeerId,
+                                e.DisplayName,
+                                e.Online,
+                                e.ExclusiveMode,
+                                e.LatencyMs,
+                                e.RoomId
+                            }),
+                            clocks = stats
+                        }, LineFraming.JsonOptions)
+                    });
+            }
+
             case MessageTypes.SetPolicy:
                 return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
                 {
@@ -379,6 +465,31 @@ public sealed class CommandProcessor
             case MessageTypes.LinkStreaming:
             {
                 var provider = msg.Provider ?? StreamingProvider.Tidal;
+                if (string.Equals(msg.Text, "oauth", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(msg.Token, "oauth", StringComparison.OrdinalIgnoreCase))
+                {
+                    var begin = _streaming.BeginOAuth(provider);
+                    return Direct(new MonoMessage
+                    {
+                        Type = MessageTypes.LinkStreaming,
+                        Ok = true,
+                        Provider = provider,
+                        Body = JsonSerializer.Serialize(begin, LineFraming.JsonOptions)
+                    });
+                }
+
+                if (string.Equals(msg.Text, "oauth_complete", StringComparison.OrdinalIgnoreCase))
+                {
+                    var acc = _streaming.CompleteOAuth(provider, msg.Token, msg.PairingCode, msg.DisplayName);
+                    return new CommandResult(null, new MonoMessage
+                    {
+                        Type = MessageTypes.LinkStreaming,
+                        Ok = acc.Connected,
+                        Provider = provider,
+                        Body = JsonSerializer.Serialize(_streaming.AccountViews, LineFraming.JsonOptions)
+                    }, CatalogMessage());
+                }
+
                 if (string.IsNullOrWhiteSpace(msg.Token))
                 {
                     _streaming.Unlink(provider);
@@ -391,11 +502,11 @@ public sealed class CommandProcessor
                     }, CatalogMessage());
                 }
 
-                var acc = _streaming.Link(provider, msg.Token, msg.DisplayName);
+                var linked = _streaming.Link(provider, msg.Token, msg.DisplayName);
                 return new CommandResult(null, new MonoMessage
                 {
                     Type = MessageTypes.LinkStreaming,
-                    Ok = acc.Connected,
+                    Ok = linked.Connected,
                     Provider = provider,
                     Body = JsonSerializer.Serialize(_streaming.AccountViews, LineFraming.JsonOptions)
                 }, CatalogMessage());

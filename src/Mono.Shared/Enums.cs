@@ -51,7 +51,8 @@ public enum DspPresetKind
     Headphones,
     Speakers,
     RoomIr,
-    Crossfeed
+    Crossfeed,
+    Parametric
 }
 
 public enum StreamingProvider

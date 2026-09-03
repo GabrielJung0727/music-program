@@ -9,7 +9,7 @@ public readonly record struct AudioFormat(int SampleRate, int BitDepth, int Chan
 
 /// <summary>
 /// 트랙 한 개를 media_time 구간 단위로 잘라 주는 디코더 어댑터.
-/// FLAC/ALAC 등 실제 디코더는 이 인터페이스 뒤에 추가한다.
+/// WAV·FLAC·ALAC/MP3(MF)·DSF 경로가 있다. MF는 전량 메모리 디코드.
 /// </summary>
 public interface ITrackSlicer : IDisposable
 {
@@ -36,6 +36,12 @@ public static class AudioSourceFactory
                 if (ext is ".dsf")
                 {
                     return new DsfSlicer(path);
+                }
+
+                // Windows Media Foundation: FLAC / ALAC(m4a) / MP3 / AAC / AIFF 등
+                if (ext is ".flac" or ".mp3" or ".m4a" or ".aac" or ".aiff" or ".aif" or ".wma" or ".mp4")
+                {
+                    return new MediaFoundationSlicer(path);
                 }
             }
             catch (Exception)
@@ -133,6 +139,53 @@ public sealed class WavSlicer : ITrackSlicer
     }
 
     public void Dispose() => _fs.Dispose();
+}
+
+/// <summary>
+/// NAudio Media Foundation 디코더. FLAC/MP3/M4A 등을 PCM으로 풀어 구간 슬라이스한다.
+/// </summary>
+public sealed class MediaFoundationSlicer : ITrackSlicer
+{
+    private readonly byte[] _pcm;
+    private readonly int _bytesPerFrame;
+
+    public MediaFoundationSlicer(string path)
+    {
+        using var reader = new NAudio.Wave.AudioFileReader(path);
+        var rate = reader.WaveFormat.SampleRate;
+        var channels = reader.WaveFormat.Channels;
+        var samples = new List<float>(rate * channels * 8);
+        var buf = new float[rate * channels / 5];
+        int read;
+        while ((read = reader.Read(buf, 0, buf.Length)) > 0)
+        {
+            for (var i = 0; i < read; i++) samples.Add(buf[i]);
+        }
+
+        var f = samples.ToArray();
+        _pcm = DspPipeline.FromFloat(f, 24);
+        Format = new AudioFormat(rate, 24, Math.Max(channels, 1), false);
+        _bytesPerFrame = Format.BytesPerFrame;
+        DurationMs = rate == 0 || _bytesPerFrame == 0
+            ? 0
+            : _pcm.Length * 1000L / (_bytesPerFrame * (long)rate);
+    }
+
+    public AudioFormat Format { get; }
+    public long DurationMs { get; }
+
+    public byte[] Read(long startMs, int durationMs)
+    {
+        if (_bytesPerFrame == 0 || _pcm.Length == 0) return [];
+        var start = (int)Math.Clamp(startMs * Format.SampleRate / 1000 * _bytesPerFrame, 0, _pcm.Length);
+        var want = (int)Math.Min((long)durationMs * Format.SampleRate / 1000 * _bytesPerFrame, _pcm.Length - start);
+        if (want <= 0) return [];
+        var slice = new byte[want];
+        Buffer.BlockCopy(_pcm, start, slice, 0, want);
+        return slice;
+    }
+
+    public void Dispose() { }
 }
 
 /// <summary>DSF 원본 DSD 비트스트림 패스스루. PCM 변환을 하지 않는다.</summary>
