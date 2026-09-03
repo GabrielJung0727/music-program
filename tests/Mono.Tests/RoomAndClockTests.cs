@@ -464,6 +464,16 @@ public class RoomAndClockTests
     }
 
     [Fact]
+    public void BeginOAuthWithoutPartnerKeysUsesDemoToken()
+    {
+        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_ID", null);
+        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_SECRET", null);
+        var (_, _, _, streaming) = NewStack();
+        streaming.BeginOAuth(StreamingProvider.Tidal);
+        Assert.True(streaming.IsConnected(StreamingProvider.Tidal));
+    }
+
+    [Fact]
     public void ZoneIndependentGivesEachDeviceItsOwnRoom()
     {
         var (rooms, _, _, _) = NewStack();

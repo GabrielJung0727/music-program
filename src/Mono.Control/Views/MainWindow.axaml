@@ -457,10 +457,6 @@
                   <Button Classes="primary" Content="받고 다시 시작" Command="{Binding ApplyUpdateCommand}"
                           IsEnabled="{Binding UpdateReady}"/>
                 </StackPanel>
-                <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="Claude처럼 버튼을 누르면 창이 닫히고, Core·Output까지 한 세트로 교체한 뒤 다시 실행됩니다. 자동 업데이트는 Velopack 설치본에서만 동작합니다. GitHub Releases에 새 패키지를 올리면 됩니다."/>
-                <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="출시 UX: Mono.Control.exe만 실행합니다. Core·Output은 백그라운드(WinExe)로 기동됩니다. 레거시 웹 UI는 제거되었습니다."/>
               </StackPanel>
             </ScrollViewer>
           </Grid>

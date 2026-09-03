@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>Mono.Setup</RootNamespace>
+    <AssemblyName>Mono.Setup</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>mono-app.ico</ApplicationIcon>
+    <Version>0.1.2</Version>
+    <AssemblyTitle>mono</AssemblyTitle>
+    <Product>mono</Product>
+    <Company>mono</Company>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="mono-app.ico" />
+    <EmbeddedResource Include="Assets\logo.png" LogicalName="logo.png" Condition="Exists('Assets\logo.png')" />
+    <EmbeddedResource Include="Payload\VelopackSetup.exe" LogicalName="VelopackSetup.exe" Condition="Exists('Payload\VelopackSetup.exe')" />
+  </ItemGroup>
+</Project>

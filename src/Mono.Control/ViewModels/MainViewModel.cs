@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Models;
 using Mono.Control.Services;
 using Mono.Protocol;
+using Mono.Shared;
 
 namespace Mono.Control.ViewModels;
 
@@ -69,7 +70,7 @@ public partial class MainViewModel : ObservableObject
         DarkTheme = Prefs.GetBool("dark_theme");
         ApplyTheme();
         AppVersion = _updater.CurrentVersion;
-        UpdateStatus = $"현재 버전 {AppVersion}";
+        UpdateStatus = "";
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _clockTimer.Tick += (_, _) => TickClock();
@@ -235,8 +236,11 @@ public partial class MainViewModel : ObservableObject
 
     public async Task StartAsync()
     {
+        // Setup 위저드에서 onboarded=1 을 쓰면 첫 실행 온보딩을 건너뛴다. 가이드로만 재실행.
         ShowOnboarding = !Prefs.GetBool("onboarded");
         DisplayName = Prefs.Get("name", Environment.UserName);
+        LibraryPath = Prefs.Get("library_path", LibraryPath);
+        ZoneName = Prefs.Get("zone_name", string.IsNullOrWhiteSpace(ZoneName) ? "This PC" : ZoneName);
         _session.DisplayName = DisplayName;
 
         StatusText = "Core 확인 중…";
@@ -255,6 +259,30 @@ public partial class MainViewModel : ObservableObject
 
         await Safe(() => _session.CatalogAsync());
         await Safe(() => _session.ListRoomsAsync());
+
+        if (Prefs.GetBool("connect_local_output"))
+            await ConnectOutputAsync();
+
+        if (Prefs.GetBool("scan_library_on_start") && !string.IsNullOrWhiteSpace(LibraryPath))
+            await ScanLibraryAsync();
+
+        switch (Prefs.Get("streaming_choice", "none"))
+        {
+            case "tidal":
+                await Safe(() => _session.BeginStreamingOAuthAsync(1));
+                break;
+            case "qobuz":
+                await Safe(() => _session.BeginStreamingOAuthAsync(2));
+                break;
+            case "demo":
+                await Safe(() => _session.LinkStreamingAsync(1));
+                break;
+        }
+
+        // 한 번만 적용
+        if (Prefs.Get("streaming_choice", "none") != "none")
+            Prefs.Set("streaming_choice", "done");
+
         _ = CheckForUpdatesAsync();
     }
 
@@ -509,7 +537,7 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             UpdateReady = false;
-            UpdateStatus = "업데이트 확인 실패: " + ex.Message;
+            UpdateStatus = UpdateCheckErrors.Describe(ex);
         }
         finally
         {
@@ -603,7 +631,9 @@ public partial class MainViewModel : ObservableObject
                 break;
             case MessageTypes.LinkStreaming:
                 StatusText = (msg.Ok ?? false) ? "스트리밍 연동 응답" : (msg.Error ?? "스트리밍");
-                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"demo\":true", StringComparison.OrdinalIgnoreCase))
+                    StatusText = "파트너 키 없음 — 데모 토큰으로 연동했습니다.";
+                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
                     StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
                 break;
             case MessageTypes.SyncProbe:
