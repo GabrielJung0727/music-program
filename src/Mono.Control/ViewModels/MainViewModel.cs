@@ -37,34 +37,36 @@ public partial class MainViewModel : ObservableObject
 
         NavItems =
         [
-            new("home", "Home", "Browse"),
-            new("genres", "Genres", "Browse"),
-            new("qobuz", "Qobuz", "Browse"),
-            new("tidal", "TIDAL", "Browse"),
-            new("lounge", "라운지", "Browse"),
-            new("history", "History", "Browse"),
-            new("albums", "Albums", "My Library"),
-            new("artists", "Artists", "My Library"),
-            new("tracks", "Tracks", "My Library"),
-            new("playlists", "Playlists", "My Library"),
-            new("devices", "Audio", "Setup"),
-            new("settings", "Settings", "Setup"),
+            new("home", "Home", "Browse", "nav-home"),
+            new("genres", "Genres", "Browse", "nav-genres"),
+            new("qobuz", "Qobuz", "Browse", "nav-qobuz"),
+            new("tidal", "TIDAL", "Browse", "nav-tidal"),
+            new("lounge", "라운지", "Browse", "nav-lounge"),
+            new("history", "History", "Browse", "nav-history"),
+            new("albums", "Albums", "My Library", "nav-albums"),
+            new("artists", "Artists", "My Library", "nav-artists"),
+            new("tracks", "Tracks", "My Library", "nav-tracks"),
+            new("playlists", "Playlists", "My Library", "nav-playlists"),
+            new("devices", "Audio", "Setup", "nav-audio"),
+            new("settings", "Settings", "Setup", "nav-settings"),
         ];
         SelectedNav = NavItems[0];
 
         GenreTiles =
         [
-            new("all", "All", "#2C2C34", "전체 라이브러리"),
-            new("hires", "Hi-Res", "#1F4E5F", "96kHz+"),
-            new("dsd", "DSD", "#5C3D2E", "네이티브 DSD"),
-            new("jazz", "Jazz", "#3D4F5F", "시드·스캔 재즈"),
-            new("tidal", "TIDAL", "#111111", "스트리밍"),
-            new("qobuz", "Qobuz", "#1A3A5C", "Studio / Hi-Res"),
-            new("local", "Local", "#3A4A3A", "로컬 파일"),
+            new("all", "All", "#2C2C34", "전체 라이브러리", "genre-local"),
+            new("hires", "Hi-Res", "#1F4E5F", "96kHz+", "genre-hires"),
+            new("dsd", "DSD", "#5C3D2E", "네이티브 DSD", "genre-dsd"),
+            new("jazz", "Jazz", "#3D4F5F", "시드·스캔 재즈", "genre-jazz"),
+            new("tidal", "TIDAL", "#111111", "스트리밍", "genre-tidal"),
+            new("qobuz", "Qobuz", "#1A3A5C", "Studio / Hi-Res", "genre-qobuz"),
+            new("local", "Local", "#3A4A3A", "로컬 파일", "genre-local"),
         ];
 
         CloseToTray = Prefs.GetBool("close_to_tray");
         LibraryPath = Prefs.Get("library_path", "");
+        DarkTheme = Prefs.GetBool("dark_theme");
+        ApplyTheme();
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _clockTimer.Tick += (_, _) => TickClock();
@@ -148,6 +150,7 @@ public partial class MainViewModel : ObservableObject
     public bool IsLibraryToolsVisible => SelectedNav?.Id is "home" or "albums" or "artists" or "tracks" or "genres" or "qobuz" or "tidal";
     public bool IsContentLibrary => !IsLoungePage && !IsDevicesPage && !IsSettingsPage;
     public string PlayPauseLabel => IsPlaying ? "⏸" : "▶";
+    public string ThemeButtonLabel => DarkTheme ? "라이트" : "다크";
     public bool IsNpLyrics => NowPlayingTab == 0;
     public bool IsNpArtist => NowPlayingTab == 1;
     public bool IsNpCredits => NowPlayingTab == 2;
@@ -166,6 +169,12 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsNpCredits));
     }
     partial void OnCloseToTrayChanged(bool value) => Prefs.SetBool("close_to_tray", value);
+    partial void OnDarkThemeChanged(bool value)
+    {
+        Prefs.SetBool("dark_theme", value);
+        OnPropertyChanged(nameof(ThemeButtonLabel));
+        ApplyTheme();
+    }
     partial void OnLibraryPathChanged(string value) => Prefs.Set("library_path", value ?? "");
     partial void OnOnboardingStepChanged(int value)
     {
@@ -469,12 +478,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ToggleTheme()
+    private void ToggleTheme() => DarkTheme = !DarkTheme;
+
+    private void ApplyTheme()
     {
-        DarkTheme = !DarkTheme;
-        if (Avalonia.Application.Current is not null)
-            Avalonia.Application.Current.RequestedThemeVariant =
-                DarkTheme ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
+        if (Avalonia.Application.Current is null) return;
+        Avalonia.Application.Current.RequestedThemeVariant = DarkTheme
+            ? Avalonia.Styling.ThemeVariant.Dark
+            : Avalonia.Styling.ThemeVariant.Light;
     }
 
     [RelayCommand]

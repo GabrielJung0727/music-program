@@ -39,6 +39,8 @@ public partial class App : Application
                 {
                     ToolTipText = "mono",
                     IsVisible = true,
+                    Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(
+                        new Uri("avares://Mono.Control/Assets/icons/tray/mono-tray-light.png"))),
                     Menu = new NativeMenu
                     {
                         new NativeMenuItem("열기") { Command = new RelayAction(() => Dispatcher.UIThread.Post(ShowMain)) },
