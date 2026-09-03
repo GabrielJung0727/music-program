@@ -9,27 +9,37 @@ namespace Mono.Setup;
 /// </summary>
 internal sealed class WizardForm : Form
 {
-    private static readonly Color Bg = Color.FromArgb(255, 255, 255);
+    private static readonly Color CardPanel = Color.FromArgb(248, 255, 255, 255);
+    private static readonly Color Accent = Color.FromArgb(109, 109, 246);
+    private static readonly Color SoftAccent = Color.FromArgb(236, 236, 248);
     private static readonly Color TextCol = Color.FromArgb(26, 26, 30);
     private static readonly Color Muted = Color.FromArgb(107, 111, 122);
-    private static readonly Color Accent = Color.FromArgb(109, 109, 246);
     private static readonly Color Border = Color.FromArgb(230, 231, 236);
     private static readonly Color CardBg = Color.FromArgb(247, 247, 250);
-    private static readonly Color SoftAccent = Color.FromArgb(236, 236, 248);
 
     private readonly bool _silent;
-    private int _step; // 0..4 config, 5 = installing
+    private int _step;
     private string _installRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
     private string _displayName = Environment.UserName;
     private string _libraryPath = "";
     private string _zoneName = "This PC";
     private bool _enableLocalOutput = true;
-    private string _streaming = "none"; // tidal | qobuz | demo | none
+    private string _streaming = "none";
     private bool _busy;
+    private Image? _bgImage;
 
-    private readonly Panel _body = new() { Dock = DockStyle.Fill, BackColor = Bg };
-    private readonly Panel _footer = new() { Dock = DockStyle.Bottom, Height = 88, BackColor = Bg };
+    // 좌: 배경 히어로 / 우: UI 카드 (로고 PictureBox 없음 — 겹침 방지)
+    private readonly Panel _stage = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(245, 245, 247) };
+    private readonly Panel _card = new()
+    {
+        Dock = DockStyle.Right,
+        Width = 460,
+        BackColor = CardPanel,
+        Padding = new Padding(0),
+    };
+    private readonly Panel _body = new() { Dock = DockStyle.Fill, BackColor = Color.Transparent, AutoScroll = true };
+    private readonly Panel _footer = new() { Dock = DockStyle.Bottom, Height = 128, BackColor = Color.Transparent };
     private ProgressBar? _bar;
     private Label? _status;
 
@@ -41,15 +51,17 @@ internal sealed class WizardForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(820, 640);
-        BackColor = Bg;
+        ClientSize = new Size(1100, 720);
+        BackColor = Color.FromArgb(245, 245, 247);
         ForeColor = TextCol;
         Font = new Font("Segoe UI", 10.5f);
         DoubleBuffered = true;
-        MinimumSize = new Size(780, 600);
+        MinimumSize = new Size(980, 680);
 
-        Controls.Add(_body);
-        Controls.Add(_footer);
+        _card.Controls.Add(_body);
+        _card.Controls.Add(_footer);
+        Controls.Add(_stage);
+        Controls.Add(_card);
 
         Shown += async (_, _) =>
         {
@@ -75,6 +87,25 @@ internal sealed class WizardForm : Form
         _body.Controls.Clear();
         _footer.Controls.Clear();
 
+        string bgName = _step switch
+        {
+            0 => "welcome",
+            1 => "name",
+            2 => "library",
+            3 => "audio",
+            4 => "streaming",
+            _ => "installing",
+        };
+        var bg = LoadBg(bgName);
+        if (bg is not null)
+        {
+            var old = _bgImage;
+            _bgImage = bg;
+            _stage.BackgroundImage = _bgImage;
+            _stage.BackgroundImageLayout = ImageLayout.Zoom;
+            old?.Dispose();
+        }
+
         switch (_step)
         {
             case 0: RenderWelcome(); break;
@@ -91,37 +122,24 @@ internal sealed class WizardForm : Form
 
     private void RenderWelcome()
     {
-        var logo = new PictureBox
-        {
-            Size = new Size(88, 88),
-            SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.Transparent,
-            Anchor = AnchorStyles.None,
-        };
-        var img = LoadLogo();
-        if (img is not null) logo.Image = img;
+        // 워드마크만 — 큰 앱 아이콘 PictureBox는 제거 (텍스트와 겹침)
+        var brand = TitleLabel("mono", 36, 400);
+        var tag = TitleLabel("혼자서도, 같이서도\n하나의 소리로.", 20, 400);
+        var sub = MutedLabel("이름·라이브러리·출력·스트리밍을 여기서 맞춘 뒤 설치합니다.\n본 앱을 열면 바로 쓸 수 있습니다.", 400);
 
-        var brand = TitleLabel("mono", 36);
-        brand.Font = new Font("Segoe UI Semibold", 36f);
-        var tag = TitleLabel("혼자서도, 같이서도\n하나의 소리로.", 22);
-        tag.Font = new Font("Segoe UI Semibold", 20f);
-        var sub = MutedLabel("이름·라이브러리·출력·스트리밍을 여기서 맞춘 뒤 설치합니다.\n본 앱을 열면 바로 쓸 수 있습니다.");
-
-        var pathCaption = MutedLabel("설치 위치");
-        var pathRow = new Panel { Height = 40, Width = 520 };
+        var pathCaption = MutedLabel("설치 위치", 400);
         var pathBox = new TextBox
         {
             Text = _installRoot,
             ReadOnly = true,
             BorderStyle = BorderStyle.FixedSingle,
-            Width = 400,
-            Height = 32,
-            Location = new Point(0, 4),
+            Width = 280,
+            Height = 34,
             BackColor = Color.White,
             ForeColor = TextCol,
+            Font = new Font("Segoe UI", 10f),
         };
         var change = Pill("변경", SoftAccent, TextCol, 96);
-        change.Location = new Point(416, 2);
         change.Click += (_, _) =>
         {
             using var dlg = new FolderBrowserDialog
@@ -138,41 +156,38 @@ internal sealed class WizardForm : Form
                 pathBox.Text = _installRoot;
             }
         };
-        pathRow.Controls.Add(pathBox);
-        pathRow.Controls.Add(change);
 
-        var stack = CenterStack(560, logo, Gap(12), brand, Gap(8), tag, Gap(10), sub, Gap(28), pathCaption, Gap(6), pathRow);
-        _body.Controls.Add(stack);
+        _body.Controls.Add(VStack(400, 28, brand, tag, sub, Gap(20), pathCaption, Row(12, pathBox, change)));
 
         var start = Pill(AlreadyInstalled ? "설정 계속" : "시작하기", Accent, Color.White, 200);
         start.Click += (_, _) => { _step = 1; Render(); };
-        FooterCenter(start);
-
         if (AlreadyInstalled)
         {
             var launch = Link("이미 설치됨 — 바로 실행");
             launch.Click += (_, _) => { LaunchApp(); Application.Exit(); };
-            launch.Location = new Point(24, 52);
-            _footer.Controls.Add(launch);
+            FooterStack(start, launch);
+        }
+        else
+        {
+            FooterCenter(start);
         }
     }
 
     private void RenderName()
     {
         AddBack();
-        var title = TitleLabel("어떻게 불러드릴까요?", 26);
-        var sub = MutedLabel("라운지와 기기에서 보이는 표시 이름입니다.");
+        var title = TitleLabel("어떻게 불러드릴까요?", 26, 400);
+        var sub = MutedLabel("라운지와 기기에서 보이는 표시 이름입니다.", 400);
         var box = new TextBox
         {
             Text = _displayName,
-            Width = 360,
+            Width = 320,
             Height = 36,
             Font = new Font("Segoe UI", 12f),
             BorderStyle = BorderStyle.FixedSingle,
         };
         box.TextChanged += (_, _) => _displayName = box.Text;
-        var stack = CenterStack(480, title, Gap(8), sub, Gap(24), box);
-        _body.Controls.Add(stack);
+        _body.Controls.Add(VStack(400, 36, title, sub, Gap(12), box));
 
         var next = Pill("계속", Accent, Color.White, 160);
         next.Click += (_, _) =>
@@ -188,13 +203,13 @@ internal sealed class WizardForm : Form
     private void RenderLibrary()
     {
         AddBack();
-        var title = TitleLabel("음원 라이브러리", 26);
-        var sub = MutedLabel("로컬 음악 폴더를 지정하면 첫 실행 때 스캔합니다. 나중에 Settings에서도 바꿀 수 있습니다.");
+        var title = TitleLabel("음원 라이브러리", 26, 400);
+        var sub = MutedLabel("로컬 음악 폴더를 지정하면 첫 실행 때 스캔합니다. 나중에 Settings에서도 바꿀 수 있습니다.", 400);
         var pathBox = new TextBox
         {
             Text = _libraryPath,
-            Width = 400,
-            Height = 32,
+            Width = 280,
+            Height = 34,
             BorderStyle = BorderStyle.FixedSingle,
             ReadOnly = true,
             PlaceholderText = "폴더 선택…",
@@ -209,14 +224,8 @@ internal sealed class WizardForm : Form
                 pathBox.Text = _libraryPath;
             }
         };
-        var row = new Panel { Width = 520, Height = 40 };
-        pathBox.Location = new Point(0, 4);
-        browse.Location = new Point(412, 2);
-        row.Controls.Add(pathBox);
-        row.Controls.Add(browse);
 
-        var stack = CenterStack(560, title, Gap(8), sub, Gap(24), row);
-        _body.Controls.Add(stack);
+        _body.Controls.Add(VStack(400, 36, title, sub, Gap(12), Row(12, pathBox, browse)));
 
         var skip = Link("건너뛰기");
         skip.Click += (_, _) => { _libraryPath = ""; _step = 3; Render(); };
@@ -228,12 +237,12 @@ internal sealed class WizardForm : Form
     private void RenderAudio()
     {
         AddBack();
-        var title = TitleLabel("출력 장치", 26);
-        var sub = MutedLabel("이 PC의 WASAPI/ASIO 출력을 쓰려면 Enable 하세요. 존 이름은 나중에 Audio에서 바꿀 수 있습니다.");
+        var title = TitleLabel("출력 장치", 26, 400);
+        var sub = MutedLabel("이 PC의 WASAPI/ASIO 출력을 쓰려면 Enable 하세요. 존 이름은 나중에 Audio에서 바꿀 수 있습니다.", 400);
 
         var card = new Panel
         {
-            Width = 560,
+            Width = 400,
             Height = 88,
             BackColor = CardBg,
         };
@@ -268,7 +277,7 @@ internal sealed class WizardForm : Form
         var enable = Pill(_enableLocalOutput ? "Enabled" : "Enable",
             _enableLocalOutput ? Accent : SoftAccent,
             _enableLocalOutput ? Color.White : TextCol, 110);
-        enable.Location = new Point(430, 24);
+        enable.Location = new Point(280, 24);
         enable.Click += (_, _) =>
         {
             _enableLocalOutput = !_enableLocalOutput;
@@ -279,7 +288,7 @@ internal sealed class WizardForm : Form
         card.Controls.Add(kind);
         card.Controls.Add(enable);
 
-        var zoneCaption = MutedLabel("존 이름");
+        var zoneCaption = MutedLabel("존 이름", 280);
         var zone = new TextBox
         {
             Text = _zoneName,
@@ -289,29 +298,25 @@ internal sealed class WizardForm : Form
         };
         zone.TextChanged += (_, _) => _zoneName = zone.Text;
 
-        var stack = CenterStack(580, title, Gap(8), sub, Gap(24), card, Gap(20), zoneCaption, Gap(6), zone);
-        _body.Controls.Add(stack);
+        _body.Controls.Add(VStack(400, 28, title, sub, Gap(16), card, Gap(12), zoneCaption, zone));
 
         var skip = Link("건너뛰기");
         skip.Click += (_, _) => { _enableLocalOutput = false; _step = 4; Render(); };
         var next = Pill("계속", Accent, Color.White, 160);
         next.Click += (_, _) => { _step = 4; Render(); };
-        FooterPair(skip, next);
-        var note = MutedLabel("걱정 마세요. Audio에서 언제든 장치를 추가할 수 있습니다.");
-        note.Location = new Point((ClientSize.Width - 420) / 2, 58);
-        note.AutoSize = true;
-        _footer.Controls.Add(note);
+        var note = MutedLabel("걱정 마세요. Audio에서 언제든 장치를 추가할 수 있습니다.", 420);
+        FooterActions(Row(16, skip, next), note);
     }
 
     private void RenderStreaming()
     {
         AddBack();
-        var title = TitleLabel("스트리밍 연동", 26);
-        var sub = MutedLabel("Tidal·Qobuz를 연결하거나 데모로 미리 볼 수 있습니다. 파트너 키가 없으면 데모 토큰을 씁니다.");
+        var title = TitleLabel("스트리밍 연동", 24, 400);
+        var sub = MutedLabel("Tidal·Qobuz를 연결하거나 데모로 미리 볼 수 있습니다.", 400);
 
         Panel Card(string heading, string body, string choice)
         {
-            var p = new Panel { Width = 170, Height = 200, BackColor = CardBg, Margin = new Padding(8) };
+            var p = new Panel { Width = 120, Height = 200, BackColor = CardBg, Margin = new Padding(4) };
             p.Paint += (_, e) =>
             {
                 var selected = _streaming == choice;
@@ -330,11 +335,15 @@ internal sealed class WizardForm : Form
             {
                 Text = body,
                 ForeColor = Muted,
-                Location = new Point(14, 48),
-                Size = new Size(142, 80),
+                Location = new Point(8, 44),
+                Size = new Size(104, 90),
+                Font = new Font("Segoe UI", 8.5f),
             };
-            var go = Pill("선택", SoftAccent, TextCol, 120);
-            go.Location = new Point(25, 148);
+            FitLabel(b, 104);
+            b.Location = new Point(8, 44);
+            b.TextAlign = ContentAlignment.TopLeft;
+            var go = Pill("선택", SoftAccent, TextCol, 96);
+            go.Location = new Point(12, 148);
             go.Click += (_, _) =>
             {
                 _streaming = choice;
@@ -350,18 +359,18 @@ internal sealed class WizardForm : Form
 
         var row = new FlowLayoutPanel
         {
-            Width = 580,
+            Width = 400,
             Height = 220,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            BackColor = Bg,
+            BackColor = Color.Transparent,
+            AutoSize = false,
         };
-        row.Controls.Add(Card("TIDAL", "HiFi / Max 카탈로그를 라이브러리에 더합니다.", "tidal"));
-        row.Controls.Add(Card("Qobuz", "Studio·Hi-Res 음원으로 확장합니다.", "qobuz"));
-        row.Controls.Add(Card("데모", "키 없이 데모 토큰으로 미리 봅니다.", "demo"));
+        row.Controls.Add(Card("TIDAL", "HiFi / Max", "tidal"));
+        row.Controls.Add(Card("Qobuz", "Studio / Hi-Res", "qobuz"));
+        row.Controls.Add(Card("데모", "키 없이 미리보기", "demo"));
 
-        var stack = CenterStack(600, title, Gap(8), sub, Gap(20), row);
-        _body.Controls.Add(stack);
+        _body.Controls.Add(VStack(400, 28, title, sub, Gap(12), row));
 
         var no = Link("나중에 — 설치만 진행");
         no.Click += (_, _) =>
@@ -371,28 +380,22 @@ internal sealed class WizardForm : Form
             Render();
             _ = InstallAndFinishAsync(launch: true);
         };
-        FooterCenter(no);
-        var note = MutedLabel("나중에 Settings에서도 연동할 수 있습니다.");
-        note.Location = new Point((ClientSize.Width - 320) / 2, 58);
-        note.AutoSize = true;
-        _footer.Controls.Add(note);
+        FooterStack(no, MutedLabel("나중에 Settings에서도 연동할 수 있습니다.", 360));
     }
 
     private void RenderInstalling()
     {
-        var title = TitleLabel("설치하는 중", 26);
-        var sub = MutedLabel("파일을 풀고 바로가기를 만든 뒤 mono를 준비합니다.");
+        var title = TitleLabel("설치하는 중", 26, 400);
+        var sub = MutedLabel("파일을 풀고 바로가기를 만든 뒤 mono를 준비합니다.", 400);
         _bar = new ProgressBar
         {
-            Width = 420,
+            Width = 320,
             Height = 10,
             Style = ProgressBarStyle.Marquee,
             MarqueeAnimationSpeed = 28,
         };
-        _status = MutedLabel("잠시만 기다려 주세요…");
-        _status.Width = 420;
-        var stack = CenterStack(480, title, Gap(8), sub, Gap(28), _bar, Gap(12), _status);
-        _body.Controls.Add(stack);
+        _status = MutedLabel("잠시만 기다려 주세요…", 400);
+        _body.Controls.Add(VStack(400, 48, title, sub, Gap(20), _bar, Gap(8), _status));
     }
 
     private async Task InstallAndFinishAsync(bool launch)
@@ -581,10 +584,18 @@ internal sealed class WizardForm : Form
         return stream is null ? null : Image.FromStream(stream);
     }
 
+    private static Image? LoadBg(string stepName)
+    {
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{stepName}.jpg");
+        if (stream is not null) return Image.FromStream(stream);
+        var directPath = Path.Combine(AppContext.BaseDirectory, "Assets", "backgrounds", $"{stepName}.jpg");
+        return File.Exists(directPath) ? Image.FromFile(directPath) : null;
+    }
+
     private void AddBack()
     {
         var back = Link("← 뒤로");
-        back.Location = new Point(24, 20);
+        back.Location = new Point(20, 16);
         back.Click += (_, _) =>
         {
             if (_step > 0)
@@ -594,63 +605,155 @@ internal sealed class WizardForm : Form
             }
         };
         _body.Controls.Add(back);
+        back.BringToFront();
     }
 
-    private void FooterCenter(Control c)
-    {
-        c.Location = new Point((ClientSize.Width - c.Width) / 2, 18);
-        _footer.Controls.Add(c);
-    }
+    private void FooterCenter(Control c) => FooterStack(c);
 
-    private void FooterPair(Control left, Control right)
-    {
-        var total = left.Width + 16 + right.Width;
-        var x = (ClientSize.Width - total) / 2;
-        left.Location = new Point(x, 22);
-        right.Location = new Point(x + left.Width + 16, 18);
-        _footer.Controls.Add(left);
-        _footer.Controls.Add(right);
-    }
+    private void FooterPair(Control left, Control right) => FooterStack(Row(16, left, right));
 
-    private Panel CenterStack(int width, params Control[] items)
+    private void FooterStack(params Control[] items) => FooterActions(items);
+
+    private void FooterActions(params Control[] items)
     {
-        var p = new Panel { Width = width, BackColor = Bg };
-        var y = 0;
+        _footer.Controls.Clear();
+        var inner = new Panel { BackColor = Color.Transparent, Width = Math.Max(200, _footer.ClientSize.Width) };
+        var y = 16;
         foreach (var c in items)
         {
-            c.Location = new Point(Math.Max(0, (width - c.Width) / 2), y);
-            p.Controls.Add(c);
-            y += c.Height + 4;
+            if (c is Label lab)
+                FitLabel(lab, Math.Min(520, Math.Max(200, _footer.ClientSize.Width - 48)));
+            c.Location = new Point(Math.Max(0, (inner.Width - c.Width) / 2), y);
+            inner.Controls.Add(c);
+            y += c.Height + 10;
         }
-        p.Height = y + 8;
-        void LayoutCenter(object? s, EventArgs e)
+        inner.Height = y + 16;
+        void Place(object? s, EventArgs e)
         {
-            p.Location = new Point(Math.Max(24, (_body.ClientSize.Width - p.Width) / 2),
-                Math.Max(48, (_body.ClientSize.Height - p.Height) / 2 - 20));
+            inner.Width = Math.Max(200, _footer.ClientSize.Width);
+            foreach (Control child in inner.Controls)
+                child.Left = Math.Max(0, (inner.Width - child.Width) / 2);
+            // 세로: 푸터 안에서 가운데, 아래 여백 확보해 잘림 방지
+            inner.Location = new Point(0, Math.Max(8, (_footer.ClientSize.Height - inner.Height) / 2));
         }
-        _body.Resize += LayoutCenter;
-        LayoutCenter(null, EventArgs.Empty);
+        _footer.Resize += Place;
+        Place(null, EventArgs.Empty);
+        _footer.Controls.Add(inner);
+    }
+
+    private static Panel Row(int gap, params Control[] items)
+    {
+        var w = 0;
+        var h = 0;
+        foreach (var c in items)
+        {
+            h = Math.Max(h, c.Height);
+            w += c.Width + gap;
+        }
+        w = Math.Max(0, w - gap);
+        var p = new Panel { Width = w, Height = Math.Max(h, 40), BackColor = Color.Transparent };
+        var x = 0;
+        foreach (var c in items)
+        {
+            c.Location = new Point(x, Math.Max(0, (p.Height - c.Height) / 2));
+            p.Controls.Add(c);
+            x += c.Width + gap;
+        }
         return p;
     }
 
-    private static Control Gap(int h) => new Panel { Height = h, Width = 10, BackColor = Bg };
-
-    private static Label TitleLabel(string text, float size) => new()
+    private Panel VStack(int width, int topPad, params Control[] items)
     {
-        Text = text,
-        Font = new Font("Segoe UI Semibold", size),
-        ForeColor = TextCol,
-        AutoSize = true,
-        TextAlign = ContentAlignment.MiddleCenter,
+        var host = new Panel
+        {
+            Width = width,
+            BackColor = Color.Transparent,
+            AutoSize = false,
+        };
+
+        var y = topPad;
+        foreach (var c in items)
+        {
+            if (c is Label lab)
+                FitLabel(lab, width);
+
+            c.Location = new Point(Math.Max(0, (width - c.Width) / 2), y);
+            host.Controls.Add(c);
+            y += c.Height + 16;
+        }
+
+        host.Height = y + 16;
+
+        void Place(object? s, EventArgs e)
+        {
+            var viewW = _body.ClientSize.Width;
+            var viewH = _body.ClientSize.Height;
+            // 가로·세로 모두 가운데. 넘치면 위에서 스크롤.
+            var left = Math.Max(8, (viewW - width) / 2);
+            var top = host.Height <= viewH - 8
+                ? Math.Max(8, (viewH - host.Height) / 2)
+                : 8;
+            host.Location = new Point(left, top);
+        }
+
+        _body.Resize += Place;
+        Place(null, EventArgs.Empty);
+        return host;
+    }
+
+    private static void FitLabel(Label lab, int maxWidth)
+    {
+        var text = (lab.Text ?? "").Replace("\r\n", "\n").Replace('\r', '\n');
+        lab.Text = text.Replace("\n", Environment.NewLine);
+        var boxW = lab.MaximumSize.Width > 0 ? Math.Min(lab.MaximumSize.Width, maxWidth) : maxWidth;
+        boxW = Math.Max(120, boxW);
+
+        var measured = TextRenderer.MeasureText(
+            lab.Text,
+            lab.Font,
+            new Size(boxW, 0),
+            TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+
+        var lineCount = Math.Max(1, lab.Text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length);
+        if (lab.Text.Contains('\n') || lab.Text.Contains('\r'))
+            lineCount = Math.Max(lineCount, lab.Text.Replace("\r\n", "\n").Split('\n').Length);
+
+        var minH = (lab.Font.Height + 8) * lineCount;
+        lab.AutoSize = false;
+        lab.Width = boxW;
+        lab.Height = Math.Max(measured.Height + 16, minH);
+        lab.MaximumSize = new Size(boxW, 0);
+        lab.TextAlign = ContentAlignment.TopCenter;
+        lab.UseCompatibleTextRendering = false;
+    }
+
+    private static Control Gap(int h) => new Panel
+    {
+        Height = Math.Max(4, h),
+        Width = 10,
+        BackColor = Color.Transparent,
     };
 
-    private static Label MutedLabel(string text) => new()
+    private static Label TitleLabel(string text, float size, int width) => new()
     {
         Text = text,
+        Font = new Font("Segoe UI", size, FontStyle.Bold),
+        ForeColor = TextCol,
+        AutoSize = false,
+        Width = width,
+        MaximumSize = new Size(width, 0),
+        TextAlign = ContentAlignment.TopCenter,
+    };
+
+    private static Label MutedLabel(string text, int width = 520) => new()
+    {
+        Text = text,
+        Font = new Font("Segoe UI", 10.5f),
         ForeColor = Muted,
-        AutoSize = true,
-        MaximumSize = new Size(520, 0),
-        TextAlign = ContentAlignment.MiddleCenter,
+        AutoSize = false,
+        Width = width,
+        MaximumSize = new Size(width, 0),
+        TextAlign = ContentAlignment.TopCenter,
     };
 
     private static Button Pill(string text, Color fill, Color fg, int width)
@@ -658,22 +761,24 @@ internal sealed class WizardForm : Form
         var b = new Button
         {
             Text = text,
-            Size = new Size(width, 40),
+            Size = new Size(width, 44),
             FlatStyle = FlatStyle.Flat,
             BackColor = fill,
             ForeColor = fg,
             Cursor = Cursors.Hand,
-            Font = new Font("Segoe UI Semibold", 10.5f),
+            Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Padding = new Padding(10, 0, 10, 0),
+            UseCompatibleTextRendering = true,
         };
         b.FlatAppearance.BorderSize = 0;
-        // rounded feel via region
-        b.Region = RoundRegion(b.Width, b.Height, 20);
+        b.Region = RoundRegion(b.Width, b.Height, 22);
         return b;
     }
 
     private static LinkLabel Link(string text)
     {
-        var l = new LinkLabel
+        return new LinkLabel
         {
             Text = text,
             AutoSize = true,
@@ -681,8 +786,10 @@ internal sealed class WizardForm : Form
             ActiveLinkColor = Accent,
             VisitedLinkColor = Muted,
             LinkBehavior = LinkBehavior.HoverUnderline,
+            Font = new Font("Segoe UI", 10f),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Padding = new Padding(0, 4, 0, 8),
         };
-        return l;
     }
 
     private static Region RoundRegion(int w, int h, int r)

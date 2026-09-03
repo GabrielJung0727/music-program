@@ -1,11 +1,11 @@
 ## mono – Self-Contained + Velopack 릴리스
 ## 대상: Windows 11 x64
 ##
-##   .\publish.ps1 -Version 0.1.2
-##   .\publish.ps1 -Version 0.1.2 -SkipZip -GitHubRelease
+##   .\publish.ps1 -Version 0.1.3
+##   .\publish.ps1 -Version 0.1.3 -SkipZip -GitHubRelease
 
 param(
-    [string]$Version = "0.1.2",
+    [string]$Version = "0.1.3",
     [switch]$GitHubRelease,
     [switch]$SkipZip
 )

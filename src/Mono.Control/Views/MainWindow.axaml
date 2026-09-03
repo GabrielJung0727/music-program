@@ -49,19 +49,19 @@
               </Button>
               <Button Classes="ghost" Command="{Binding OpenGuideCommand}" ToolTip.Tip="가이드">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-guide.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Guide}"/>
                   <TextBlock Text="가이드" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="테마">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-theme.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Theme}"/>
                   <TextBlock Text="{Binding ThemeButtonLabel}" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding ResyncCommand}" ToolTip.Tip="리싱크">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-resync.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Resync}"/>
                   <TextBlock Text="리싱크" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
@@ -106,7 +106,7 @@
                                     <Border Classes="artslot" Height="130">
                                       <Panel>
                                         <Image Classes="artph"
-                                               Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
+                                               Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
                                                IsVisible="{Binding !HasArt}"/>
                                         <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
                                       </Panel>
@@ -169,7 +169,7 @@
                           <Border Classes="artslot" Height="140">
                             <Panel>
                               <Image Classes="artph"
-                                     Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
+                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
                                      IsVisible="{Binding !HasArt}"/>
                               <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
                             </Panel>
@@ -211,7 +211,7 @@
                           <Border Classes="artslot" Height="140">
                             <Panel>
                               <Image Classes="artph"
-                                     Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
+                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
                                      IsVisible="{Binding !HasArt}"/>
                               <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
                             </Panel>
@@ -291,16 +291,16 @@
                     <Button Classes="primary" Content="전송" Command="{Binding SendChatCommand}"/>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="❤️" ToolTip.Tip="하트" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-heart.svg}"/>
+                        <Image Classes="icon" Source="{DynamicResource Mono.Icon.Heart}"/>
                       </Button>
                       <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🎉" ToolTip.Tip="파티" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-party.svg}"/>
+                        <Image Classes="icon" Source="{DynamicResource Mono.Icon.Party}"/>
                       </Button>
                       <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="👏" ToolTip.Tip="박수" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-clap.svg}"/>
+                        <Image Classes="icon" Source="{DynamicResource Mono.Icon.Clap}"/>
                       </Button>
                       <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🔥" ToolTip.Tip="파이어" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-fire.svg}"/>
+                        <Image Classes="icon" Source="{DynamicResource Mono.Icon.Fire}"/>
                       </Button>
                     </StackPanel>
                   </StackPanel>
@@ -318,11 +318,11 @@
                 <TextBlock Text="시그널 패스" FontWeight="SemiBold"/>
                 <Border Classes="panel" CornerRadius="10" Padding="12">
                   <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-source.svg}"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathSource}"/>
                     <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-dsp.svg}"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathDsp}"/>
                     <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-device.svg}"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathDevice}"/>
                     <TextBlock Text="{Binding SignalPathText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0"/>
                   </StackPanel>
                 </Border>
@@ -340,37 +340,37 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="0" ToolTip.Tip="Off">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-off.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspOff}"/>
                       <TextBlock Text="Off" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="1">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-headphones.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspHeadphones}"/>
                       <TextBlock Text="Headphones" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="2">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-speakers.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspSpeakers}"/>
                       <TextBlock Text="Speakers" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="3">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-roomir.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspRoomir}"/>
                       <TextBlock Text="Room IR" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="4">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-crossfeed.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspCrossfeed}"/>
                       <TextBlock Text="Crossfeed" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="5">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-eq.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspEq}"/>
                       <TextBlock Text="Parametric" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
@@ -392,7 +392,7 @@
                   <TextBox Width="360" Text="{Binding IrPath}" Watermark="IR 파일 경로"/>
                   <Button Classes="ghost" Click="PickIrClick" ToolTip.Tip="IR 찾기">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.Folder}"/>
                       <TextBlock Text="찾기…" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
@@ -403,7 +403,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="ghost" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="harman">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-device-eq.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspDeviceEq}"/>
                       <TextBlock Text="Harman" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
@@ -434,14 +434,14 @@
                   <TextBox Width="360" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
                   <Button Classes="ghost" Click="PickLibraryClick" ToolTip.Tip="폴더 선택">
                     <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.Folder}"/>
                       <TextBlock Text="폴더…" VerticalAlignment="Center"/>
                     </StackPanel>
                   </Button>
                 </StackPanel>
                 <Button Classes="ghost" Command="{Binding ScanLibraryCommand}" HorizontalAlignment="Left">
                   <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-scan.svg}"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.Scan}"/>
                     <TextBlock Text="스캔" VerticalAlignment="Center"/>
                   </StackPanel>
                 </Button>
@@ -472,7 +472,7 @@
               <Border Classes="artslot" Width="56" Height="56" CornerRadius="6">
                 <Panel>
                   <Image Classes="artph" Width="40" Height="40"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"/>
+                         Source="{DynamicResource Mono.Icon.ArtPlaceholder}"/>
                   <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
                 </Panel>
               </Border>
@@ -487,18 +487,18 @@
           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
               <Button Classes="ghost" Command="{Binding PrevCommand}" ToolTip.Tip="이전" Padding="12,8">
-                <Image Classes="icon-lg" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-prev.svg}"/>
+                <Image Classes="icon-lg" Source="{DynamicResource Mono.Icon.Prev}"/>
               </Button>
               <Button Classes="primary" Command="{Binding PlayPauseCommand}" Width="72" Height="40" ToolTip.Tip="재생/일시정지">
                 <Panel>
                   <Image Classes="icon-lg" IsVisible="{Binding !IsPlaying}"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-play.svg}"/>
+                         Source="{DynamicResource Mono.Icon.Play}"/>
                   <Image Classes="icon-lg" IsVisible="{Binding IsPlaying}"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-pause.svg}"/>
+                         Source="{DynamicResource Mono.Icon.Pause}"/>
                 </Panel>
               </Button>
               <Button Classes="ghost" Command="{Binding NextCommand}" ToolTip.Tip="다음" Padding="12,8">
-                <Image Classes="icon-lg" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-next.svg}"/>
+                <Image Classes="icon-lg" Source="{DynamicResource Mono.Icon.Next}"/>
               </Button>
             </StackPanel>
             <Grid ColumnDefinitions="40,*,40" Margin="40,0">
@@ -530,7 +530,7 @@
             <TextBlock Text="{Binding SignalPathText}" Classes="muted" FontSize="10" HorizontalAlignment="Right" MaxWidth="260" TextTrimming="CharacterEllipsis"/>
             <Button Classes="ghost" Command="{Binding ConnectOutputCommand}" HorizontalAlignment="Right">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-output.svg}"/>
+                <Image Classes="icon" Source="{DynamicResource Mono.Icon.Output}"/>
                 <TextBlock Text="출력 연결" VerticalAlignment="Center"/>
               </StackPanel>
             </Button>
@@ -551,24 +551,24 @@
         <DockPanel Margin="40">
           <DockPanel DockPanel.Dock="Top">
             <Button DockPanel.Dock="Right" Classes="ghost" Command="{Binding CloseNowPlayingCommand}" ToolTip.Tip="닫기" Foreground="White">
-              <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-close.svg}"/>
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Close}"/>
             </Button>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="0">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-lyrics.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpLyrics}"/>
                   <TextBlock Text="가사" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="1">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-artist.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpArtist}"/>
                   <TextBlock Text="아티스트" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="2">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-credits.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpCredits}"/>
                   <TextBlock Text="크레딧" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
@@ -629,7 +629,7 @@
               <TextBox Width="280" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
               <Button Classes="ghost" Click="PickLibraryClick">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Folder}"/>
                   <TextBlock Text="폴더…" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>

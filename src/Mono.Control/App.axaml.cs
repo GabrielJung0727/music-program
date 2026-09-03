@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using Mono.Control.Services;
 using Mono.Control.ViewModels;
@@ -13,6 +14,7 @@ public partial class App : Application
 {
     private MainViewModel? _vm;
     private MainWindow? _main;
+    private TrayIcon? _tray;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -33,26 +35,36 @@ public partial class App : Application
                 desktop.Shutdown();
             };
 
-            TrayIcon.SetIcons(this, new TrayIcons
+            _tray = new TrayIcon
             {
-                new TrayIcon
+                ToolTipText = "mono",
+                IsVisible = true,
+                Icon = LoadTrayIcon(_vm.DarkTheme),
+                Menu = new NativeMenu
                 {
-                    ToolTipText = "mono",
-                    IsVisible = true,
-                    Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(
-                        new Uri("avares://Mono.Control/Assets/icons/tray/mono-tray-light.png"))),
-                    Menu = new NativeMenu
-                    {
-                        new NativeMenuItem("열기") { Command = new RelayAction(() => Dispatcher.UIThread.Post(ShowMain)) },
-                        new NativeMenuItem("종료") { Command = new RelayAction(() => Dispatcher.UIThread.Post(QuitFromTray)) }
-                    }
+                    new NativeMenuItem("열기") { Command = new RelayAction(() => Dispatcher.UIThread.Post(ShowMain)) },
+                    new NativeMenuItem("종료") { Command = new RelayAction(() => Dispatcher.UIThread.Post(QuitFromTray)) }
                 }
-            });
+            };
+            TrayIcon.SetIcons(this, [_tray]);
+            _vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainViewModel.DarkTheme) && _tray is not null)
+                    _tray.Icon = LoadTrayIcon(_vm.DarkTheme);
+            };
 
             _ = _vm.StartAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static WindowIcon LoadTrayIcon(bool dark)
+    {
+        var uri = dark
+            ? "avares://Mono.Control/Assets/icons/dark/tray/mono-tray-dark.png"
+            : "avares://Mono.Control/Assets/icons/tray/mono-tray-light.png";
+        return new WindowIcon(AssetLoader.Open(new Uri(uri)));
     }
 
     private void ShowMain()

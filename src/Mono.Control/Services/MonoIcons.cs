@@ -11,16 +11,33 @@ public static class MonoIcons
 {
     private static readonly ConcurrentDictionary<string, IImage?> Cache = new(StringComparer.OrdinalIgnoreCase);
 
-    public static string UiUri(string stem) => $"avares://Mono.Control/Assets/icons/ui/{stem}.svg";
-    public static string GenreUri(string stem) => $"avares://Mono.Control/Assets/icons/genres/{stem}.svg";
+    public static bool IsDark => Avalonia.Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
 
-    public static IImage? Ui(string stem) => Get(UiUri(stem));
+    public static string UiUri(string stem, bool? dark = null)
+    {
+        var isDark = dark ?? IsDark;
+        return isDark
+            ? $"avares://Mono.Control/Assets/icons/dark/ui/{stem}.svg"
+            : $"avares://Mono.Control/Assets/icons/ui/{stem}.svg";
+    }
+
+    public static string GenreUri(string stem, bool? dark = null)
+    {
+        var isDark = dark ?? IsDark;
+        return isDark
+            ? $"avares://Mono.Control/Assets/icons/dark/genres/{stem}.svg"
+            : $"avares://Mono.Control/Assets/icons/genres/{stem}.svg";
+    }
+
+    public static IImage? Ui(string stem) => Get(UiUri(stem)) ?? Get(UiUri(stem, false));
 
     public static IImage? Genre(string stem)
     {
         var key = stem.StartsWith("genre-", StringComparison.Ordinal) ? stem : "genre-" + stem;
-        return Get(GenreUri(key)) ?? Get(UiUri(key));
+        return Get(GenreUri(key)) ?? Get(UiUri(key)) ?? Get(GenreUri(key, false)) ?? Get(UiUri(key, false));
     }
+
+    public static void ClearCache() => Cache.Clear();
 
     public static IImage? Get(string avaresUri)
     {

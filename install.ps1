@@ -3,7 +3,7 @@
 ## 이 스크립트는 로컬 산출물을 쓰거나, gh로 받은 뒤 Unblock-File 합니다.
 
 param(
-    [string]$Version = "0.1.2"
+    [string]$Version = "0.1.3"
 )
 
 $ErrorActionPreference = 'Stop'

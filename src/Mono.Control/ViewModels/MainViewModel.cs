@@ -188,6 +188,9 @@ public partial class MainViewModel : ObservableObject
         Prefs.SetBool("dark_theme", value);
         OnPropertyChanged(nameof(ThemeButtonLabel));
         ApplyTheme();
+        MonoIcons.ClearCache();
+        OnPropertyChanged(nameof(NavItems));
+        OnPropertyChanged(nameof(GenreTiles));
     }
     partial void OnLibraryPathChanged(string value) => Prefs.Set("library_path", value ?? "");
     partial void OnOnboardingStepChanged(int value)
