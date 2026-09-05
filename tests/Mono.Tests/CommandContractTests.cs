@@ -135,6 +135,52 @@ public class CommandContractTests
     }
 
     [Fact]
+    public void SetVolumeCarriesTargetAndPercent()
+    {
+        var m = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.SetVolume,
+            TargetPeerId = "out-1",
+            Volume = 70
+        });
+        Assert.Equal("set_volume", m.Type);
+        Assert.Equal("out-1", m.TargetPeerId);
+        Assert.Equal(70, m.Volume);
+    }
+
+    [Fact]
+    public void ZoneCommandsCarryDedicatedZoneFields()
+    {
+        // Core는 zoneId/zoneMode 전용 필드를 읽는다 — Text·Index가 아니다.
+        var mode = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.SetZoneMode,
+            ZoneId = "zone-1",
+            ZoneMode = ZoneMode.Independent
+        });
+        Assert.Equal("set_zone_mode", mode.Type);
+        Assert.Equal("zone-1", mode.ZoneId);
+        Assert.Equal(ZoneMode.Independent, mode.ZoneMode);
+
+        var rename = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.RenameZone,
+            ZoneId = "zone-1",
+            Text = "거실"
+        });
+        Assert.Equal("거실", rename.Text);
+        Assert.Equal("zone-1", rename.ZoneId);
+    }
+
+    [Fact]
+    public void RedeemCarriesPairingCode()
+    {
+        var m = RoundTrip(new MonoMessage { Type = MessageTypes.Redeem, PairingCode = "482913" });
+        Assert.Equal("redeem", m.Type);
+        Assert.Equal("482913", m.PairingCode);
+    }
+
+    [Fact]
     public void ReactCarriesWhitelistedEmoji()
     {
         // Core가 화이트리스트를 강제하지만, 보내는 쪽도 같은 목록을 안다.
