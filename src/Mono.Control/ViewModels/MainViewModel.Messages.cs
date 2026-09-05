@@ -55,6 +55,15 @@ public partial class MainViewModel
             case MessageTypes.Playlists:
                 LoadPlaylists(msg.Body);
                 break;
+            case MessageTypes.Graph:
+                try { Lounge.ApplyGraph(JsonSerializer.Deserialize<ArtistGraph>(msg.Body ?? "", Json)); }
+                catch { Lounge.ApplyGraph(null); }
+                break;
+            case MessageTypes.Archive:
+                Lounge.ApplyArchive(string.IsNullOrWhiteSpace(msg.PlaylistId)
+                    ? (msg.Body ?? "세션을 종료했습니다")
+                    : "세션을 저장하고 하이라이트 플레이리스트를 만들었습니다");
+                break;
             case MessageTypes.Album:
                 LoadAlbum(msg.Body);
                 break;
@@ -281,6 +290,7 @@ public partial class MainViewModel
             VolumeBlockedReason = "출력 장치가 없습니다 — 「출력 연결」을 누르세요";
         }
 
+        Lounge.CurrentArtistId = snap.CurrentTrack?.ArtistId ?? "";
         Lounge.ApplySnapshot(snap);
         Audio.ApplySnapshot(snap);
     }

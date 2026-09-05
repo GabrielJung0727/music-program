@@ -157,6 +157,42 @@
                         </ItemsControl>
                       </StackPanel>
                       <StackPanel>
+                        <TextBlock Text="뮤지션 관계도" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <Button Classes="ghost" Content="현재 아티스트 탐색" HorizontalAlignment="Left"
+                                Command="{Binding ShowGraphCommand}" CommandParameter="{Binding CurrentArtistId}"/>
+                        <StackPanel IsVisible="{Binding HasGraph}" Margin="0,6,0,0" Spacing="4">
+                          <TextBlock Text="{Binding Graph.Artist.Name}" FontWeight="SemiBold" FontSize="12"/>
+                          <TextBlock Text="{Binding Graph.Artist.Bio}" Classes="muted" FontSize="11"
+                                     TextWrapping="Wrap" MaxHeight="80"/>
+                          <TextBlock Text="연관 아티스트" Classes="muted" FontSize="11" Margin="0,4,0,0"
+                                     IsVisible="{Binding Graph.HasRelated}"/>
+                          <ItemsControl ItemsSource="{Binding Graph.Related}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="models:GraphArtist">
+                                <Button Classes="ghost" Margin="0,2,0,0" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left" Content="{Binding Name}"
+                                        ToolTip.Tip="따라가기 — 다음 큐 후보로 제안"
+                                        Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).FollowArtistCommand}"
+                                        CommandParameter="{Binding}"/>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </StackPanel>
+
+                      <StackPanel>
+                        <TextBlock Text="세션 종료" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                   Text="저장하면 좋았던 곡(♥·핀·완청)이 하이라이트 플레이리스트가 됩니다."/>
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                          <Button Classes="primary" Content="저장하고 종료" Command="{Binding EndSessionSaveCommand}"/>
+                          <Button Classes="ghost" Content="저장 없이 종료" Command="{Binding EndSessionDiscardCommand}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding ArchiveResult}" Classes="muted" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,4,0,0"/>
+                      </StackPanel>
+
+                      <StackPanel>
                         <TextBlock Text="라운지 채팅" FontWeight="SemiBold" Margin="0,0,0,8"/>
                         <ListBox ItemsSource="{Binding ChatLines}" Height="240"/>
                       </StackPanel>

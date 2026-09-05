@@ -49,6 +49,17 @@ public sealed partial class LoungeViewModel : PageViewModel
     [ObservableProperty] private string _pinText = "";
     [ObservableProperty] private long _currentMediaMs;
     [ObservableProperty] private string _currentArtistId = "";
+    [ObservableProperty] private ArtistGraph? _graph;
+    [ObservableProperty] private string _archiveResult = "";
+
+    /// <summary>그래프 패널 표시 여부. XAML 에서 컨버터를 쓰지 않도록 bool 로 낸다.</summary>
+    public bool HasGraph => Graph?.Artist is not null;
+
+    partial void OnGraphChanged(ArtistGraph? value) => OnPropertyChanged(nameof(HasGraph));
+
+    public void ApplyGraph(ArtistGraph? graph) => Graph = graph;
+
+    public void ApplyArchive(string message) => ArchiveResult = message;
 
     /// <summary>호스트가 아닐 때 왜 못 바꾸는지. 버튼을 숨기지 않고 사유를 붙인다.</summary>
     public string HostBlockedReason => IsHost ? "" : "호스트만 바꿀 수 있습니다";
@@ -255,4 +266,21 @@ public sealed partial class LoungeViewModel : PageViewModel
     [RelayCommand]
     private Task SeekPinAsync(PinEntry? pin)
         => pin is null ? Task.CompletedTask : Safe(() => Session.SeekPinAsync(pin.Id));
+
+    // ── 관계도 · 아카이브 ───────────────────────────────
+    /// <summary>현재 곡 아티스트의 관계도. Core 로컬 그래프라 왕복이 빠르다.</summary>
+    [RelayCommand]
+    private Task ShowGraphAsync(string? artistId)
+        => string.IsNullOrEmpty(artistId) ? Task.CompletedTask : Safe(() => Session.GraphAsync(artistId));
+
+    /// <summary>"이 연주자 따라가기" — 다음 큐 후보로 제안한다.</summary>
+    [RelayCommand]
+    private Task FollowArtistAsync(GraphArtist? artist)
+        => artist is null ? Task.CompletedTask : Safe(() => Session.FollowArtistAsync(artist.Id));
+
+    [RelayCommand]
+    private Task EndSessionSaveAsync() => Safe(() => Session.EndSessionAsync(true));
+
+    [RelayCommand]
+    private Task EndSessionDiscardAsync() => Safe(() => Session.EndSessionAsync(false));
 }
