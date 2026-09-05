@@ -1,64 +1,32 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
              xmlns:models="using:Mono.Control.Models"
-             xmlns:svg="using:Avalonia.Svg.Skia"
              x:Class="Mono.Control.Views.Pages.GenresPage"
-             x:DataType="vm:MainViewModel">
-            <ScrollViewer>
-              <StackPanel Spacing="16">
-                <ItemsControl ItemsSource="{Binding GenreTiles}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:GenreTile">
-                      <Button Classes="genretile" Background="{Binding Accent}"
-                              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectGenreCommand}"
-                              CommandParameter="{Binding}">
-                        <Grid>
-                          <Image Width="56" Height="56" Opacity="0.35"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
-                                 Source="{Binding Motif, Converter={StaticResource SvgIcon}, ConverterParameter=genres}"/>
-                          <StackPanel VerticalAlignment="Bottom">
-                            <TextBlock Text="{Binding Label}" FontSize="22" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="{Binding Subtitle}" Foreground="#CCFFFFFF" FontSize="12"/>
-                          </StackPanel>
-                        </Grid>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <ItemsControl ItemsSource="{Binding FilteredTracks}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:CatalogTrack">
-                      <Border Classes="trackcard">
-                        <StackPanel Spacing="6">
-                          <Border Classes="artslot" Height="140">
-                            <Panel>
-                              <Image Classes="artph"
-                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
-                                     IsVisible="{Binding !HasArt}"/>
-                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                            </Panel>
-                          </Border>
-                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                          <Button Classes="primary" Content="재생" Padding="10,4"
-                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
-                                  CommandParameter="{Binding}"/>
-                        </StackPanel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="16">
+      <TextBlock Text="{Binding EmptyGenresHint}" Classes="muted" TextWrapping="Wrap"
+                 IsVisible="{Binding HasEmptyGenresHint}"/>
+
+      <ItemsControl ItemsSource="{Binding Genres}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:GenreCount">
+            <Button Classes="genretile"
+                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectGenreCommand}"
+                    CommandParameter="{Binding}">
+              <StackPanel VerticalAlignment="Bottom">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11"/>
               </StackPanel>
-            </ScrollViewer>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

@@ -72,24 +72,6 @@ public sealed class NavItem
     public string Icon { get; }
 }
 
-public sealed class GenreTile
-{
-    public GenreTile(string id, string label, string accent, string subtitle, string motif)
-    {
-        Id = id;
-        Label = label;
-        Accent = accent;
-        Subtitle = subtitle;
-        Motif = motif;
-    }
-
-    public string Id { get; }
-    public string Label { get; }
-    public string Accent { get; }
-    public string Subtitle { get; }
-    public string Motif { get; }
-}
-
 public sealed class HomeRail
 {
     public HomeRail(string title, IEnumerable<CatalogTrack> items)

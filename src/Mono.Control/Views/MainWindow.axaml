@@ -80,7 +80,17 @@
           <Grid Grid.Row="2">
             <pages:HomePage IsVisible="{Binding IsHomePage}"/>
 
-            <pages:GenresPage IsVisible="{Binding IsGenresPage}"/>
+            <pages:GenresPage DataContext="{Binding Library}"
+                              IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsGenresPage}"/>
+
+            <pages:ComposersPage DataContext="{Binding Library}"
+                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsComposersPage}"/>
+
+            <pages:CompositionsPage DataContext="{Binding Library}"
+                                    IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsCompositionsPage}"/>
+
+            <pages:FoldersPage DataContext="{Binding Library}"
+                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsFoldersPage}"/>
 
             <pages:LibraryPage IsVisible="{Binding IsLibraryGrid}"/>
 

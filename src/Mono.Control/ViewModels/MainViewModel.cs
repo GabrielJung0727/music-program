@@ -60,16 +60,6 @@ public partial class MainViewModel : ObservableObject
         ];
         SelectedNav = NavItems[0];
 
-        GenreTiles =
-        [
-            new("all", "All", "#2C2C34", "전체 라이브러리", "genre-local"),
-            new("hires", "Hi-Res", "#1F4E5F", "96kHz+", "genre-hires"),
-            new("dsd", "DSD", "#5C3D2E", "네이티브 DSD", "genre-dsd"),
-            new("jazz", "Jazz", "#3D4F5F", "시드·스캔 재즈", "genre-jazz"),
-            new("tidal", "TIDAL", "#111111", "스트리밍", "genre-tidal"),
-            new("qobuz", "Qobuz", "#1A3A5C", "Studio / Hi-Res", "genre-qobuz"),
-            new("local", "Local", "#3A4A3A", "로컬 파일", "genre-local"),
-        ];
 
         CloseToTray = Prefs.GetBool("close_to_tray");
         LibraryPath = Prefs.Get("library_path", "");
@@ -92,7 +82,6 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<CatalogTrack> Tracks { get; } = new();
     public ObservableCollection<CatalogTrack> FilteredTracks { get; } = new();
     public ObservableCollection<HomeRail> HomeRails { get; } = new();
-    public ObservableCollection<GenreTile> GenreTiles { get; }
     public ObservableCollection<OutputDevice> Outputs { get; } = new();
     public ObservableCollection<ZoneItem> Zones { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
@@ -222,7 +211,6 @@ public partial class MainViewModel : ObservableObject
         ApplyTheme();
         MonoIcons.ClearCache();
         OnPropertyChanged(nameof(NavItems));
-        OnPropertyChanged(nameof(GenreTiles));
     }
     partial void OnLibraryPathChanged(string value) => Prefs.Set("library_path", value ?? "");
     partial void OnOnboardingStepChanged(int value)
@@ -351,11 +339,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectGenre(GenreTile? tile)
+    private void SelectGenre(GenreCount? genre)
     {
-        if (tile is null) return;
-        _genreFilter = tile.Id == "all" ? null : tile.Id;
-        PageSubtitle = tile.Subtitle;
+        _genreFilter = genre?.Name;
+        PageSubtitle = genre is null ? "" : $"{genre.Name} · {genre.TrackCount}곡";
+        SelectedNav = NavItems.First(n => n.Id == "tracks");
         ApplyFilter();
     }
 
@@ -557,8 +545,8 @@ public partial class MainViewModel : ObservableObject
             src = Tracks.Where(t => t.Source == 2 || t.GenreHint.Contains("Qobuz", StringComparison.OrdinalIgnoreCase));
         else if (nav is "tidal")
             src = Tracks.Where(t => t.Source == 1 || t.GenreHint.Contains("Tidal", StringComparison.OrdinalIgnoreCase));
-        else if (nav is "genres" && _genreFilter is not null)
-            src = FilterByGenre(Tracks, _genreFilter);
+        else if (_genreFilter is not null)
+            src = Tracks.Where(t => t.Genres.Contains(_genreFilter, StringComparer.OrdinalIgnoreCase));
 
         var q = SearchText.Trim();
         if (q.Length > 0)
@@ -575,20 +563,6 @@ public partial class MainViewModel : ObservableObject
         RebuildHomeRails();
     }
 
-    private static IEnumerable<CatalogTrack> FilterByGenre(IEnumerable<CatalogTrack> tracks, string id) => id switch
-    {
-        "hires" => tracks.Where(t => t.SampleRate >= 96000 && !t.IsDsd),
-        "dsd" => tracks.Where(t => t.IsDsd),
-        "jazz" => tracks.Where(t =>
-            (t.Artist?.Contains("Coltrane", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Miles", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Brubeck", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Hiromi", StringComparison.OrdinalIgnoreCase) ?? false)),
-        "tidal" => tracks.Where(t => t.Source == 1),
-        "qobuz" => tracks.Where(t => t.Source == 2),
-        "local" => tracks.Where(t => t.Source == 0),
-        _ => tracks
-    };
 
     private void RebuildHomeRails()
     {

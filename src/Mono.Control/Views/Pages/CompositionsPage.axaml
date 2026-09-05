@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.CompositionsPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel>
+      <Grid ColumnDefinitions="*,220,110" Margin="12,0,12,8">
+        <TextBlock Text="작품" Classes="muted" FontSize="11"/>
+        <TextBlock Grid.Column="1" Text="작곡가" Classes="muted" FontSize="11"/>
+        <TextBlock Grid.Column="2" Text="연주" Classes="muted" FontSize="11"/>
+      </Grid>
+      <ItemsControl ItemsSource="{Binding Compositions}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:CompositionEntry">
+            <Border Classes="trackcard" Margin="0,0,0,6" Padding="12">
+              <Grid ColumnDefinitions="*,220,110">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="1" Text="{Binding Composer}" Classes="muted"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="2" Text="{Binding PerformanceText}" Classes="muted"/>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
