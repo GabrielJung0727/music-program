@@ -85,4 +85,63 @@ public class CommandContractTests
         });
         Assert.Equal(PlaybackSourceMode.FanOut, s.SourceMode);
     }
+
+    [Fact]
+    public void PinCarriesMediaTimeAndText()
+    {
+        var m = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.Pin,
+            MediaTimeMs = 42_000,
+            Text = "이 구간"
+        });
+        Assert.Equal("pin", m.Type);
+        Assert.Equal(42_000, m.MediaTimeMs);
+        Assert.Equal("이 구간", m.Text);
+    }
+
+    [Fact]
+    public void CreatePlaylistCarriesNameAndTrackIds()
+    {
+        // Core는 이름을 Text에서, 곡 목록을 TrackIds에서 읽는다.
+        var m = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.CreatePlaylist,
+            Text = "밤에 듣는 재즈",
+            TrackIds = ["tr-blue-train", "tr-so-what"]
+        });
+        Assert.Equal("create_playlist", m.Type);
+        Assert.Equal("밤에 듣는 재즈", m.Text);
+        Assert.Equal(2, m.TrackIds!.Count);
+        Assert.Contains("tr-so-what", m.TrackIds);
+    }
+
+    [Fact]
+    public void PlaylistAndArchiveIdsSurviveRoundTrip()
+    {
+        var load = RoundTrip(new MonoMessage
+        {
+            Type = MessageTypes.LoadPlaylist,
+            PlaylistId = "pl-1",
+            Flag = true
+        });
+        Assert.Equal("load_playlist", load.Type);
+        Assert.Equal("pl-1", load.PlaylistId);
+        Assert.True(load.Flag);
+
+        var share = RoundTrip(new MonoMessage { Type = MessageTypes.ShareSession, ArchiveId = "ar-1" });
+        Assert.Equal("share_session", share.Type);
+        Assert.Equal("ar-1", share.ArchiveId);
+    }
+
+    [Fact]
+    public void ReactCarriesWhitelistedEmoji()
+    {
+        // Core가 화이트리스트를 강제하지만, 보내는 쪽도 같은 목록을 안다.
+        foreach (var emoji in new[] { "❤️", "🎉", "👏", "🔥" })
+        {
+            var m = RoundTrip(new MonoMessage { Type = MessageTypes.React, Emoji = emoji });
+            Assert.Equal(emoji, m.Emoji);
+        }
+    }
 }
