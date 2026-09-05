@@ -50,7 +50,7 @@
   - `readonly record struct WorkId(string Key, string Title)` — `Key`는 그룹핑용 정규화 문자열, `Title`은 화면 표시용
   - `static WorkId? CompositionGrouping.Identify(string trackTitle, string? composer)` — 묶을 근거가 없으면 `null`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/CompositionGroupingTests.cs`:
 
@@ -134,7 +134,7 @@ public class CompositionGroupingTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CompositionGroupingTests
@@ -142,7 +142,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CompositionGroupingTests
 
 기대: 컴파일 실패 — `CompositionGrouping`이 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `src/Mono.Core/CompositionGrouping.cs`:
 
@@ -193,7 +193,7 @@ public static partial class CompositionGrouping
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CompositionGroupingTests
@@ -201,7 +201,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CompositionGroupingTests
 
 기대: 7개 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Core/CompositionGrouping.cs tests/Mono.Tests/CompositionGroupingTests.cs
@@ -225,7 +225,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: 없음.
 - Produces: `Track.Genres` (`List<string>`) · `Track.Composers` (`List<string>`) — 둘 다 절대 null이 아니다. DB에는 `genres` · `composers` 컬럼에 ``(unit separator)로 이어 붙여 저장한다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/CatalogMigrationTests.cs`:
 
@@ -304,7 +304,7 @@ public class CatalogMigrationTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CatalogMigrationTests
@@ -312,7 +312,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CatalogMigrationTests
 
 기대: 컴파일 실패 — `Track.Genres`가 없다. `SaveTrack`이 없으면 그것도 함께 뜬다.
 
-- [ ] **Step 3: 도메인에 필드를 더한다**
+- [x] **Step 3: 도메인에 필드를 더한다**
 
 `src/Mono.Shared/Catalog.cs`의 `Track` 클래스, `TrackNumber` 아래에 추가:
 
@@ -324,7 +324,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CatalogMigrationTests
     public List<string> Composers { get; init; } = [];
 ```
 
-- [ ] **Step 4: 스키마와 마이그레이션을 더한다**
+- [x] **Step 4: 스키마와 마이그레이션을 더한다**
 
 `src/Mono.Core/CatalogStore.cs`의 `CREATE TABLE tracks` 마지막 컬럼을 바꾼다:
 
@@ -355,7 +355,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CatalogMigrationTests
         }
 ```
 
-- [ ] **Step 5: 읽기·쓰기를 잇는다**
+- [x] **Step 5: 읽기·쓰기를 잇는다**
 
 `CatalogStore.cs`에 목록 직렬화 헬퍼를 더한다(클래스 안 아무 곳):
 
@@ -392,7 +392,7 @@ public void UpsertTrack(Track track, Album album, Artist artist)
 
 테스트와 스캐너는 이걸 쓴다.
 
-- [ ] **Step 6: 통과를 확인한다**
+- [x] **Step 6: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CatalogMigrationTests
@@ -401,7 +401,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 마이그레이션 2개 통과, 전체도 통과(기존 70 + 작품 7 + 마이그레이션 2 = 79).
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Shared/Catalog.cs src/Mono.Core/CatalogStore.cs tests/Mono.Tests/CatalogMigrationTests.cs
@@ -422,7 +422,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `Track.Genres` · `Track.Composers` (Task 2).
 - Produces: 스캔한 파일의 `tag.Genres` → `Track.Genres`, `tag.Composers` → `Track.Composers`.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/ScannerTagTests.cs`:
 
@@ -487,7 +487,7 @@ public class ScannerTagTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter ScannerTagTests
@@ -501,7 +501,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter ScannerTagTests
 grep -n 'public ArtworkService' src/Mono.Core/ArtworkService.cs
 ```
 
-- [ ] **Step 3: 스캐너를 고친다**
+- [x] **Step 3: 스캐너를 고친다**
 
 `src/Mono.Core/LibraryScanner.cs`의 `Import` 안, `Track`을 만드는 객체 초기화자에 두 줄을 더한다:
 
@@ -512,7 +512,7 @@ grep -n 'public ArtworkService' src/Mono.Core/ArtworkService.cs
 
 기존 트랙을 갱신하는 경로가 따로 있으면 거기에도 같은 값을 넣는다 — 재스캔 시 태그가 반영돼야 한다.
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter ScannerTagTests
@@ -520,7 +520,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter ScannerTagTests
 
 기대: 1개 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Core/LibraryScanner.cs tests/Mono.Tests/ScannerTagTests.cs
@@ -549,7 +549,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `MessageTypes.Folders = "folders"` — 응답 본문은 `[{ path, trackCount, exists }]`
   - `CommandProcessor` 생성자 마지막 인자가 `string libraryRoot` → `IReadOnlyList<string> libraryRoots`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/ScanRootTests.cs`:
 
@@ -624,7 +624,7 @@ public class ScanRootTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter ScanRootTests
@@ -632,7 +632,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter ScanRootTests
 
 기대: 컴파일 실패 — `ScanAll`이 없다.
 
-- [ ] **Step 3: `ScanAll`을 더한다**
+- [x] **Step 3: `ScanAll`을 더한다**
 
 `src/Mono.Core/LibraryScanner.cs`의 `Scan(string root)` 아래:
 
@@ -658,7 +658,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter ScanRootTests
 
 `Scan`이 없는 폴더를 만들어 버리는 현재 동작(`Directory.CreateDirectory(root)`)은 그대로 둔다 — 단일 루트 기본 경로를 준비하는 용도다. `ScanAll`은 그 앞에서 걸러낸다.
 
-- [ ] **Step 4: 설정을 복수로 읽는다**
+- [x] **Step 4: 설정을 복수로 읽는다**
 
 `src/Mono.Core/Program.cs`의 `var library = ...` 줄을 바꾼다:
 
@@ -672,7 +672,7 @@ var libraryRoots = configuredRoots.Length > 0 ? configuredRoots.ToList() : new L
 `Directory.CreateDirectory(library);`는 그대로 둔다(기본 루트 준비).
 `CommandProcessor`를 만드는 곳에서 마지막 인자를 `libraryRoots`로 바꾼다.
 
-- [ ] **Step 5: `CommandProcessor`를 고친다**
+- [x] **Step 5: `CommandProcessor`를 고친다**
 
 생성자 마지막 파라미터를 바꾼다:
 
@@ -708,7 +708,7 @@ var libraryRoots = configuredRoots.Length > 0 ? configuredRoots.ToList() : new L
             }
 ```
 
-- [ ] **Step 6: `folders` 명령을 더한다**
+- [x] **Step 6: `folders` 명령을 더한다**
 
 `src/Mono.Protocol/MessageTypes.cs`의 `ScanLibrary` 줄 아래:
 
@@ -734,7 +734,7 @@ var libraryRoots = configuredRoots.Length > 0 ? configuredRoots.ToList() : new L
                 });
 ```
 
-- [ ] **Step 7: 빌드하고 전체 테스트**
+- [x] **Step 7: 빌드하고 전체 테스트**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -744,7 +744,7 @@ dotnet test Mono.slnx --nologo -v q
 기대: 경고 0. 테스트 81개 통과(79 + 스캔 루트 2).
 `CommandProcessor` 생성자를 부르는 다른 곳(테스트 포함)이 있으면 컴파일러가 잡아준다 — 거기도 목록으로 바꾼다.
 
-- [ ] **Step 8: 커밋**
+- [x] **Step 8: 커밋**
 
 ```bash
 git add src/Mono.Core/ src/Mono.Protocol/MessageTypes.cs tests/Mono.Tests/ScanRootTests.cs
@@ -769,7 +769,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `CatalogView()` 항목에 `genres` (`string[]`) · `composers` (`string[]`) · `workKey` (`string?`) · `workTitle` (`string?`) 추가
   - `Search(string)` 반환 타입이 `IReadOnlyList<Track>` → `IReadOnlyList<object>` — `CatalogView()`와 **같은 모양**
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/CatalogViewTests.cs`:
 
@@ -868,7 +868,7 @@ public class CatalogViewTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CatalogViewTests
@@ -876,7 +876,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CatalogViewTests
 
 기대: 실패 — `Search`가 다른 모양을 내고 `workKey`가 없다.
 
-- [ ] **Step 3: 뷰를 한 곳으로 모은다**
+- [x] **Step 3: 뷰를 한 곳으로 모은다**
 
 `src/Mono.Core/CatalogStore.cs`에서 `CatalogView()`의 `Select` 안 익명 객체를 꺼내 재사용 가능한 private 메서드로 만든다:
 
@@ -956,7 +956,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter CatalogViewTests
 grep -rn '\.Search(' src/ --include=*.cs | grep -v obj
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter CatalogViewTests
@@ -965,7 +965,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 뷰 5개 통과, 전체 86개 통과(81 + 5).
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Core/CatalogStore.cs tests/Mono.Tests/CatalogViewTests.cs
@@ -978,12 +978,28 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 3a단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 87개 통과 (2단계 70 + 작품 7 + 마이그레이션 2 + 스캐너 1 + 스캔 루트 2 + 뷰 5)
-- [ ] 구 스키마 `catalog.db`가 재스캔 없이 열리고 새 컬럼은 빈 값이다
-- [ ] `search`와 `catalog` 응답의 필드 집합이 완전히 같다
-- [ ] `folders` 명령이 루트별 경로·존재 여부·트랙 수를 돌려준다
-- [ ] 작곡가 태그가 없는 트랙은 `workKey`가 null이다 (묶이지 않는다)
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **89개** 통과 (2단계 70 + 작품 7 + 마이그레이션 3 + 스캐너 1 + 스캔 루트 2 + 뷰 6)
+- [x] 구 스키마 `catalog.db`가 재스캔 없이 열리고 새 컬럼은 빈 값이다
+- [x] `search`와 `catalog` 응답의 필드 집합이 완전히 같다 — 실제 TCP로 확인
+- [x] `folders` 명령이 루트별 경로·존재 여부·트랙 수를 돌려준다 — 실제 TCP로 확인
+- [x] 작곡가 태그가 없는 트랙은 `workKey`가 실리지 않는다 (`WhenWritingNull`)
+
+실측(신규 DB, TCP 프로브):
+```
+tr-blue-train    genres=[Jazz, Hard Bop] composers=[John Coltrane] work=Blue Train
+tr-kanden        genres=[J-Pop]          composers=[米津玄師]      work=感電
+search "Hard Bop" -> [tr-blue-train, tr-moment-notice]
+search "요네즈 켄시" -> [tr-kanden]        localPath 누출 없음, 필드 집합 일치
+```
+
+**계획 밖에서 고친 것:** `dotnet run --project src/Mono.Core`가 삭제된 `wwwroot`를 찾다
+기동 전에 죽고 있었다(커밋 `3277af2`에서 레거시 웹 UI와 함께 지워졌는데 정적 웹 자산 의존이 남음).
+README가 안내하는 명령이라 `StaticWebAssetsEnabled=false`로 고쳤다.
+
+**남는 한계:** 마이그레이션은 기존 행을 보존하므로, **이미 쓰던 `catalog.db`의 트랙은 재스캔 전까지
+장르·작곡가가 비어 있다.** 실제 음원이 있으면 「라이브러리 스캔」으로 채워지지만, 데모 시드만 있는
+설치본은 비어 있는 채로 남는다. 3b의 Genres 화면이 빈 상태를 어떻게 보여줄지 정해야 한다.
 
 ## 다음 단계
 
