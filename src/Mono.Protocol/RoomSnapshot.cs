@@ -67,6 +67,20 @@ public sealed class RoomSnapshot
 
     public int CatalogCount { get; set; }
 
+    // 컬렉션은 절대 null이 아니다 — UI가 null 검사 없이 순회한다.
+    public List<SnapshotQueueItem> Queue { get; set; } = [];
+    public List<SnapshotRequest> Requests { get; set; } = [];
+    public List<SnapshotPin> Pins { get; set; } = [];
+    public List<SnapshotReaction> Reactions { get; set; } = [];
+    public Dictionary<string, int> ReactionCounts { get; set; } = [];
+    public List<string> AllowedReactionEmoji { get; set; } = [];
+    public List<SnapshotHeatBucket> Heatmap { get; set; } = [];
+    public List<SnapshotChatLine> Chat { get; set; } = [];
+    public List<SnapshotMember> Members { get; set; } = [];
+    public List<SnapshotOutput> Outputs { get; set; } = [];
+    public List<string> Spectators { get; set; } = [];
+    public Dictionary<string, string> Peers { get; set; } = [];
+
     /// <summary>깨진 JSON이면 null. 호출자가 화면을 유지할 수 있게 예외를 던지지 않는다.</summary>
     public static RoomSnapshot? Parse(string? json)
     {
@@ -80,4 +94,90 @@ public sealed class RoomSnapshot
             return null;
         }
     }
+}
+
+public sealed class SnapshotQueueItem
+{
+    public string Id { get; set; } = "";
+    public string TrackId { get; set; } = "";
+    public string AddedByPeerId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? Artist { get; set; }
+    public long DurationMs { get; set; }
+    public string? Badge { get; set; }
+    public string? ArtUrl { get; set; }
+}
+
+public sealed class SnapshotRequest
+{
+    public string Id { get; set; } = "";
+    public string TrackId { get; set; } = "";
+    public string FromPeerId { get; set; } = "";
+    public string? FromName { get; set; }
+    public string? Title { get; set; }
+}
+
+public sealed class SnapshotPin
+{
+    public string Id { get; set; } = "";
+    public string PeerId { get; set; } = "";
+    public string? PeerName { get; set; }
+    public string TrackId { get; set; } = "";
+    public long MediaTimeMs { get; set; }
+    public string Text { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public bool OnCurrentTrack { get; set; }
+}
+
+public sealed class SnapshotReaction
+{
+    public string PeerId { get; set; } = "";
+    public string TrackId { get; set; } = "";
+    public string Emoji { get; set; } = "";
+    public DateTimeOffset At { get; set; }
+    public long MediaTimeMs { get; set; }
+}
+
+/// <summary>반응 히트맵의 10초 버킷.</summary>
+public sealed class SnapshotHeatBucket
+{
+    public string TrackId { get; set; } = "";
+    public long BucketMs { get; set; }
+    public int Count { get; set; }
+}
+
+public sealed class SnapshotChatLine
+{
+    public string PeerId { get; set; } = "";
+    public string? PeerName { get; set; }
+    public string Text { get; set; } = "";
+    public DateTimeOffset At { get; set; }
+}
+
+public sealed class SnapshotMember
+{
+    public string PeerId { get; set; } = "";
+    public string? Name { get; set; }
+    public MemberRole Role { get; set; }
+    public bool IsOutput { get; set; }
+    public bool Spectator { get; set; }
+    public PeerStats? Stats { get; set; }
+}
+
+public sealed class SnapshotOutput
+{
+    public string PeerId { get; set; } = "";
+    public string? DisplayName { get; set; }
+    public int MaxSampleRate { get; set; }
+    public int MaxBitDepth { get; set; }
+    public bool SupportsDsd { get; set; }
+    public bool ExclusiveMode { get; set; }
+    public long ReportedLatencyMs { get; set; }
+    public bool HardwareVolume { get; set; }
+    public int VolumePercent { get; set; }
+    public string? Device { get; set; }
+    public bool Spectator { get; set; }
+    public string? Badge { get; set; }
+    public string? Note { get; set; }
+    public PeerStats? Stats { get; set; }
 }

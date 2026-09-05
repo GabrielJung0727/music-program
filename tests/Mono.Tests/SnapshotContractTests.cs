@@ -75,4 +75,60 @@ public class SnapshotContractTests
         Assert.Null(RoomSnapshot.Parse("not json"));
         Assert.Null(RoomSnapshot.Parse(""));
     }
+
+    [Fact]
+    public void QueueAndPinsAndReactionsSurviveRoundTrip()
+    {
+        var (rooms, _) = NewStack();
+        var room = rooms.Create("host", "Lounge", RoomMode.OpenLounge, "Host");
+        rooms.Enqueue(room.Id, "host", "tr-blue-train");
+        rooms.Pin(room.Id, "host", 12_000, "여기 색소폰");
+        rooms.React(room.Id, "host", "❤️");
+
+        var snap = RoomSnapshot.Parse(rooms.SnapshotJson(room))!;
+
+        var q = Assert.Single(snap.Queue);
+        Assert.Equal("tr-blue-train", q.TrackId);
+        Assert.Equal("host", q.AddedByPeerId);
+        Assert.False(string.IsNullOrEmpty(q.Title));
+
+        var pin = Assert.Single(snap.Pins);
+        Assert.Equal(12_000, pin.MediaTimeMs);
+        Assert.Equal("여기 색소폰", pin.Text);
+        Assert.Equal("host", pin.PeerId);
+
+        Assert.Contains(snap.Reactions, r => r.Emoji == "❤️");
+        Assert.Equal(4, snap.AllowedReactionEmoji.Count);
+        Assert.Contains("🔥", snap.AllowedReactionEmoji);
+    }
+
+    [Fact]
+    public void MembersCarryRoleAndStats()
+    {
+        var (rooms, _) = NewStack();
+        var room = rooms.Create("host", "Lounge", RoomMode.OpenLounge, "Host");
+
+        var snap = RoomSnapshot.Parse(rooms.SnapshotJson(room))!;
+
+        var host = Assert.Single(snap.Members, m => m.PeerId == "host");
+        Assert.Equal(MemberRole.Host, host.Role);
+        Assert.False(host.Spectator);
+    }
+
+    [Fact]
+    public void CollectionsAreNeverNull()
+    {
+        // 최소 JSON에서도 목록을 순회할 수 있어야 한다 — UI가 null 검사를 안 하도록.
+        var snap = RoomSnapshot.Parse("""{"id":"r1"}""")!;
+        Assert.Empty(snap.Queue);
+        Assert.Empty(snap.Pins);
+        Assert.Empty(snap.Members);
+        Assert.Empty(snap.Outputs);
+        Assert.Empty(snap.Chat);
+        Assert.Empty(snap.Heatmap);
+        Assert.Empty(snap.Requests);
+        Assert.Empty(snap.Reactions);
+        Assert.Empty(snap.AllowedReactionEmoji);
+        Assert.Empty(snap.Spectators);
+    }
 }
