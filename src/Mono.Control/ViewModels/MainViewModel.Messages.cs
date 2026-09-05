@@ -47,6 +47,9 @@ public partial class MainViewModel
                 else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
                     StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
                 break;
+            case MessageTypes.Folders:
+                LoadFolders(msg.Body);
+                break;
             case MessageTypes.ListZones:
                 LoadZones(msg.Body);
                 break;
@@ -68,6 +71,7 @@ public partial class MainViewModel
         }
         catch { /* ignore malformed */ }
         ApplyFilter();
+        Library.Rebuild(Tracks);
         PageSubtitle = $"{Tracks.Count} tracks";
         _ = PrefetchArtAsync();
     }
@@ -86,6 +90,16 @@ public partial class MainViewModel
                 await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
         }
         Audio.ArtPerfText = ArtCache.StatsText();
+    }
+
+    private void LoadFolders(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) { Library.ApplyFolders([]); return; }
+        try
+        {
+            Library.ApplyFolders(JsonSerializer.Deserialize<List<FolderEntry>>(body, Json) ?? []);
+        }
+        catch { /* 형식이 어긋나면 이전 목록을 유지한다 */ }
     }
 
     private void LoadZones(string? body)

@@ -8,6 +8,9 @@ public sealed partial class CoreSession
     public Task CatalogAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Catalog });
     public Task SearchAsync(string q) => SendAsync(new MonoMessage { Type = MessageTypes.Search, Text = q });
     public Task ScanAsync(string? path) => SendAsync(new MonoMessage { Type = MessageTypes.ScanLibrary, Path = path });
+
+    /// <summary>스캔 루트 목록. 존이 룸 스냅샷에 없듯 폴더도 별도 조회다.</summary>
+    public Task FoldersAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Folders });
     public Task HistoryAsync() => SendAsync(new MonoMessage { Type = MessageTypes.History });
     public Task PlaylistsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Playlists });
     public Task ArchivesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Archives });

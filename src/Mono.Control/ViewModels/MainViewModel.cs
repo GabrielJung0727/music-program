@@ -32,6 +32,7 @@ public partial class MainViewModel : ObservableObject
         _supervisor = supervisor;
         Lounge = new LoungeViewModel(session);
         Audio = new AudioViewModel(session);
+        Library = new LibraryViewModel(session);
         _session.MessageReceived += OnMessage;
         _session.ConnectionChanged += () => Dispatcher.UIThread.Post(() =>
         {
@@ -51,6 +52,9 @@ public partial class MainViewModel : ObservableObject
             new("artists", "Artists", "My Library", "nav-artists"),
             new("tracks", "Tracks", "My Library", "nav-tracks"),
             new("playlists", "Playlists", "My Library", "nav-playlists"),
+            new("composers", "Composers", "My Library", "nav-artists"),
+            new("compositions", "Compositions", "My Library", "nav-tracks"),
+            new("folders", "Folders", "My Library", "nav-albums"),
             new("devices", "Audio", "Setup", "nav-audio"),
             new("settings", "Settings", "Setup", "nav-settings"),
         ];
@@ -82,6 +86,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>화면별 상태. 셸은 스냅샷을 받아 이들에게 밀어 넣는다.</summary>
     public LoungeViewModel Lounge { get; }
     public AudioViewModel Audio { get; }
+    public LibraryViewModel Library { get; }
 
     public ObservableCollection<NavItem> NavItems { get; }
     public ObservableCollection<CatalogTrack> Tracks { get; } = new();
@@ -172,7 +177,14 @@ public partial class MainViewModel : ObservableObject
     public bool IsSettingsPage => SelectedNav?.Id == "settings";
     public bool IsHomePage => SelectedNav?.Id == "home";
     public bool IsGenresPage => SelectedNav?.Id == "genres";
-    public bool IsLibraryGrid => IsContentLibrary && !IsHomePage && !IsGenresPage;
+    public bool IsComposersPage => SelectedNav?.Id == "composers";
+    public bool IsCompositionsPage => SelectedNav?.Id == "compositions";
+    public bool IsFoldersPage => SelectedNav?.Id == "folders";
+    public bool IsHistoryPage => SelectedNav?.Id == "history";
+    public bool IsPlaylistsPage => SelectedNav?.Id == "playlists";
+    public bool IsLibraryGrid => IsContentLibrary && !IsHomePage && !IsGenresPage
+                                && !IsComposersPage && !IsCompositionsPage && !IsFoldersPage
+                                && !IsHistoryPage && !IsPlaylistsPage;
     public bool IsLibraryToolsVisible => SelectedNav?.Id is "home" or "albums" or "artists" or "tracks" or "genres" or "qobuz" or "tidal";
     public bool IsContentLibrary => !IsLoungePage && !IsDevicesPage && !IsSettingsPage;
     public string PlayPauseLabel => IsPlaying ? "⏸" : "▶";
@@ -231,6 +243,11 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsHomePage));
         OnPropertyChanged(nameof(IsGenresPage));
+        OnPropertyChanged(nameof(IsComposersPage));
+        OnPropertyChanged(nameof(IsCompositionsPage));
+        OnPropertyChanged(nameof(IsFoldersPage));
+        OnPropertyChanged(nameof(IsHistoryPage));
+        OnPropertyChanged(nameof(IsPlaylistsPage));
         OnPropertyChanged(nameof(IsLibraryGrid));
         OnPropertyChanged(nameof(IsLibraryToolsVisible));
         OnPropertyChanged(nameof(IsContentLibrary));
@@ -243,6 +260,9 @@ public partial class MainViewModel : ObservableObject
             "Tracks" => "My Tracks",
             "Playlists" => "My Playlists",
             "Genres" => "Genres",
+            "Composers" => "My Composers",
+            "Compositions" => "My Compositions",
+            "Folders" => "Folders",
             "라운지" => "라운지",
             "Audio" => "Audio devices",
             "Settings" => "Settings",
@@ -253,6 +273,7 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
         if (value.Id is "lounge") _ = Safe(() => _session.ListRoomsAsync());
         if (value.Id is "history") _ = Safe(() => _session.HistoryAsync());
+        if (value.Id is "folders") _ = Safe(() => _session.FoldersAsync());
         if (value.Id is "playlists") _ = Safe(() => _session.PlaylistsAsync());
         if (value.Id is "devices") _ = Safe(async () => { await _session.EndpointsAsync(); await _session.ListZonesAsync(); });
     }
