@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Models;
 using Mono.Control.Services;
+using Mono.Control.ViewModels.Pages;
 using Mono.Protocol;
 using Mono.Shared;
 
@@ -29,6 +30,8 @@ public partial class MainViewModel : ObservableObject
     {
         _session = session;
         _supervisor = supervisor;
+        Lounge = new LoungeViewModel(session);
+        Audio = new AudioViewModel(session);
         _session.MessageReceived += OnMessage;
         _session.ConnectionChanged += () => Dispatcher.UIThread.Post(() =>
         {
@@ -76,14 +79,15 @@ public partial class MainViewModel : ObservableObject
         _clockTimer.Start();
     }
 
+    /// <summary>화면별 상태. 셸은 스냅샷을 받아 이들에게 밀어 넣는다.</summary>
+    public LoungeViewModel Lounge { get; }
+    public AudioViewModel Audio { get; }
+
     public ObservableCollection<NavItem> NavItems { get; }
     public ObservableCollection<CatalogTrack> Tracks { get; } = new();
     public ObservableCollection<CatalogTrack> FilteredTracks { get; } = new();
     public ObservableCollection<HomeRail> HomeRails { get; } = new();
     public ObservableCollection<GenreTile> GenreTiles { get; }
-    public ObservableCollection<RoomListItem> Rooms { get; } = new();
-    public ObservableCollection<string> ChatLines { get; } = new();
-    public ObservableCollection<CatalogTrack> QueueTracks { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
     public ObservableCollection<string> LyricLines { get; } = new();
 
@@ -98,11 +102,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _displayName = Environment.UserName;
     [ObservableProperty] private string _libraryPath = "";
     [ObservableProperty] private string _zoneName = "내 방";
-    [ObservableProperty] private string _roomName = "Night Lounge";
-    [ObservableProperty] private int _roomMode;
-    [ObservableProperty] private string _joinRoomId = "";
-    [ObservableProperty] private string _inviteCode = "";
-    [ObservableProperty] private string _chatInput = "";
     [ObservableProperty] private string _nowTitle = "트랙을 큐에 넣으세요";
     [ObservableProperty] private string _nowArtist = "";
     [ObservableProperty] private string _nowBadge = "";
@@ -129,20 +128,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showNowPlaying;
     [ObservableProperty] private int _nowPlayingTab;
     [ObservableProperty] private bool _closeToTray;
-    [ObservableProperty] private bool _eqGraphicMode;
-    [ObservableProperty] private double _eqBand1;
-    [ObservableProperty] private double _eqBand2;
-    [ObservableProperty] private double _eqBand3;
-    [ObservableProperty] private double _eqBand4;
-    [ObservableProperty] private double _eqBand5;
-    [ObservableProperty] private string _irPath = "";
-    [ObservableProperty] private double _speakerDelayL;
-    [ObservableProperty] private double _speakerDelayR;
-    [ObservableProperty] private double _speakerGainL;
-    [ObservableProperty] private double _speakerGainR;
-    [ObservableProperty] private double _headroomDb = -3;
-    [ObservableProperty] private string _deviceEqProfile = "harman";
-    [ObservableProperty] private string _syncProbeText = "";
     [ObservableProperty] private string _appVersion = "";
     [ObservableProperty] private string _updateStatus = "";
     [ObservableProperty] private bool _updateBusy;
@@ -150,7 +135,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _updateProgress;
     [ObservableProperty] private bool _followHostView;
     [ObservableProperty] private double _linerScrollY;
-    [ObservableProperty] private string _artPerfText = "";
     /// <summary>Core가 마지막으로 보낸 룸 스냅샷 — 페이지 뷰모델이 읽는 단일 상태원.</summary>
     [ObservableProperty] private RoomSnapshot? _currentSnapshot;
     private bool _suppressLinerScrollSend;
@@ -302,11 +286,7 @@ public partial class MainViewModel : ObservableObject
         StatusText = "라이브러리 경로: " + path;
     }
 
-    public void SetIrPathFromPicker(string path)
-    {
-        IrPath = path;
-        _ = Safe(() => _session.SetConvolutionIrAsync(path));
-    }
+    public void SetIrPathFromPicker(string path) => Audio.SetIrPathFromPicker(path);
 
     [RelayCommand]
     private void SelectNav(NavItem? item)
@@ -323,13 +303,6 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
     }
 
-    [RelayCommand]
-    private async Task JoinListedRoomAsync(RoomListItem? room)
-    {
-        if (room is null) return;
-        JoinRoomId = room.Id;
-        await JoinRoomAsync();
-    }
 
     [RelayCommand]
     private void NextOnboarding()
@@ -406,40 +379,12 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ResyncAsync() => await Safe(() => _session.ResyncAsync());
 
-    [RelayCommand]
-    private async Task SyncProbeAsync() => await Safe(() => _session.SyncProbeAsync());
 
-    [RelayCommand]
-    private async Task CreateRoomAsync() => await Safe(() => _session.CreateRoomAsync(RoomName, RoomMode));
 
-    [RelayCommand]
-    private async Task JoinRoomAsync()
-    {
-        if (string.IsNullOrWhiteSpace(JoinRoomId)) return;
-        await Safe(() => _session.JoinRoomAsync(JoinRoomId.Trim(), string.IsNullOrWhiteSpace(InviteCode) ? null : InviteCode.Trim()));
-    }
 
-    [RelayCommand]
-    private async Task LeaveRoomAsync() => await Safe(() => _session.LeaveRoomAsync());
 
-    [RelayCommand]
-    private async Task RefreshRoomsAsync() => await Safe(() => _session.ListRoomsAsync());
 
-    [RelayCommand]
-    private async Task SendChatAsync()
-    {
-        if (string.IsNullOrWhiteSpace(ChatInput)) return;
-        var t = ChatInput.Trim();
-        ChatInput = "";
-        await Safe(() => _session.ChatAsync(t));
-    }
 
-    [RelayCommand]
-    private async Task ReactAsync(string? emoji)
-    {
-        if (string.IsNullOrWhiteSpace(emoji)) return;
-        await Safe(() => _session.ReactAsync(emoji));
-    }
 
     [RelayCommand]
     private async Task PlayTrackAsync(CatalogTrack? track)
@@ -448,7 +393,7 @@ public partial class MainViewModel : ObservableObject
         await Safe(async () =>
         {
             if (string.IsNullOrWhiteSpace(CurrentRoomId))
-                await _session.CreateRoomAsync(RoomName, RoomMode);
+                await _session.CreateRoomAsync(Lounge.RoomName, Lounge.RoomMode);
             await _session.EnqueueAsync(track.Id);
             await _session.PlayAsync();
         });
@@ -468,117 +413,15 @@ public partial class MainViewModel : ObservableObject
         await Safe(() => _session.ChooseAutoplayAsync(track.Id));
     }
 
-    [RelayCommand]
-    private async Task ClearQueueAsync() => await Safe(() => _session.ClearQueueAsync());
 
-    [RelayCommand]
-    private async Task SetDspAsync(string? preset)
-    {
-        if (!int.TryParse(preset, out var p)) return;
-        await Safe(() => _session.SetDspAsync(p));
-    }
 
-    [RelayCommand]
-    private async Task ApplyEasyEqAsync()
-    {
-        var bands = new[]
-        {
-            new { f = 60f, g = (float)EqBand1, q = 0.7f },
-            new { f = 250f, g = (float)EqBand2, q = 0.9f },
-            new { f = 1000f, g = (float)EqBand3, q = 1.0f },
-            new { f = 4000f, g = (float)EqBand4, q = 1.1f },
-            new { f = 12000f, g = (float)EqBand5, q = 0.8f },
-        };
-        var json = JsonSerializer.Serialize(bands);
-        await Safe(() => _session.SetEasyEqAsync(json, EqGraphicMode));
-        StatusText = EqGraphicMode ? "Graphic EQ 적용" : "Parametric EQ 적용";
-    }
 
-    [RelayCommand]
-    private async Task ApplySpeakerSetupAsync()
-    {
-        var csv = string.Join(",",
-            SpeakerDelayL.ToString(CultureInfo.InvariantCulture),
-            SpeakerDelayR.ToString(CultureInfo.InvariantCulture),
-            SpeakerGainL.ToString(CultureInfo.InvariantCulture),
-            SpeakerGainR.ToString(CultureInfo.InvariantCulture));
-        await Safe(() => _session.SetSpeakerSetupAsync(csv));
-    }
 
-    [RelayCommand]
-    private async Task ApplyHeadroomAsync() => await Safe(() => _session.SetHeadroomAsync((float)HeadroomDb));
 
-    [RelayCommand]
-    private async Task ApplyDeviceEqAsync(string? profile)
-    {
-        var p = string.IsNullOrWhiteSpace(profile) ? DeviceEqProfile : profile!;
-        DeviceEqProfile = p;
-        await Safe(() => _session.SetDeviceEqAsync(p));
-    }
 
-    [RelayCommand]
-    private async Task ClearIrAsync()
-    {
-        IrPath = "";
-        await Safe(() => _session.SetConvolutionIrAsync(null));
-    }
 
     [RelayCommand]
     private void ToggleTheme() => DarkTheme = !DarkTheme;
-
-    [RelayCommand]
-    private async Task CheckForUpdatesAsync()
-    {
-        if (UpdateBusy) return;
-        UpdateBusy = true;
-        UpdateProgress = 0;
-        try
-        {
-            UpdateStatus = "업데이트 확인 중…";
-            UpdateStatus = await _updater.CheckAsync();
-            UpdateReady = _updater.Pending is not null;
-        }
-        catch (Exception ex)
-        {
-            UpdateReady = false;
-            UpdateStatus = UpdateCheckErrors.Describe(ex);
-        }
-        finally
-        {
-            UpdateBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ApplyUpdateAsync()
-    {
-        if (UpdateBusy) return;
-        if (_updater.Pending is null)
-        {
-            await CheckForUpdatesAsync();
-            if (_updater.Pending is null) return;
-        }
-
-        UpdateBusy = true;
-        try
-        {
-            UpdateStatus = "업데이트 받는 중…";
-            var progress = new Progress<int>(p =>
-            {
-                UpdateProgress = p;
-                UpdateStatus = $"업데이트 받는 중… {p}%";
-            });
-            await _updater.DownloadAsync(progress);
-            UpdateStatus = "창을 닫고 설치한 뒤 다시 켭니다…";
-            await ShutdownAsync();
-            _updater.ApplyAndRestart();
-        }
-        catch (Exception ex)
-        {
-            UpdateStatus = "업데이트 실패: " + ex.Message;
-            UpdateBusy = false;
-        }
-    }
 
     private void ApplyTheme()
     {
@@ -603,81 +446,6 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task SeekToAsync() => await Safe(() => _session.SeekAsync((long)SeekValue));
 
-    private void OnMessage(MonoMessage msg) => Dispatcher.UIThread.Post(() => HandleMessage(msg));
-
-    private void HandleMessage(MonoMessage msg)
-    {
-        if (!string.IsNullOrWhiteSpace(msg.Error))
-            StatusText = msg.Error!;
-
-        switch (msg.Type)
-        {
-            case MessageTypes.Welcome:
-                StatusText = "환영합니다";
-                break;
-            case MessageTypes.Catalog:
-            case MessageTypes.Search:
-                LoadCatalog(msg.Body);
-                break;
-            case MessageTypes.ListRooms:
-                LoadRooms(msg.Body);
-                break;
-            case MessageTypes.RoomState:
-                ApplyRoomState(msg.Body);
-                break;
-            case MessageTypes.WikiBio:
-                WikiText = msg.Body ?? msg.Text ?? "";
-                ArtistBio = WikiText;
-                break;
-            case MessageTypes.Chat:
-                if (!string.IsNullOrWhiteSpace(msg.Text))
-                    ChatLines.Add($"{msg.DisplayName ?? msg.PeerId}: {msg.Text}");
-                break;
-            case MessageTypes.LinkStreaming:
-                StatusText = (msg.Ok ?? false) ? "스트리밍 연동 응답" : (msg.Error ?? "스트리밍");
-                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"demo\":true", StringComparison.OrdinalIgnoreCase))
-                    StatusText = "파트너 키 없음 — 데모 토큰으로 연동했습니다.";
-                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
-                    StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
-                break;
-            case MessageTypes.SyncProbe:
-                SyncProbeText = msg.Body ?? "";
-                StatusText = "Sync probe 수신";
-                break;
-        }
-    }
-
-    private void LoadCatalog(string? body)
-    {
-        Tracks.Clear();
-        if (string.IsNullOrWhiteSpace(body)) { ApplyFilter(); return; }
-        try
-        {
-            var list = JsonSerializer.Deserialize<List<CatalogTrack>>(body, Json) ?? [];
-            foreach (var t in list) Tracks.Add(t);
-        }
-        catch { /* ignore malformed */ }
-        ApplyFilter();
-        PageSubtitle = $"{Tracks.Count} tracks";
-        _ = PrefetchArtAsync();
-    }
-
-    private async Task PrefetchArtAsync()
-    {
-        _artCts?.Cancel();
-        _artCts = new CancellationTokenSource();
-        var ct = _artCts.Token;
-        foreach (var t in Tracks.ToList())
-        {
-            if (ct.IsCancellationRequested) break;
-            if (string.IsNullOrWhiteSpace(t.AbsoluteArtUrl)) continue;
-            var bmp = await ArtCache.GetAsync(t.AbsoluteArtUrl, ct, decodeWidth: 160);
-            if (bmp is not null)
-                await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
-        }
-        ArtPerfText = ArtCache.StatsText();
-    }
-
     partial void OnFollowHostViewChanged(bool value)
     {
         if (_suppressLinerScrollSend) return;
@@ -697,122 +465,6 @@ public partial class MainViewModel : ObservableObject
     {
         FollowHostView = !FollowHostView;
         await Task.CompletedTask;
-    }
-
-    private void LoadRooms(string? body)
-    {
-        Rooms.Clear();
-        if (string.IsNullOrWhiteSpace(body)) return;
-        try
-        {
-            var list = JsonSerializer.Deserialize<List<RoomListItem>>(body, Json) ?? [];
-            foreach (var r in list) Rooms.Add(r);
-        }
-        catch { /* ignore */ }
-    }
-
-    private void ApplyRoomState(string? body)
-    {
-        var snap = RoomSnapshot.Parse(body);
-        if (snap is null)
-        {
-            // 빈 본문은 정상(하트비트). 내용이 있는데 못 읽으면 계약이 어긋난 것이니 드러낸다.
-            if (!string.IsNullOrWhiteSpace(body)) StatusText = "스냅샷 파싱 실패";
-            return;
-        }
-        CurrentSnapshot = snap;
-
-        CurrentRoomId = snap.Id;
-        RoomChip = $"{(string.IsNullOrEmpty(snap.Name) ? "룸" : snap.Name)} · {snap.Id[..Math.Min(6, snap.Id.Length)]}";
-        IsPlaying = snap.Playing;
-        PathBadge = snap.PathBadge ?? (snap.BitPerfect ? "Bit-perfect" : "Processed");
-        NowBadge = PathBadge;
-
-        SignalPathText = snap.DspEnabled
-            ? $"Decode → DSP({snap.DspPreset}"
-              + (string.IsNullOrWhiteSpace(snap.DeviceEqProfile) ? "" : "/" + snap.DeviceEqProfile)
-              + (string.IsNullOrWhiteSpace(snap.ConvolutionIrPath) ? "" : "+IR")
-              + $") → Output · {PathBadge}"
-            : $"Decode → Bit-perfect → Output · {PathBadge}";
-        if (!string.IsNullOrWhiteSpace(snap.ConvolutionIrPath)) IrPath = snap.ConvolutionIrPath!;
-
-        var duration = Math.Max(1, snap.DurationMs);
-        SeekMaximum = duration;
-        _baseMedia = snap.MediaTimeMs;
-        _baseLocal = Environment.TickCount64;
-        _playingClock = IsPlaying;
-        SeekValue = snap.MediaTimeMs;
-        UpdateTimeTexts(snap.MediaTimeMs, duration);
-
-        LinerNotes = snap.LinerNotes ?? "";
-        CreditsText = snap.Credits ?? "";
-
-        _suppressLinerScrollSend = true;
-        FollowHostView = snap.FollowHostView;
-        LinerScrollY = snap.LinerScrollY;
-        _suppressLinerScrollSend = false;
-
-        CurrentLyric = snap.CurrentLyric ?? "";
-        LyricLines.Clear();
-        foreach (var line in snap.Lyrics)
-            if (!string.IsNullOrWhiteSpace(line.Text)) LyricLines.Add(line.Text);
-
-        if (snap.CurrentTrack is { } ct)
-        {
-            NowTitle = string.IsNullOrWhiteSpace(ct.Title) ? "트랙" : ct.Title;
-            NowArtist = string.Join(" · ", new[] { ct.ArtistName, ct.AlbumTitle }
-                .Where(s => !string.IsNullOrWhiteSpace(s)));
-            NowArtUrl = string.IsNullOrWhiteSpace(ct.ArtUrl) ? "" : "http://127.0.0.1:7702" + ct.ArtUrl;
-            _ = RefreshNowArtAsync(NowArtUrl);
-            if (!string.IsNullOrWhiteSpace(ct.ArtistId) && string.IsNullOrWhiteSpace(ArtistBio))
-                _ = Safe(() => _session.WikiAsync(ct.ArtistId!));
-        }
-
-        ArtistBio = snap.Artist?.Bio ?? ArtistBio;
-
-        QueueTracks.Clear();
-        foreach (var q in snap.Queue)
-        {
-            QueueTracks.Add(new CatalogTrack
-            {
-                Id = q.TrackId,
-                Title = q.Title,
-                Artist = q.Artist,
-                DurationMs = q.DurationMs,
-                Badge = q.Badge,
-                ArtUrl = q.ArtUrl
-            });
-        }
-
-        // 기존 동작 유지: 통계가 있는 첫 멤버를 쓰고, 없으면 직전 값을 그대로 둔다.
-        foreach (var m in snap.Members)
-        {
-            if (m.Stats is not { } st) continue;
-            SyncText = $"sync {st.OffsetMs:+0.00;-0.00}ms · jitter {st.JitterMs:0.00}ms";
-            break;
-        }
-
-        ChatLines.Clear();
-        foreach (var c in snap.Chat) ChatLines.Add($"{c.PeerName ?? c.PeerId}: {c.Text}");
-
-        AutoplayChoices.Clear();
-        if (snap.Autoplay is { } ap)
-        {
-            foreach (var c in ap.Candidates)
-            {
-                AutoplayChoices.Add(new CatalogTrack
-                {
-                    Id = c.Id,
-                    Title = c.Title,
-                    Artist = c.ArtistName,
-                    DurationMs = c.DurationMs,
-                    Badge = c.Badge,
-                    ArtUrl = c.ArtUrl
-                });
-            }
-        }
-        // 기존 코드는 candidates 배열이 비어 있어도 카드를 띄웠다. 빈 카드는 띄우지 않는다.
-        ShowAutoplay = AutoplayChoices.Count > 0;
     }
 
     private async Task RefreshNowArtAsync(string url)
@@ -897,46 +549,4 @@ public partial class MainViewModel : ObservableObject
         try { await action(); }
         catch (Exception ex) { StatusText = ex.Message; }
     }
-}
-
-internal static class Prefs
-{
-    private static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
-    private static string FilePath => Path.Combine(Dir, "prefs.ini");
-
-    private static Dictionary<string, string> Load()
-    {
-        var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(FilePath)) return d;
-        foreach (var line in File.ReadAllLines(FilePath))
-        {
-            var i = line.IndexOf('=');
-            if (i <= 0) continue;
-            d[line[..i]] = line[(i + 1)..];
-        }
-        return d;
-    }
-
-    private static void Save(Dictionary<string, string> d)
-    {
-        Directory.CreateDirectory(Dir);
-        File.WriteAllLines(FilePath, d.Select(kv => kv.Key + "=" + kv.Value));
-    }
-
-    public static string Get(string key, string fallback)
-    {
-        var d = Load();
-        return d.TryGetValue(key, out var v) ? v : fallback;
-    }
-
-    public static void Set(string key, string value)
-    {
-        var d = Load();
-        d[key] = value;
-        Save(d);
-    }
-
-    public static bool GetBool(string key) => Get(key, "") == "1";
-    public static void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
 }
