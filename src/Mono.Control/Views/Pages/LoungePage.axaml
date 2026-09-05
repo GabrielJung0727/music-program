@@ -117,10 +117,45 @@
                         <Image Classes="icon" Source="{DynamicResource Mono.Icon.Fire}"/>
                       </Button>
                     </StackPanel>
+                    <TextBlock Classes="muted" FontSize="11" Text="곡당 3번까지 남길 수 있습니다."/>
                   </StackPanel>
                   <ScrollViewer>
                     <StackPanel Spacing="12">
                       <local:LoungeAdminPanel/>
+
+                      <StackPanel>
+                        <TextBlock Text="핀" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Classes="muted" FontSize="11" Margin="0,0,0,4"
+                                   Text="지금 재생 위치에 감상을 남깁니다. 시크바에 마커로 표시됩니다."/>
+                        <DockPanel>
+                          <Button DockPanel.Dock="Right" Classes="ghost" Content="꽂기" Margin="4,0,0,0"
+                                  Command="{Binding AddPinCommand}"/>
+                          <TextBox Text="{Binding PinText}" Watermark="이 구간 감상"/>
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding Pins}" Margin="0,6,0,0">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:PinEntry">
+                              <Border Classes="panel" CornerRadius="8" Padding="8" Margin="0,0,0,4">
+                                <DockPanel>
+                                  <Button DockPanel.Dock="Right" Classes="ghost" Content="✕" Padding="6,2" FontSize="11"
+                                          VerticalAlignment="Center"
+                                          Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RemovePinCommand}"
+                                          CommandParameter="{Binding}"/>
+                                  <Button Classes="ghost" Background="Transparent" BorderThickness="0"
+                                          HorizontalContentAlignment="Left" ToolTip.Tip="이 구간으로 이동"
+                                          Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).SeekPinCommand}"
+                                          CommandParameter="{Binding}">
+                                    <StackPanel>
+                                      <TextBlock Text="{Binding Text}" FontSize="12"/>
+                                      <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
+                                    </StackPanel>
+                                  </Button>
+                                </DockPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
                       <StackPanel>
                         <TextBlock Text="라운지 채팅" FontWeight="SemiBold" Margin="0,0,0,8"/>
                         <ListBox ItemsSource="{Binding ChatLines}" Height="240"/>
