@@ -55,6 +55,9 @@ public partial class MainViewModel
             case MessageTypes.Playlists:
                 LoadPlaylists(msg.Body);
                 break;
+            case MessageTypes.Album:
+                LoadAlbum(msg.Body);
+                break;
             case MessageTypes.Folders:
                 LoadFolders(msg.Body);
                 break;
@@ -103,6 +106,13 @@ public partial class MainViewModel
                 await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
         }
         Audio.ArtPerfText = ArtCache.StatsText();
+    }
+
+    private void LoadAlbum(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) { Library.ApplyAlbum(null); return; }
+        try { Library.ApplyAlbum(JsonSerializer.Deserialize<AlbumDetail>(body, Json)); }
+        catch { /* 형식이 어긋나면 열지 않는다 */ }
     }
 
     private void LoadHistory(string? body)

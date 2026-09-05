@@ -11,6 +11,9 @@ public sealed partial class CoreSession
 
     /// <summary>스캔 루트 목록. 존이 룸 스냅샷에 없듯 폴더도 별도 조회다.</summary>
     public Task FoldersAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Folders });
+
+    /// <summary>앨범 한 장의 상세. 라이너·크레딧은 catalog 에 없으므로 눌렀을 때만 받는다.</summary>
+    public Task AlbumAsync(string albumId) => SendAsync(new MonoMessage { Type = MessageTypes.Album, Text = albumId });
     public Task HistoryAsync() => SendAsync(new MonoMessage { Type = MessageTypes.History });
     public Task PlaylistsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Playlists });
     public Task ArchivesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Archives });

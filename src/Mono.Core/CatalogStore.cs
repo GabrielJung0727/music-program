@@ -226,6 +226,30 @@ public sealed class CatalogStore : IDisposable
         };
     }
 
+    /// <summary>앨범 한 장의 상세. 라이너·크레딧은 여기서만 나간다 — 트랙마다 실으면 낭비다.</summary>
+    public object? AlbumDetail(string albumId)
+    {
+        lock (_gate)
+        {
+            if (!_albums.TryGetValue(albumId, out var album)) return null;
+            return new
+            {
+                album.Id,
+                album.Title,
+                artist = _artists.GetValueOrDefault(album.ArtistId)?.Name,
+                album.Year,
+                album.Label,
+                album.LinerNotes,
+                album.Credits,
+                tracks = _tracks.Values
+                    .Where(t => t.AlbumId == albumId)
+                    .OrderBy(t => t.TrackNumber)
+                    .Select(TrackView)
+                    .ToList()
+            };
+        }
+    }
+
     public IReadOnlyList<object> CatalogView()
     {
         lock (_gate)

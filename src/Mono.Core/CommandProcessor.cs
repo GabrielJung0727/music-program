@@ -470,6 +470,18 @@ public sealed class CommandProcessor
                 }, CatalogMessage());
             }
 
+            case MessageTypes.Album:
+            {
+                var detail = _catalog.AlbumDetail(msg.Text ?? "");
+                return detail is null
+                    ? Fail("album not found")
+                    : Direct(new MonoMessage
+                    {
+                        Type = MessageTypes.Album,
+                        Body = JsonSerializer.Serialize(detail, LineFraming.JsonOptions)
+                    });
+            }
+
             case MessageTypes.Folders:
                 return Direct(new MonoMessage
                 {

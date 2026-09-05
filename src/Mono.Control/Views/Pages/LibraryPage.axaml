@@ -25,14 +25,19 @@
                     <DataTemplate x:DataType="models:CatalogTrack">
                       <Border Classes="trackcard">
                         <StackPanel Spacing="6">
-                          <Border Classes="artslot" Height="140">
-                            <Panel>
-                              <Image Classes="artph"
-                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
-                                     IsVisible="{Binding !HasArt}"/>
-                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                            </Panel>
-                          </Border>
+                          <Button Classes="ghost" Padding="0" BorderThickness="0" Background="Transparent"
+                                  ToolTip.Tip="앨범 열기"
+                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).Library.OpenAlbumCommand}"
+                                  CommandParameter="{Binding}">
+                            <Border Classes="artslot" Height="140">
+                              <Panel>
+                                <Image Classes="artph"
+                                       Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
+                                       IsVisible="{Binding !HasArt}"/>
+                                <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                              </Panel>
+                            </Border>
+                          </Button>
                           <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
                           <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
                           <TextBlock Text="{Binding Badge}" Classes="muted" FontSize="11"/>

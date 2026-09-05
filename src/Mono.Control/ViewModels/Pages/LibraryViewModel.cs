@@ -22,11 +22,19 @@ public sealed partial class LibraryViewModel : PageViewModel
     public ObservableCollection<PlaylistEntry> Playlists { get; } = new();
 
     [ObservableProperty] private string _emptyGenresHint = "";
+    [ObservableProperty] private AlbumDetail? _selectedAlbum;
 
     /// <summary>안내 문구 표시 여부. XAML 에서 컨버터를 쓰지 않도록 bool 로 낸다.</summary>
     public bool HasEmptyGenresHint => !string.IsNullOrEmpty(EmptyGenresHint);
 
     partial void OnEmptyGenresHintChanged(string value) => OnPropertyChanged(nameof(HasEmptyGenresHint));
+
+    /// <summary>오버레이 표시 여부. XAML 에서 컨버터를 쓰지 않도록 bool 로 낸다.</summary>
+    public bool HasSelectedAlbum => SelectedAlbum is not null;
+
+    partial void OnSelectedAlbumChanged(AlbumDetail? value) => OnPropertyChanged(nameof(HasSelectedAlbum));
+
+    public void ApplyAlbum(AlbumDetail? album) => SelectedAlbum = album;
 
     public void Rebuild(IEnumerable<CatalogTrack> tracks)
     {
@@ -103,4 +111,13 @@ public sealed partial class LibraryViewModel : PageViewModel
     [RelayCommand]
     private Task ExportM3uAsync(PlaylistEntry? playlist)
         => playlist is null ? Task.CompletedTask : Safe(() => Session.ExportM3uAsync(playlist.Id));
+
+    [RelayCommand]
+    private Task OpenAlbumAsync(CatalogTrack? track)
+        => string.IsNullOrEmpty(track?.AlbumId)
+            ? Task.CompletedTask
+            : Safe(() => Session.AlbumAsync(track.AlbumId!));
+
+    [RelayCommand]
+    private void CloseAlbum() => SelectedAlbum = null;
 }

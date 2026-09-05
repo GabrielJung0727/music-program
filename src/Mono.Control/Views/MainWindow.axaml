@@ -281,6 +281,45 @@
       </Border>
     </Grid>
 
+    <!-- Album detail -->
+    <Border IsVisible="{Binding Library.HasSelectedAlbum}"
+            Background="{DynamicResource Mono.Onboarding}">
+      <Border Classes="obcard" MaxWidth="720" MaxHeight="640"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
+        <DockPanel Margin="24">
+          <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="닫기"
+                    Command="{Binding Library.CloseAlbumCommand}"/>
+            <StackPanel DataContext="{Binding Library.SelectedAlbum}">
+              <TextBlock Text="{Binding Title}" Classes="h1" FontSize="22"/>
+              <TextBlock Text="{Binding Subtitle}" Classes="muted"/>
+            </StackPanel>
+          </DockPanel>
+          <ScrollViewer Margin="0,16,0,0" DataContext="{Binding Library.SelectedAlbum}">
+            <StackPanel Spacing="12">
+              <ItemsControl ItemsSource="{Binding Tracks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="models:CatalogTrack">
+                    <Grid ColumnDefinitions="*,60" Margin="0,0,0,4">
+                      <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Grid.Column="1" Text="{Binding DurationText}" Classes="muted"
+                                 HorizontalAlignment="Right"/>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="라이너 노트" FontWeight="SemiBold" IsVisible="{Binding HasLinerNotes}"/>
+              <TextBlock Text="{Binding LinerNotes}" Classes="muted" TextWrapping="Wrap"
+                         IsVisible="{Binding HasLinerNotes}"/>
+              <TextBlock Text="크레딧" FontWeight="SemiBold" IsVisible="{Binding HasCredits}"/>
+              <TextBlock Text="{Binding Credits}" Classes="muted" TextWrapping="Wrap"
+                         IsVisible="{Binding HasCredits}"/>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Border>
+
     <!-- Queue drawer -->
     <Border IsVisible="{Binding ShowQueue}" Background="{DynamicResource Mono.Panel}"
             HorizontalAlignment="Right" Width="360" Margin="0,0,0,92"
