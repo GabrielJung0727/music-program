@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -152,6 +151,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _followHostView;
     [ObservableProperty] private double _linerScrollY;
     [ObservableProperty] private string _artPerfText = "";
+    /// <summary>Core가 마지막으로 보낸 룸 스냅샷 — 페이지 뷰모델이 읽는 단일 상태원.</summary>
+    [ObservableProperty] private RoomSnapshot? _currentSnapshot;
     private bool _suppressLinerScrollSend;
 
     public bool IsLoungePage => SelectedNav?.Id == "lounge";
@@ -712,134 +713,106 @@ public partial class MainViewModel : ObservableObject
 
     private void ApplyRoomState(string? body)
     {
-        if (string.IsNullOrWhiteSpace(body)) return;
-        try
+        var snap = RoomSnapshot.Parse(body);
+        if (snap is null)
         {
-            var node = JsonNode.Parse(body)?.AsObject();
-            if (node is null) return;
+            // 빈 본문은 정상(하트비트). 내용이 있는데 못 읽으면 계약이 어긋난 것이니 드러낸다.
+            if (!string.IsNullOrWhiteSpace(body)) StatusText = "스냅샷 파싱 실패";
+            return;
+        }
+        CurrentSnapshot = snap;
 
-            CurrentRoomId = node["id"]?.GetValue<string>() ?? "";
-            RoomChip = $"{node["name"]?.GetValue<string>() ?? "룸"} · {CurrentRoomId[..Math.Min(6, CurrentRoomId.Length)]}";
-            IsPlaying = node["playing"]?.GetValue<bool>() ?? false;
-            PathBadge = node["pathBadge"]?.GetValue<string>()
-                        ?? ((node["bitPerfect"]?.GetValue<bool>() ?? false) ? "Bit-perfect" : "Processed");
-            NowBadge = PathBadge;
+        CurrentRoomId = snap.Id;
+        RoomChip = $"{(string.IsNullOrEmpty(snap.Name) ? "룸" : snap.Name)} · {snap.Id[..Math.Min(6, snap.Id.Length)]}";
+        IsPlaying = snap.Playing;
+        PathBadge = snap.PathBadge ?? (snap.BitPerfect ? "Bit-perfect" : "Processed");
+        NowBadge = PathBadge;
 
-            var dsp = node["dspPreset"]?.ToString() ?? "Off";
-            var dspOn = node["dspEnabled"]?.GetValue<bool>() ?? false;
-            var ir = node["convolutionIrPath"]?.GetValue<string>();
-            var deviceEq = node["deviceEqProfile"]?.GetValue<string>();
-            SignalPathText = dspOn
-                ? $"Decode → DSP({dsp}{(string.IsNullOrWhiteSpace(deviceEq) ? "" : "/" + deviceEq)}{(string.IsNullOrWhiteSpace(ir) ? "" : "+IR")}) → Output · {PathBadge}"
-                : $"Decode → Bit-perfect → Output · {PathBadge}";
-            if (!string.IsNullOrWhiteSpace(ir)) IrPath = ir;
+        SignalPathText = snap.DspEnabled
+            ? $"Decode → DSP({snap.DspPreset}"
+              + (string.IsNullOrWhiteSpace(snap.DeviceEqProfile) ? "" : "/" + snap.DeviceEqProfile)
+              + (string.IsNullOrWhiteSpace(snap.ConvolutionIrPath) ? "" : "+IR")
+              + $") → Output · {PathBadge}"
+            : $"Decode → Bit-perfect → Output · {PathBadge}";
+        if (!string.IsNullOrWhiteSpace(snap.ConvolutionIrPath)) IrPath = snap.ConvolutionIrPath!;
 
-            var media = node["mediaTimeMs"]?.GetValue<long>() ?? 0;
-            var duration = Math.Max(1, node["durationMs"]?.GetValue<long>() ?? 1);
-            SeekMaximum = duration;
-            _baseMedia = media;
-            _baseLocal = Environment.TickCount64;
-            _playingClock = IsPlaying;
-            SeekValue = media;
-            UpdateTimeTexts(media, duration);
+        var duration = Math.Max(1, snap.DurationMs);
+        SeekMaximum = duration;
+        _baseMedia = snap.MediaTimeMs;
+        _baseLocal = Environment.TickCount64;
+        _playingClock = IsPlaying;
+        SeekValue = snap.MediaTimeMs;
+        UpdateTimeTexts(snap.MediaTimeMs, duration);
 
-            LinerNotes = node["linerNotes"]?.GetValue<string>() ?? "";
-            CreditsText = node["credits"]?.GetValue<string>() ?? "";
-            _suppressLinerScrollSend = true;
-            FollowHostView = node["followHostView"]?.GetValue<bool>() ?? FollowHostView;
-            if (node["linerScrollY"] is JsonValue scrollNode && scrollNode.TryGetValue<double>(out var scrollY))
-                LinerScrollY = scrollY;
-            _suppressLinerScrollSend = false;
-            CurrentLyric = node["currentLyric"]?.GetValue<string>() ?? "";
-            LyricLines.Clear();
-            if (node["lyrics"] is JsonArray ly)
+        LinerNotes = snap.LinerNotes ?? "";
+        CreditsText = snap.Credits ?? "";
+
+        _suppressLinerScrollSend = true;
+        FollowHostView = snap.FollowHostView;
+        LinerScrollY = snap.LinerScrollY;
+        _suppressLinerScrollSend = false;
+
+        CurrentLyric = snap.CurrentLyric ?? "";
+        LyricLines.Clear();
+        foreach (var line in snap.Lyrics)
+            if (!string.IsNullOrWhiteSpace(line.Text)) LyricLines.Add(line.Text);
+
+        if (snap.CurrentTrack is { } ct)
+        {
+            NowTitle = string.IsNullOrWhiteSpace(ct.Title) ? "트랙" : ct.Title;
+            NowArtist = string.Join(" · ", new[] { ct.ArtistName, ct.AlbumTitle }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            NowArtUrl = string.IsNullOrWhiteSpace(ct.ArtUrl) ? "" : "http://127.0.0.1:7702" + ct.ArtUrl;
+            _ = RefreshNowArtAsync(NowArtUrl);
+            if (!string.IsNullOrWhiteSpace(ct.ArtistId) && string.IsNullOrWhiteSpace(ArtistBio))
+                _ = Safe(() => _session.WikiAsync(ct.ArtistId!));
+        }
+
+        ArtistBio = snap.Artist?.Bio ?? ArtistBio;
+
+        QueueTracks.Clear();
+        foreach (var q in snap.Queue)
+        {
+            QueueTracks.Add(new CatalogTrack
             {
-                foreach (var line in ly)
+                Id = q.TrackId,
+                Title = q.Title,
+                Artist = q.Artist,
+                DurationMs = q.DurationMs,
+                Badge = q.Badge,
+                ArtUrl = q.ArtUrl
+            });
+        }
+
+        // 기존 동작 유지: 통계가 있는 첫 멤버를 쓰고, 없으면 직전 값을 그대로 둔다.
+        foreach (var m in snap.Members)
+        {
+            if (m.Stats is not { } st) continue;
+            SyncText = $"sync {st.OffsetMs:+0.00;-0.00}ms · jitter {st.JitterMs:0.00}ms";
+            break;
+        }
+
+        ChatLines.Clear();
+        foreach (var c in snap.Chat) ChatLines.Add($"{c.PeerName ?? c.PeerId}: {c.Text}");
+
+        AutoplayChoices.Clear();
+        if (snap.Autoplay is { } ap)
+        {
+            foreach (var c in ap.Candidates)
+            {
+                AutoplayChoices.Add(new CatalogTrack
                 {
-                    var text = line?["text"]?.GetValue<string>();
-                    if (!string.IsNullOrWhiteSpace(text)) LyricLines.Add(text!);
-                }
-            }
-
-            if (node["currentTrack"] is JsonObject ct)
-            {
-                NowTitle = ct["title"]?.GetValue<string>() ?? "트랙";
-                NowArtist = string.Join(" · ", new[]
-                {
-                    ct["artistName"]?.GetValue<string>(),
-                    ct["albumTitle"]?.GetValue<string>()
-                }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                var art = ct["artUrl"]?.GetValue<string>();
-                NowArtUrl = string.IsNullOrWhiteSpace(art) ? "" : "http://127.0.0.1:7702" + art;
-                _ = RefreshNowArtAsync(NowArtUrl);
-                var artistId = ct["artistId"]?.GetValue<string>();
-                if (!string.IsNullOrWhiteSpace(artistId) && string.IsNullOrWhiteSpace(ArtistBio))
-                    _ = Safe(() => _session.WikiAsync(artistId!));
-            }
-
-            if (node["artist"] is JsonObject ar)
-                ArtistBio = ar["bio"]?.GetValue<string>() ?? ArtistBio;
-
-            QueueTracks.Clear();
-            if (node["queue"] is JsonArray qArr)
-            {
-                foreach (var q in qArr)
-                {
-                    QueueTracks.Add(new CatalogTrack
-                    {
-                        Id = q?["trackId"]?.GetValue<string>() ?? "",
-                        Title = q?["title"]?.GetValue<string>() ?? "Track",
-                        Artist = q?["artist"]?.GetValue<string>(),
-                        DurationMs = q?["durationMs"]?.GetValue<long>() ?? 0,
-                        Badge = q?["badge"]?.GetValue<string>(),
-                        ArtUrl = q?["artUrl"]?.GetValue<string>()
-                    });
-                }
-            }
-
-            if (node["members"] is JsonArray members)
-            {
-                foreach (var m in members)
-                {
-                    var stats = m?["stats"];
-                    if (stats is null) continue;
-                    var off = stats["offsetMs"]?.GetValue<double>();
-                    var jit = stats["jitterMs"]?.GetValue<double>();
-                    if (off is not null)
-                    {
-                        SyncText = $"sync {off:+0.00;-0.00}ms · jitter {jit:0.00}ms";
-                        break;
-                    }
-                }
-            }
-
-            ChatLines.Clear();
-            if (node["chat"] is JsonArray chat)
-            {
-                foreach (var c in chat)
-                    ChatLines.Add($"{c?["peerName"]}: {c?["text"]}");
-            }
-
-            AutoplayChoices.Clear();
-            ShowAutoplay = false;
-            if (node["autoplay"] is JsonObject ap && ap["candidates"] is JsonArray cands)
-            {
-                ShowAutoplay = true;
-                foreach (var c in cands)
-                {
-                    AutoplayChoices.Add(new CatalogTrack
-                    {
-                        Id = c?["id"]?.GetValue<string>() ?? "",
-                        Title = c?["title"]?.GetValue<string>() ?? "",
-                        Artist = c?["artist"]?.GetValue<string>() ?? c?["artistName"]?.GetValue<string>()
-                    });
-                }
+                    Id = c.Id,
+                    Title = c.Title,
+                    Artist = c.ArtistName,
+                    DurationMs = c.DurationMs,
+                    Badge = c.Badge,
+                    ArtUrl = c.ArtUrl
+                });
             }
         }
-        catch (Exception ex)
-        {
-            StatusText = "스냅샷 파싱: " + ex.Message;
-        }
+        // 기존 코드는 candidates 배열이 비어 있어도 카드를 띄웠다. 빈 카드는 띄우지 않는다.
+        ShowAutoplay = AutoplayChoices.Count > 0;
     }
 
     private async Task RefreshNowArtAsync(string url)
