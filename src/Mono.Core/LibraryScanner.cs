@@ -106,6 +106,8 @@ public sealed class LibraryScanner
             LyricsLrc = SidecarLyrics(file) ?? (string.IsNullOrWhiteSpace(tag.Lyrics) ? null : tag.Lyrics),
             ArtworkPath = art,
             TrackNumber = (int)tag.Track,
+            Genres = [.. tag.Genres.Where(g => !string.IsNullOrWhiteSpace(g)).Select(g => g.Trim())],
+            Composers = [.. tag.Composers.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim())],
             MergedLocalAndStreaming = (existing?.StreamingId ?? streamingTwin?.StreamingId) is not null
         };
         _catalog.UpsertTrack(track, album, artist);
