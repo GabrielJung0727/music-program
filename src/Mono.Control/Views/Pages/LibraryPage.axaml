@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:models="using:Mono.Control.Models"
+             xmlns:svg="using:Avalonia.Svg.Skia"
+             x:Class="Mono.Control.Views.Pages.LibraryPage"
+             x:DataType="vm:MainViewModel">
+            <ScrollViewer>
+              <StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12"
+                            IsVisible="{Binding IsLibraryToolsVisible}">
+                  <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
+                  <Button Classes="ghost" Content="Tidal 데모" Command="{Binding LinkTidalDemoCommand}"/>
+                  <Button Classes="ghost" Content="Qobuz 데모" Command="{Binding LinkQobuzDemoCommand}"/>
+                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
+                </StackPanel>
+
+                <ItemsControl ItemsSource="{Binding FilteredTracks}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:CatalogTrack">
+                      <Border Classes="trackcard">
+                        <StackPanel Spacing="6">
+                          <Border Classes="artslot" Height="140">
+                            <Panel>
+                              <Image Classes="artph"
+                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
+                                     IsVisible="{Binding !HasArt}"/>
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                            </Panel>
+                          </Border>
+                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                          <TextBlock Text="{Binding Badge}" Classes="muted" FontSize="11"/>
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Classes="primary" Content="재생" Padding="10,4"
+                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
+                                    CommandParameter="{Binding}"/>
+                            <Button Classes="ghost" Content="큐"
+                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).EnqueueTrackCommand}"
+                                    CommandParameter="{Binding}"/>
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+</UserControl>
