@@ -81,6 +81,18 @@ public sealed class RoomSnapshot
     public List<string> Spectators { get; set; } = [];
     public Dictionary<string, string> Peers { get; set; } = [];
 
+    // 현재 재생 맥락 — 곡이 없으면 CurrentTrack·Album·Artist·Autoplay가 전부 null이다.
+    public SnapshotTrack? CurrentTrack { get; set; }
+    public SnapshotAlbum? Album { get; set; }
+    public SnapshotArtist? Artist { get; set; }
+    public List<SnapshotTrack> AlbumTracks { get; set; } = [];
+    public List<SnapshotArtist> RelatedArtists { get; set; } = [];
+    public string? LinerNotes { get; set; }
+    public string? Credits { get; set; }
+    public List<SnapshotLyricLine> Lyrics { get; set; } = [];
+    public string? CurrentLyric { get; set; }
+    public SnapshotAutoplay? Autoplay { get; set; }
+
     /// <summary>깨진 JSON이면 null. 호출자가 화면을 유지할 수 있게 예외를 던지지 않는다.</summary>
     public static RoomSnapshot? Parse(string? json)
     {
@@ -180,4 +192,61 @@ public sealed class SnapshotOutput
     public string? Badge { get; set; }
     public string? Note { get; set; }
     public PeerStats? Stats { get; set; }
+}
+
+public sealed class SnapshotTrack
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? AlbumId { get; set; }
+    public string? ArtistId { get; set; }
+    public string? ArtistName { get; set; }
+    public string? AlbumTitle { get; set; }
+    public int SampleRate { get; set; }
+    public int BitDepth { get; set; }
+    public int Channels { get; set; }
+    public bool IsDsd { get; set; }
+    public int? DsdRate { get; set; }
+    public long DurationMs { get; set; }
+    public StreamingProvider Source { get; set; }
+    public StreamingQuality StreamingQuality { get; set; }
+    public bool MergedLocalAndStreaming { get; set; }
+    public bool HasLocal { get; set; }
+    public string? Badge { get; set; }
+    public string? ArtUrl { get; set; }
+}
+
+public sealed class SnapshotAlbum
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string? ArtistId { get; set; }
+    public string? LinerNotes { get; set; }
+    public string? Label { get; set; }
+    public int? Year { get; set; }
+    public string? Credits { get; set; }
+    public string? ArtworkPath { get; set; }
+}
+
+public sealed class SnapshotArtist
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public List<string> RelatedArtistIds { get; set; } = [];
+    public string? Bio { get; set; }
+    public List<string> AlternateNames { get; set; } = [];
+}
+
+public sealed class SnapshotLyricLine
+{
+    public long TimeMs { get; set; }
+    public string Text { get; set; } = "";
+}
+
+/// <summary>곡 종료 약 40초 전 제시되는 스마트 오토플레이 후보.</summary>
+public sealed class SnapshotAutoplay
+{
+    public List<SnapshotTrack> Candidates { get; set; } = [];
+    public long DeadlineUnixMs { get; set; }
+    public string? ChosenId { get; set; }
 }

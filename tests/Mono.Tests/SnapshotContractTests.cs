@@ -131,4 +131,38 @@ public class SnapshotContractTests
         Assert.Empty(snap.AllowedReactionEmoji);
         Assert.Empty(snap.Spectators);
     }
+
+    [Fact]
+    public void CurrentTrackAndAlbumSurviveRoundTrip()
+    {
+        var (rooms, catalog) = NewStack();
+        var room = rooms.Create("host", "Lounge", RoomMode.OpenLounge, "Host");
+        rooms.Enqueue(room.Id, "host", "tr-blue-train");
+        rooms.Play(room.Id, "host");
+
+        var snap = RoomSnapshot.Parse(rooms.SnapshotJson(room))!;
+        var expected = catalog.Tracks["tr-blue-train"];
+
+        Assert.NotNull(snap.CurrentTrack);
+        Assert.Equal("tr-blue-train", snap.CurrentTrack!.Id);
+        Assert.Equal(expected.Title, snap.CurrentTrack.Title);
+        Assert.Equal(expected.SampleRate, snap.CurrentTrack.SampleRate);
+        Assert.False(string.IsNullOrEmpty(snap.CurrentTrack.ArtistName));
+        Assert.NotNull(snap.Album);
+        Assert.Equal(expected.AlbumId, snap.Album!.Id);
+        Assert.NotNull(snap.Artist);
+        Assert.NotEmpty(snap.AlbumTracks);
+    }
+
+    [Fact]
+    public void EmptyRoomHasNoCurrentTrack()
+    {
+        var (rooms, _) = NewStack();
+        var room = rooms.Create("host", "Lounge", RoomMode.OpenLounge, "Host");
+
+        var snap = RoomSnapshot.Parse(rooms.SnapshotJson(room))!;
+
+        Assert.Null(snap.CurrentTrack);
+        Assert.Null(snap.Autoplay);
+    }
 }
