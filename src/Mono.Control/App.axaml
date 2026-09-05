@@ -22,6 +22,8 @@
           <SolidColorBrush x:Key="Mono.Onboarding" Color="#CCFFFFFF"/>
           <SolidColorBrush x:Key="Mono.Card" Color="#FFFFFF"/>
           <SolidColorBrush x:Key="Mono.GhostFg" Color="#1A1A1E"/>
+          <SolidColorBrush x:Key="Mono.Warn" Color="#D9762F"/>
+          <SolidColorBrush x:Key="Mono.Bad" Color="#CC4444"/>
 
           <svg:SvgImage x:Key="Mono.Icon.Guide" Source="avares://Mono.Control/Assets/icons/ui/action-guide.svg"/>
           <svg:SvgImage x:Key="Mono.Icon.Theme" Source="avares://Mono.Control/Assets/icons/ui/action-theme.svg"/>
@@ -67,6 +69,8 @@
           <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC121317"/>
           <SolidColorBrush x:Key="Mono.Card" Color="#1C1C22"/>
           <SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F5"/>
+          <SolidColorBrush x:Key="Mono.Warn" Color="#E39A5C"/>
+          <SolidColorBrush x:Key="Mono.Bad" Color="#EE8888"/>
 
           <svg:SvgImage x:Key="Mono.Icon.Guide" Source="avares://Mono.Control/Assets/icons/dark/ui/action-guide.svg"/>
           <svg:SvgImage x:Key="Mono.Icon.Theme" Source="avares://Mono.Control/Assets/icons/dark/ui/action-theme.svg"/>
