@@ -1,0 +1,82 @@
+name: release
+
+# 두 가지로 낼 수 있다.
+#   1) 태그 푸시:  git tag v0.1.4 && git push origin v0.1.4
+#   2) 수동 실행:  Actions → release → Run workflow → 버전 입력 (태그도 함께 생긴다)
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '릴리스 버전 (v 없이, 예: 0.1.4)'
+        required: true
+        type: string
+
+# publish.ps1 안의 gh release create 가 릴리스와 태그를 만든다.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 프로젝트는 net8.0 을 노리지만 솔루션이 .slnx 라 새 SDK 가 필요하다
+      # (.slnx 는 .NET 8 SDK 가 읽지 못한다). 둘 다 깔아 둔다.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: dotnet 전역 도구 PATH 등록
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: 버전 결정
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.version }}'
+          } else {
+            '${{ github.ref_name }}' -replace '^v', ''
+          }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            throw "버전 형식이 x.y.z 가 아닙니다: '$v'"
+          }
+          "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "릴리스 버전: $v"
+
+      # 깨진 코드를 릴리스하지 않는다. 테스트가 실패하면 여기서 멈춘다.
+      - name: 빌드 · 테스트
+        shell: pwsh
+        run: |
+          dotnet build Mono.slnx -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+          dotnet test Mono.slnx -c Release --nologo --no-build
+          if ($LASTEXITCODE -ne 0) { throw "tests failed" }
+
+      - name: 패키지 · GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 진짜 코드 서명 인증서가 생기면 저장소 시크릿에 넣는다. 없으면 서명을 건너뛴다 —
+          # 매 실행마다 새로 만든 자체 서명 인증서는 SmartScreen에 도움이 되지 않는다.
+          MONO_SIGN_PFX_BASE64: ${{ secrets.MONO_SIGN_PFX_BASE64 }}
+          MONO_SIGN_PFX_PASSWORD: ${{ secrets.MONO_SIGN_PFX_PASSWORD }}
+        run: |
+          ./publish.ps1 -Version '${{ steps.ver.outputs.version }}' `
+                        -SkipZip -GitHubRelease -NoSign -NoTokenSave
+
+      - name: 설치본 아티팩트 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: mono-${{ steps.ver.outputs.version }}-win-x64
+          path: publish/releases/*
+          retention-days: 14

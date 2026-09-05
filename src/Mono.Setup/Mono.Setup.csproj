@@ -9,7 +9,7 @@
     <AssemblyName>Mono.Setup</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>mono-app.ico</ApplicationIcon>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <AssemblyTitle>mono</AssemblyTitle>
     <Product>mono</Product>
     <Company>mono</Company>

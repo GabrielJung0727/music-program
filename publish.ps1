@@ -7,7 +7,13 @@
 param(
     [string]$Version = "0.1.3",
     [switch]$GitHubRelease,
-    [switch]$SkipZip
+    [switch]$SkipZip,
+    ## CI용. 자체 서명 인증서를 만들지 않는다 — 릴리스마다 다른, 신뢰받지 못하는 인증서가
+    ## 붙는 것은 SmartScreen에 도움이 안 되고 빌드를 재현 불가능하게 만든다.
+    ## 진짜 인증서가 있으면 MONO_SIGN_PFX_BASE64 / MONO_SIGN_PFX_PASSWORD 로 넘긴다.
+    [switch]$NoSign,
+    ## CI에서는 gh 토큰을 개발 PC 의 prefs.ini 에 쓰지 않는다.
+    [switch]$NoTokenSave
 )
 
 $ErrorActionPreference = 'Stop'
@@ -115,9 +121,29 @@ New-Splash $logoPng $splashPath
 Copy-Item $logoPng "$PSScriptRoot\src\Mono.Setup\Assets\logo.png" -Force
 Copy-Item $iconPath "$PSScriptRoot\src\Mono.Setup\mono-app.ico" -Force
 
-$cert = Get-MonoCodeCert
-$thumb = $cert.Thumbprint
-$signTemplate = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$signScript`" -File {{file}} -Thumbprint $thumb"
+$thumb = $null
+if ($env:MONO_SIGN_PFX_BASE64) {
+    # 진짜 인증서가 주어졌다. 임시 파일로 풀어 CurrentUser\My 에 넣고 지문을 얻는다.
+    Write-Host '>>> 제공된 PFX로 서명' -ForegroundColor Cyan
+    $pfx = Join-Path $env:TEMP 'mono-sign.pfx'
+    [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:MONO_SIGN_PFX_BASE64))
+    $pwText = if ($env:MONO_SIGN_PFX_PASSWORD) { $env:MONO_SIGN_PFX_PASSWORD } else { '' }
+    $imported = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My `
+        -Password (ConvertTo-SecureString $pwText -AsPlainText -Force)
+    $thumb = $imported.Thumbprint
+    Remove-Item $pfx -Force
+}
+elseif (-not $NoSign) {
+    $cert = Get-MonoCodeCert
+    $thumb = $cert.Thumbprint
+}
+else {
+    Write-Host '>>> 서명 건너뜀 (-NoSign)' -ForegroundColor Yellow
+}
+
+$signTemplate = if ($thumb) {
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$signScript`" -File {{file}} -Thumbprint $thumb"
+} else { $null }
 
 if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
 
@@ -175,9 +201,9 @@ $vpkArgs = @(
     '--splashProgressColor', '#6D6DF6',
     '--instWelcome', "$PSScriptRoot\tools\installer\welcome.txt",
     '--instConclusion', "$PSScriptRoot\tools\installer\conclusion.txt",
-    '--shortcuts', 'StartMenuRoot',
-    '--signTemplate', $signTemplate
+    '--shortcuts', 'StartMenuRoot'
 )
+if ($signTemplate) { $vpkArgs += @('--signTemplate', $signTemplate) }
 vpk @vpkArgs
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
@@ -195,9 +221,9 @@ if ($LASTEXITCODE -ne 0) { throw "Setup UI publish failed" }
 
 $branded = Get-ChildItem $installerOut -Filter 'Mono.Setup.exe' | Select-Object -First 1
 if (-not $branded) { throw "Mono.Setup.exe missing" }
-& $signScript -File $branded.FullName -Thumbprint $thumb
+if ($thumb) { & $signScript -File $branded.FullName -Thumbprint $thumb }
 Copy-Item $branded.FullName "$releasesDir\Mono-win-Setup.exe" -Force
-Save-GithubTokenToPrefs
+if (-not $NoTokenSave) { Save-GithubTokenToPrefs }
 
 if ($GitHubRelease) {
     Write-Host ">>> GitHub Release v$Version" -ForegroundColor Cyan
