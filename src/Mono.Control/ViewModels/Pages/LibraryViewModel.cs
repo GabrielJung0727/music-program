@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Models;
 using Mono.Control.Services;
 
@@ -17,6 +18,8 @@ public sealed partial class LibraryViewModel : PageViewModel
     public ObservableCollection<ComposerEntry> Composers { get; } = new();
     public ObservableCollection<CompositionEntry> Compositions { get; } = new();
     public ObservableCollection<FolderEntry> Folders { get; } = new();
+    public ObservableCollection<HistoryEntry> History { get; } = new();
+    public ObservableCollection<PlaylistEntry> Playlists { get; } = new();
 
     [ObservableProperty] private string _emptyGenresHint = "";
 
@@ -74,4 +77,30 @@ public sealed partial class LibraryViewModel : PageViewModel
         Folders.Clear();
         foreach (var f in folders) Folders.Add(f);
     }
+
+    public void ApplyHistory(IEnumerable<HistoryEntry> entries)
+    {
+        History.Clear();
+        foreach (var e in entries.OrderByDescending(e => e.HeardAt)) History.Add(e);
+    }
+
+    public void ApplyPlaylists(IEnumerable<PlaylistEntry> lists)
+    {
+        Playlists.Clear();
+        foreach (var p in lists) Playlists.Add(p);
+    }
+
+    /// <summary>히스토리에서 다시 듣기 — 큐에 다시 싣는다.</summary>
+    [RelayCommand]
+    private Task ReplayAsync(HistoryEntry? entry)
+        => entry is null ? Task.CompletedTask : Safe(() => Session.EnqueueAsync(entry.TrackId));
+
+    /// <summary>플레이리스트를 큐에 싣는다. 큐를 비우지 않고 뒤에 붙인다.</summary>
+    [RelayCommand]
+    private Task LoadPlaylistAsync(PlaylistEntry? playlist)
+        => playlist is null ? Task.CompletedTask : Safe(() => Session.LoadPlaylistAsync(playlist.Id));
+
+    [RelayCommand]
+    private Task ExportM3uAsync(PlaylistEntry? playlist)
+        => playlist is null ? Task.CompletedTask : Safe(() => Session.ExportM3uAsync(playlist.Id));
 }

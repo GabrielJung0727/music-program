@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.HistoryPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+      <ItemsControl ItemsSource="{Binding History}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:HistoryEntry">
+            <Border Classes="trackcard" Margin="0,0,0,6" Padding="12">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="ghost" Content="다시 듣기"
+                        VerticalAlignment="Center"
+                        Command="{Binding $parent[UserControl].((pvm:LibraryViewModel)DataContext).ReplayCommand}"
+                        CommandParameter="{Binding}"/>
+                <StackPanel>
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
+                  <TextBlock Text="{Binding When}" Classes="muted" FontSize="11"/>
+                </StackPanel>
+              </DockPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

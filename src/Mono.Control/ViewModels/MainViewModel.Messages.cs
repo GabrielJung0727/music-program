@@ -47,6 +47,12 @@ public partial class MainViewModel
                 else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
                     StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
                 break;
+            case MessageTypes.History:
+                LoadHistory(msg.Body);
+                break;
+            case MessageTypes.Playlists:
+                LoadPlaylists(msg.Body);
+                break;
             case MessageTypes.Folders:
                 LoadFolders(msg.Body);
                 break;
@@ -90,6 +96,20 @@ public partial class MainViewModel
                 await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
         }
         Audio.ArtPerfText = ArtCache.StatsText();
+    }
+
+    private void LoadHistory(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) { Library.ApplyHistory([]); return; }
+        try { Library.ApplyHistory(JsonSerializer.Deserialize<List<HistoryEntry>>(body, Json) ?? []); }
+        catch { /* 형식이 어긋나면 이전 목록을 유지한다 */ }
+    }
+
+    private void LoadPlaylists(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) { Library.ApplyPlaylists([]); return; }
+        try { Library.ApplyPlaylists(JsonSerializer.Deserialize<List<PlaylistEntry>>(body, Json) ?? []); }
+        catch { /* 형식이 어긋나면 이전 목록을 유지한다 */ }
     }
 
     private void LoadFolders(string? body)

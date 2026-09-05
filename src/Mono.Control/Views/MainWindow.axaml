@@ -92,6 +92,12 @@
             <pages:FoldersPage DataContext="{Binding Library}"
                                IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsFoldersPage}"/>
 
+            <pages:HistoryPage DataContext="{Binding Library}"
+                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsHistoryPage}"/>
+
+            <pages:PlaylistsPage DataContext="{Binding Library}"
+                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsPlaylistsPage}"/>
+
             <pages:LibraryPage IsVisible="{Binding IsLibraryGrid}"/>
 
             <pages:LoungePage DataContext="{Binding Lounge}"
