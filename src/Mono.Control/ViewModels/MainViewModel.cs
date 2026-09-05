@@ -159,6 +159,9 @@ public partial class MainViewModel : ObservableObject
         ? "재생 중인 곡이 없습니다"
         : HeartsLeft > 0 ? $"♥ 남은 횟수 {HeartsLeft}회" : "이 곡에는 이미 3번 반응했습니다";
 
+    /// <summary>룸에 들어가기 전에는 배지가 비어 있다. 빈 버튼을 두지 않는다.</summary>
+    public string PathBadgeLabel => string.IsNullOrWhiteSpace(PathBadge) ? "시그널 패스" : PathBadge;
+
     /// <summary>시킹이 막힌 이유. 비어 있으면 툴팁을 띄우지 않는다.</summary>
     public string SeekBlockedReason => SeekingAllowed ? "" : "호스트가 시킹을 잠갔습니다";
 
@@ -187,6 +190,7 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayPauseLabel));
     partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
+    partial void OnPathBadgeChanged(string value) => OnPropertyChanged(nameof(PathBadgeLabel));
     partial void OnHeartsLeftChanged(int value)
     {
         OnPropertyChanged(nameof(CanReact));

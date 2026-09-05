@@ -121,6 +121,25 @@
     <Setter Property="VerticalContentAlignment" Value="Bottom"/>
   </Style>
 
+  <!-- 볼륨 슬라이더. 스타일이 없으면 Fluent 기본 강조색(주황)이 나와 재생 버튼과 어긋난다. -->
+  <Style Selector="Slider:horizontal /template/ RepeatButton#PART_DecreaseButton">
+    <Setter Property="Background" Value="{DynamicResource Mono.Accent}"/>
+  </Style>
+  <Style Selector="Slider:horizontal /template/ RepeatButton#PART_IncreaseButton">
+    <Setter Property="Background" Value="{DynamicResource Mono.Border}"/>
+  </Style>
+  <Style Selector="Slider /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource Mono.Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Accent}"/>
+  </Style>
+  <Style Selector="Slider:disabled /template/ RepeatButton#PART_DecreaseButton">
+    <Setter Property="Background" Value="{DynamicResource Mono.Muted}"/>
+  </Style>
+  <Style Selector="Slider:disabled /template/ Thumb">
+    <Setter Property="Background" Value="{DynamicResource Mono.Muted}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Mono.Muted}"/>
+  </Style>
+
   <Style Selector="Image.icon">
     <Setter Property="Width" Value="18"/>
     <Setter Property="Height" Value="18"/>
