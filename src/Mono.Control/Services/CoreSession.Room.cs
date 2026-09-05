@@ -19,4 +19,23 @@ public sealed partial class CoreSession
     public Task FollowHostAsync(bool on) => SendAsync(new MonoMessage { Type = MessageTypes.FollowHost, Flag = on });
     public Task ListZonesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ListZones });
     public Task CreateZoneAsync(string name) => SendAsync(new MonoMessage { Type = MessageTypes.CreateZone, Text = name });
+
+    // ── 큐 협업 (Host Queue 모드: 게스트는 Request만) ──
+    public Task RequestTrackAsync(string trackId)
+        => SendAsync(new MonoMessage { Type = MessageTypes.RequestTrack, TrackId = trackId });
+
+    public Task ApproveRequestAsync(string requestId)
+        => SendAsync(new MonoMessage { Type = MessageTypes.ApproveRequest, Text = requestId });
+
+    public Task RejectRequestAsync(string requestId)
+        => SendAsync(new MonoMessage { Type = MessageTypes.RejectRequest, Text = requestId });
+
+    public Task RemoveQueueAsync(int index)
+        => SendAsync(new MonoMessage { Type = MessageTypes.RemoveQueue, Index = index });
+
+    public Task MoveQueueAsync(int index, int delta)
+        => SendAsync(new MonoMessage { Type = MessageTypes.MoveQueue, Index = index, Delta = delta });
+
+    public Task JumpToAsync(int index)
+        => SendAsync(new MonoMessage { Type = MessageTypes.JumpTo, Index = index });
 }
