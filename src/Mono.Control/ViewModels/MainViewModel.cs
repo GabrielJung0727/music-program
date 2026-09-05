@@ -137,6 +137,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _linerScrollY;
     /// <summary>Core가 마지막으로 보낸 룸 스냅샷 — 페이지 뷰모델이 읽는 단일 상태원.</summary>
     [ObservableProperty] private RoomSnapshot? _currentSnapshot;
+    [ObservableProperty] private IReadOnlyList<SnapshotHeatBucket> _heatmap = [];
+    [ObservableProperty] private IReadOnlyList<SnapshotPin> _pins = [];
+    [ObservableProperty] private bool _seekingAllowed = true;
+    /// <summary>시킹이 막힌 이유. 비어 있으면 툴팁을 띄우지 않는다.</summary>
+    public string SeekBlockedReason => SeekingAllowed ? "" : "호스트가 시킹을 잠갔습니다";
+
     private bool _suppressLinerScrollSend;
 
     public bool IsLoungePage => SelectedNav?.Id == "lounge";
@@ -161,6 +167,7 @@ public partial class MainViewModel : ObservableObject
     public bool IsObStep5 => OnboardingStep == 5;
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayPauseLabel));
+    partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
     partial void OnNowPlayingTabChanged(int value)
     {
         OnPropertyChanged(nameof(IsNpLyrics));

@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-    private void SeekLost(object? sender, PointerCaptureLostEventArgs e)
+    private void OnSeeked(object? sender, double mediaTimeMs)
     {
         if (DataContext is MainViewModel vm)
             _ = vm.SeekToCommand.ExecuteAsync(null);

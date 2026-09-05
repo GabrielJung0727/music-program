@@ -178,6 +178,10 @@ public partial class MainViewModel
         // 기존 코드는 candidates 배열이 비어 있어도 카드를 띄웠다. 빈 카드는 띄우지 않는다.
         ShowAutoplay = AutoplayChoices.Count > 0;
 
+        Heatmap = snap.Heatmap;
+        Pins = snap.Pins;
+        SeekingAllowed = snap.SeekingAllowed;
+
         Lounge.ApplySnapshot(snap);
         Audio.ApplySnapshot(snap);
     }

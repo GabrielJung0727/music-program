@@ -4,6 +4,7 @@
         xmlns:models="using:Mono.Control.Models"
         xmlns:svg="using:Avalonia.Svg.Skia"
         xmlns:pages="using:Mono.Control.Views.Pages"
+        xmlns:ctl="using:Mono.Control.Controls"
         x:Class="Mono.Control.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Width="1280" Height="800"
@@ -134,8 +135,14 @@
             </StackPanel>
             <Grid ColumnDefinitions="40,*,40" Margin="40,0">
               <TextBlock Text="{Binding ElapsedText}" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
-              <Slider Grid.Column="1" Minimum="0" Maximum="{Binding SeekMaximum}" Value="{Binding SeekValue}"
-                      PointerCaptureLost="SeekLost"/>
+              <ctl:SeekBar Grid.Column="1"
+                           Maximum="{Binding SeekMaximum}"
+                           Value="{Binding SeekValue, Mode=TwoWay}"
+                           Heatmap="{Binding Heatmap}"
+                           Pins="{Binding Pins}"
+                           SeekEnabled="{Binding SeekingAllowed}"
+                           ToolTip.Tip="{Binding SeekBlockedReason}"
+                           Seeked="OnSeeked"/>
               <TextBlock Grid.Column="2" Text="{Binding RemainText}" Classes="muted" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
             <Border IsVisible="{Binding ShowAutoplay}" Classes="panel" CornerRadius="10" Padding="8" Margin="40,4,40,0">
