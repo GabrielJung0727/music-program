@@ -76,13 +76,13 @@ public sealed class CatalogStore : IDisposable
         }
     }
 
-    public IReadOnlyList<Track> Search(string query)
+    public IReadOnlyList<object> Search(string query)
     {
         lock (_gate)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                return _tracks.Values.ToList();
+                return _tracks.Values.Select(TrackView).ToList();
             }
 
             var q = query.Trim();
@@ -96,8 +96,10 @@ public sealed class CatalogStore : IDisposable
                     || (album?.Label?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (album?.Credits?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (artist?.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || t.Genres.Any(g => g.Contains(q, StringComparison.OrdinalIgnoreCase))
+                    || t.Composers.Any(c => c.Contains(q, StringComparison.OrdinalIgnoreCase))
                     || MatchesAlias(artist, qNorm);
-            }).ToList();
+            }).Select(TrackView).ToList();
         }
     }
 
@@ -187,6 +189,43 @@ public sealed class CatalogStore : IDisposable
     }
 
     /// <summary>Control이 그리는 카탈로그 뷰. 아트는 캐시 URL로만 넘긴다.</summary>
+    /// <summary>
+    /// catalog 와 search 가 공유하는 트랙 뷰. 한 곳에서만 만든다 —
+    /// 모양이 갈리면 Control 이 같은 파서로 두 응답을 읽다가 필드를 잃는다.
+    /// </summary>
+    private object TrackView(Track t)
+    {
+        var work = CompositionGrouping.Identify(t.Title, t.Composers.FirstOrDefault());
+        return new
+        {
+            t.Id,
+            t.Title,
+            t.AlbumId,
+            t.ArtistId,
+            artist = _artists.GetValueOrDefault(t.ArtistId)?.Name,
+            artistAliases = _artists.GetValueOrDefault(t.ArtistId)?.AlternateNames ?? [],
+            album = _albums.GetValueOrDefault(t.AlbumId)?.Title,
+            year = _albums.GetValueOrDefault(t.AlbumId)?.Year,
+            label = _albums.GetValueOrDefault(t.AlbumId)?.Label,
+            t.SampleRate,
+            t.BitDepth,
+            t.IsDsd,
+            t.DsdRate,
+            t.DurationMs,
+            t.Source,
+            t.StreamingQuality,
+            t.MergedLocalAndStreaming,
+            genres = t.Genres,
+            composers = t.Composers,
+            workKey = work?.Key,
+            workTitle = work?.Title,
+            hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
+            hasLocal = t.LocalPath is not null,
+            artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
+            badge = QualityPolicyEngine.Badge(t, false)
+        };
+    }
+
     public IReadOnlyList<object> CatalogView()
     {
         lock (_gate)
@@ -195,30 +234,7 @@ public sealed class CatalogStore : IDisposable
                 .OrderBy(t => _artists.GetValueOrDefault(t.ArtistId)?.Name)
                 .ThenBy(t => _albums.GetValueOrDefault(t.AlbumId)?.Title)
                 .ThenBy(t => t.TrackNumber)
-                .Select(t => (object)new
-                {
-                    t.Id,
-                    t.Title,
-                    t.AlbumId,
-                    t.ArtistId,
-                    artist = _artists.GetValueOrDefault(t.ArtistId)?.Name,
-                    artistAliases = _artists.GetValueOrDefault(t.ArtistId)?.AlternateNames ?? [],
-                    album = _albums.GetValueOrDefault(t.AlbumId)?.Title,
-                    year = _albums.GetValueOrDefault(t.AlbumId)?.Year,
-                    label = _albums.GetValueOrDefault(t.AlbumId)?.Label,
-                    t.SampleRate,
-                    t.BitDepth,
-                    t.IsDsd,
-                    t.DsdRate,
-                    t.DurationMs,
-                    t.Source,
-                    t.StreamingQuality,
-                    t.MergedLocalAndStreaming,
-                    hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
-                    hasLocal = t.LocalPath is not null,
-                    artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
-                    badge = QualityPolicyEngine.Badge(t, false)
-                })
+                .Select(TrackView)
                 .ToList();
         }
     }
