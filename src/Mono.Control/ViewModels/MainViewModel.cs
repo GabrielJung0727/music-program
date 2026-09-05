@@ -25,6 +25,7 @@ public partial class MainViewModel : ObservableObject
     private bool _playingClock;
     private CancellationTokenSource? _artCts;
     private string? _genreFilter;
+    private CancellationTokenSource? _searchCts;
 
     public MainViewModel(CoreSession session, ProcessSupervisor supervisor)
     {
@@ -223,7 +224,31 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsObStep5));
     }
 
-    partial void OnSearchTextChanged(string value) => ApplyFilter();
+    /// <summary>
+    /// 검색은 Core 가 한다 — 아티스트 별칭 테이블을 거쳐야 "요네즈 켄시"가 米津玄師를 찾는다.
+    /// 타자마다 쏘지 않도록 250ms 묶고, 빈 문자열이면 전체 카탈로그로 돌아간다.
+    /// </summary>
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var ct = _searchCts.Token;
+        var q = value?.Trim() ?? "";
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(250, ct);
+                await (q.Length == 0 ? _session.CatalogAsync() : _session.SearchAsync(q));
+            }
+            catch (OperationCanceledException) { /* 다음 타자가 덮어썼다 */ }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+            }
+        }, ct);
+    }
     partial void OnSelectedNavChanged(NavItem? value)
     {
         OnPropertyChanged(nameof(IsLoungePage));
@@ -547,15 +572,6 @@ public partial class MainViewModel : ObservableObject
             src = Tracks.Where(t => t.Source == 1 || t.GenreHint.Contains("Tidal", StringComparison.OrdinalIgnoreCase));
         else if (_genreFilter is not null)
             src = Tracks.Where(t => t.Genres.Contains(_genreFilter, StringComparer.OrdinalIgnoreCase));
-
-        var q = SearchText.Trim();
-        if (q.Length > 0)
-        {
-            src = src.Where(t =>
-                (t.Title?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (t.Artist?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (t.Album?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
-        }
 
         var list = src.Take(500).ToList();
         foreach (var t in list) FilteredTracks.Add(t);

@@ -23,8 +23,10 @@ public partial class MainViewModel
                 StatusText = "환영합니다";
                 break;
             case MessageTypes.Catalog:
+                LoadCatalog(msg.Body, isFullCatalog: true);
+                break;
             case MessageTypes.Search:
-                LoadCatalog(msg.Body);
+                LoadCatalog(msg.Body, isFullCatalog: false);
                 break;
             case MessageTypes.ListRooms:
                 LoadRooms(msg.Body);
@@ -66,7 +68,12 @@ public partial class MainViewModel
         }
     }
 
-    private void LoadCatalog(string? body)
+    /// <summary>
+    /// catalog 와 search 는 같은 모양을 돌려주지만 뜻이 다르다. 검색 결과는 라이브러리의
+    /// 일부이므로, 장르·작곡가·작품 집계는 전체 카탈로그일 때만 다시 만든다 —
+    /// 그러지 않으면 검색 한 번에 Genres 화면이 결과만큼으로 줄어든다.
+    /// </summary>
+    private void LoadCatalog(string? body, bool isFullCatalog)
     {
         Tracks.Clear();
         if (string.IsNullOrWhiteSpace(body)) { ApplyFilter(); return; }
@@ -77,8 +84,8 @@ public partial class MainViewModel
         }
         catch { /* ignore malformed */ }
         ApplyFilter();
-        Library.Rebuild(Tracks);
-        PageSubtitle = $"{Tracks.Count} tracks";
+        if (isFullCatalog) Library.Rebuild(Tracks);
+        PageSubtitle = isFullCatalog ? $"{Tracks.Count} tracks" : $"검색 결과 {Tracks.Count}곡";
         _ = PrefetchArtAsync();
     }
 
