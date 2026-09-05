@@ -46,7 +46,7 @@
 **Interfaces:**
 - Produces: `CatalogTrack.Genres` (`List<string>`) · `.Composers` (`List<string>`) · `.WorkKey` (`string?`) · `.WorkTitle` (`string?`) — 목록은 절대 null이 아니다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 Control 프로젝트는 테스트에서 참조하지 않으므로, **Core가 내보내는 JSON이 Control 모델의 필드 이름과 맞는지**를 프로토콜 수준에서 고정한다.
 
@@ -129,7 +129,7 @@ public class LibraryGroupingTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter LibraryGroupingTests
@@ -138,7 +138,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter LibraryGroupingTests
 기대: 4개 통과 — 3a가 이미 필드를 실어 놓았으므로 바로 통과한다.
 **통과하지 않으면 3a가 덜 된 것이니 거기부터 본다.**
 
-- [ ] **Step 3: Control 모델에 필드를 더한다**
+- [x] **Step 3: Control 모델에 필드를 더한다**
 
 `src/Mono.Control/Models/CatalogTrack.cs`의 `[JsonPropertyName("hasLyrics")]` 줄 아래:
 
@@ -149,7 +149,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter LibraryGroupingTests
     [JsonPropertyName("workTitle")] public string? WorkTitle { get; set; }
 ```
 
-- [ ] **Step 4: 빌드**
+- [x] **Step 4: 빌드**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -157,7 +157,7 @@ dotnet build Mono.slnx -v q --nologo
 
 기대: 경고 0, 오류 0.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Control/Models/CatalogTrack.cs tests/Mono.Tests/LibraryGroupingTests.cs
@@ -191,7 +191,7 @@ Genres·Composers·Compositions·Folders는 같은 카탈로그를 다른 축으
   - `CoreSession.FoldersAsync()`
   - nav id `composers` · `compositions` · `folders` 추가
 
-- [ ] **Step 1: 그룹 모델을 만든다**
+- [x] **Step 1: 그룹 모델을 만든다**
 
 `src/Mono.Control/Models/LibraryGroups.cs`:
 
@@ -239,7 +239,7 @@ public sealed class FolderEntry
 }
 ```
 
-- [ ] **Step 2: 라이브러리 VM을 만든다**
+- [x] **Step 2: 라이브러리 VM을 만든다**
 
 `src/Mono.Control/ViewModels/Pages/LibraryViewModel.cs`:
 
@@ -323,7 +323,7 @@ public sealed partial class LibraryViewModel : PageViewModel
 }
 ```
 
-- [ ] **Step 3: `folders` 명령을 Control에 배선한다**
+- [x] **Step 3: `folders` 명령을 Control에 배선한다**
 
 `src/Mono.Control/Services/CoreSession.Library.cs`의 `ScanAsync` 아래:
 
@@ -332,7 +332,7 @@ public sealed partial class LibraryViewModel : PageViewModel
     public Task FoldersAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Folders });
 ```
 
-- [ ] **Step 4: 셸에 붙인다**
+- [x] **Step 4: 셸에 붙인다**
 
 `MainViewModel.cs` 생성자에서 `Audio = new AudioViewModel(session);` 아래:
 
@@ -398,7 +398,7 @@ public sealed partial class LibraryViewModel : PageViewModel
             "Folders" => "Folders",
 ```
 
-- [ ] **Step 5: 카탈로그를 받을 때 집계한다**
+- [x] **Step 5: 카탈로그를 받을 때 집계한다**
 
 `MainViewModel.Messages.cs`의 `LoadCatalog` 끝, `ApplyFilter();` 아래:
 
@@ -428,7 +428,7 @@ public sealed partial class LibraryViewModel : PageViewModel
     }
 ```
 
-- [ ] **Step 6: 빌드하고 띄운다**
+- [x] **Step 6: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -437,7 +437,7 @@ dotnet run --project src/Mono.Control
 
 확인: 사이드바에 Composers · Compositions · Folders 가 생겼다. 아직 본문은 비어 있다(Task 3에서 만든다).
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -462,7 +462,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `MainViewModel.Library` (Task 2), `SelectGenreCommand`.
 - Produces: `MainViewModel.SelectGenreCommand`이 `GenreCount`를 받도록 시그니처 변경, `_genreFilter`가 실제 장르 이름을 담는다.
 
-- [ ] **Step 1: 하드코딩 장르를 걷어낸다**
+- [x] **Step 1: 하드코딩 장르를 걷어낸다**
 
 `MainViewModel.cs` 생성자의 `GenreTiles = [...]` 블록 전체와 `public ObservableCollection<GenreTile> GenreTiles { get; }` 선언을 지운다.
 `FilterByGenre` 메서드 전체를 지운다 — 아티스트 이름으로 장르를 추측하던 코드다.
@@ -491,7 +491,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 기존 `else if (nav is "genres" && _genreFilter is not null)` 분기를 위 코드로 교체한다 —
 장르를 고르면 Tracks 화면으로 이동하므로 nav 조건이 필요 없다.
 
-- [ ] **Step 2: Genres 화면을 다시 쓴다**
+- [x] **Step 2: Genres 화면을 다시 쓴다**
 
 `src/Mono.Control/Views/Pages/GenresPage.axaml` 전체:
 
@@ -537,7 +537,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     <Setter Property="Background" Value="{DynamicResource Mono.Panel}"/>
 ```
 
-- [ ] **Step 3: Composers 화면**
+- [x] **Step 3: Composers 화면**
 
 `src/Mono.Control/Views/Pages/ComposersPage.axaml`:
 
@@ -574,7 +574,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 </UserControl>
 ```
 
-- [ ] **Step 4: Compositions 화면**
+- [x] **Step 4: Compositions 화면**
 
 `src/Mono.Control/Views/Pages/CompositionsPage.axaml`:
 
@@ -611,7 +611,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 </UserControl>
 ```
 
-- [ ] **Step 5: Folders 화면**
+- [x] **Step 5: Folders 화면**
 
 `src/Mono.Control/Views/Pages/FoldersPage.axaml`:
 
@@ -646,7 +646,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 </UserControl>
 ```
 
-- [ ] **Step 6: 코드비하인드 3개**
+- [x] **Step 6: 코드비하인드 3개**
 
 세 파일을 만든다. 클래스 이름과 파일 이름만 다르고 내용은 같다 — `ComposersPage` · `CompositionsPage` · `FoldersPage`:
 
@@ -661,7 +661,7 @@ public partial class ComposersPage : UserControl
 }
 ```
 
-- [ ] **Step 7: MainWindow에 붙인다**
+- [x] **Step 7: MainWindow에 붙인다**
 
 `MainWindow.axaml`의 `<pages:GenresPage .../>` 줄을 DataContext 주입형으로 바꾸고 세 줄을 더한다:
 
@@ -676,7 +676,7 @@ public partial class ComposersPage : UserControl
                                IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsFoldersPage}"/>
 ```
 
-- [ ] **Step 8: 빌드하고 띄운다**
+- [x] **Step 8: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -689,7 +689,7 @@ Composers 에 John Coltrane · Miles Davis · 米津玄師 아바타 · Composit
 기존 `catalog.db`를 쓰고 있으면 장르가 비어 있고 안내 문구가 뜬다 — 그게 의도한 동작이다.
 새 DB로 보려면 `src/Mono.Control/bin/Debug/net8.0/data/catalog.db`(Control 이 띄운 Core 의 DB)를 지운다.
 
-- [ ] **Step 9: 커밋**
+- [x] **Step 9: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -719,7 +719,7 @@ nav만 있고 트랙 그리드를 재활용하던 두 화면에 실제 본문을
 - Produces: `HistoryEntry` · `PlaylistEntry` · `PlaylistTrack` 모델, `LibraryViewModel.History` · `.Playlists` 컬렉션,
   `LibraryViewModel.ReplayCommand` · `LoadPlaylistCommand` · `ExportM3uCommand`.
 
-- [ ] **Step 1: 모델을 만든다**
+- [x] **Step 1: 모델을 만든다**
 
 `src/Mono.Control/Models/HistoryEntry.cs`:
 
@@ -768,7 +768,7 @@ public sealed class PlaylistTrack
 }
 ```
 
-- [ ] **Step 2: VM에 컬렉션과 커맨드를 더한다**
+- [x] **Step 2: VM에 컬렉션과 커맨드를 더한다**
 
 `LibraryViewModel.cs`의 `Folders` 아래:
 
@@ -805,7 +805,7 @@ public sealed class PlaylistTrack
 
 파일 상단에 `using CommunityToolkit.Mvvm.Input;`을 더한다.
 
-- [ ] **Step 3: 응답을 받는다**
+- [x] **Step 3: 응답을 받는다**
 
 `MainViewModel.Messages.cs`의 `HandleMessage` switch에 두 케이스를 더한다:
 
@@ -836,7 +836,7 @@ public sealed class PlaylistTrack
     }
 ```
 
-- [ ] **Step 4: History 화면**
+- [x] **Step 4: History 화면**
 
 `src/Mono.Control/Views/Pages/HistoryPage.axaml`:
 
@@ -872,7 +872,7 @@ public sealed class PlaylistTrack
 </UserControl>
 ```
 
-- [ ] **Step 5: Playlists 화면**
+- [x] **Step 5: Playlists 화면**
 
 `src/Mono.Control/Views/Pages/PlaylistsPage.axaml`:
 
@@ -921,7 +921,7 @@ public sealed class PlaylistTrack
 </UserControl>
 ```
 
-- [ ] **Step 6: 코드비하인드 2개 + MainWindow 배선**
+- [x] **Step 6: 코드비하인드 2개 + MainWindow 배선**
 
 `HistoryPage.axaml.cs` · `PlaylistsPage.axaml.cs` — 아래 형태로, 클래스 이름을 각각 `HistoryPage` · `PlaylistsPage` 로 둔다:
 
@@ -945,7 +945,7 @@ public partial class HistoryPage : UserControl
                                  IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsPlaylistsPage}"/>
 ```
 
-- [ ] **Step 7: 빌드하고 띄운다**
+- [x] **Step 7: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -955,7 +955,7 @@ dotnet run --project src/Mono.Control
 확인: 라운지에서 곡을 재생한 뒤 History 에 줄이 생기고 「다시 듣기」가 큐에 넣는다 ·
 세션을 저장하며 종료하면 Playlists 에 하이라이트 리스트가 뜬다.
 
-- [ ] **Step 8: 커밋**
+- [x] **Step 8: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -977,7 +977,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `CoreSession.SearchAsync(string)` (1단계) · `CoreSession.CatalogAsync()`.
 - Produces: 없음 — 기존 `SearchText` 동작만 바뀐다.
 
-- [ ] **Step 1: 디바운스와 서버 호출을 넣는다**
+- [x] **Step 1: 디바운스와 서버 호출을 넣는다**
 
 `MainViewModel.cs`의 필드에 타이머를 더한다:
 
@@ -1023,7 +1023,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 위 줄 앞의 `var q = SearchText.Trim(); if (q.Length > 0) { src = src.Where(...); }` 블록 전체를 지운다.
 
-- [ ] **Step 2: 빌드하고 띄운다**
+- [x] **Step 2: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1033,7 +1033,7 @@ dotnet run --project src/Mono.Control
 확인: 검색창에 **`요네즈 켄시`** 를 치면 `感電`이 나온다(별칭 매칭 — 이전에는 안 됐다) ·
 `Hard Bop` 을 치면 Coltrane 두 곡이 나온다(장르 매칭) · 지우면 전체가 돌아온다.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/Mono.Control/ViewModels/MainViewModel.cs
@@ -1069,7 +1069,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `CoreSession.AlbumAsync(string albumId)`
   - `LibraryViewModel.SelectedAlbum` (`AlbumDetail?`) · `OpenAlbumCommand` · `CloseAlbumCommand`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/AlbumDetailTests.cs`:
 
@@ -1128,7 +1128,7 @@ public class AlbumDetailTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter AlbumDetailTests
@@ -1136,7 +1136,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter AlbumDetailTests
 
 기대: 컴파일 실패 — `AlbumDetail` 이 없다.
 
-- [ ] **Step 3: Core에 구현한다**
+- [x] **Step 3: Core에 구현한다**
 
 `src/Mono.Core/CatalogStore.cs`의 `CatalogView()` 아래:
 
@@ -1189,7 +1189,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter AlbumDetailTests
 
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter AlbumDetailTests
@@ -1197,7 +1197,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter AlbumDetailTests
 
 기대: 3개 통과.
 
-- [ ] **Step 5: Control 모델과 명령을 더한다**
+- [x] **Step 5: Control 모델과 명령을 더한다**
 
 `src/Mono.Control/Models/AlbumDetail.cs`:
 
@@ -1277,7 +1277,7 @@ public sealed class AlbumDetail
     }
 ```
 
-- [ ] **Step 6: 앨범 카드에 여는 동작을 붙인다**
+- [x] **Step 6: 앨범 카드에 여는 동작을 붙인다**
 
 `LibraryPage.axaml` 의 트랙 카드 안에서, 아트를 담은 `<Border Classes="artslot" Height="140">` 를
 아래 버튼으로 감싸고 대응하는 `</Border>` 뒤에 `</Button>` 을 닫는다.
@@ -1290,7 +1290,7 @@ public sealed class AlbumDetail
                                   CommandParameter="{Binding}">
 ```
 
-- [ ] **Step 7: 오버레이를 만든다**
+- [x] **Step 7: 오버레이를 만든다**
 
 `MainWindow.axaml` 의 큐 드로어 `<!-- Queue drawer -->` 앞에 넣는다:
 
@@ -1336,7 +1336,7 @@ public sealed class AlbumDetail
 
 ```
 
-- [ ] **Step 8: 빌드하고 띄운다**
+- [x] **Step 8: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1345,7 +1345,7 @@ dotnet run --project src/Mono.Control
 
 확인: Albums 화면에서 아트를 누르면 오버레이가 열려 수록곡과 라이너가 보이고 「닫기」로 닫힌다.
 
-- [ ] **Step 9: 커밋**
+- [x] **Step 9: 커밋**
 
 ```bash
 git add src/ tests/
@@ -1358,13 +1358,24 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 3b단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 96개 통과 (3a 89 + 라이브러리 집계 4 + 앨범 상세 3)
-- [ ] 사이드바에 `04-UIUX기획서` §3.1의 항목이 전부 있다 — Home Genres Qobuz TIDAL 라운지 History Albums Artists Tracks **Composers Compositions Folders** Playlists Audio Settings
-- [ ] Genres 타일이 하드코딩이 아니라 실제 태그 집계다. 아티스트 이름으로 장르를 추측하는 코드(`FilterByGenre`)가 사라졌다
-- [ ] 검색창에 `요네즈 켄시`를 치면 `感電`이 나온다
-- [ ] History·Playlists 가 트랙 그리드 재활용이 아니라 전용 화면이다
-- [ ] 앨범 아트를 누르면 수록곡·라이너·크레딧 오버레이가 열린다
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **96개** 통과 (3a 89 + 라이브러리 집계 4 + 앨범 상세 3)
+- [x] 사이드바 15개 — 문서 §3.1 항목이 전부 있다 (**Composers · Compositions · Folders** 추가)
+- [x] Genres 타일이 실제 태그 집계다. `FilterByGenre`와 `GenreTile`이 완전히 사라졌다 (grep 0건)
+- [x] 검색창에 `요네즈 켄시`를 치면 `感電`이 나온다 — TCP 프로브로 확인
+- [x] History·Playlists 가 전용 화면이다
+- [x] `album` 명령이 라이너와 함께 응답한다 — TCP 프로브로 확인
+
+실측(신규 DB, TCP 프로브):
+```
+search "요네즈 켄시" -> [tr-kanden]
+album al-kob        -> Kind of Blue | 2곡 | liner: True
+folders             -> [(library, 0)]
+```
+
+**검증하지 못한 것:** 화면 제어 권한이 없어 **새 화면 6개의 렌더 결과를 눈으로 보지 못했다.**
+컴파일된 바인딩이라 바인딩 경로 오류는 빌드가 잡고, 앱은 예외 없이 뜬다 — 거기까지다.
+**레이아웃과 클릭 동작은 사람이 한 번 봐야 한다.**
 
 ## 다음 단계
 
