@@ -6,7 +6,7 @@ using Mono.Protocol;
 namespace Mono.Control.Services;
 
 /// <summary>Core :7700 TCP 세션. Control은 오디오를 재생하지 않는다.</summary>
-public sealed class CoreSession : IAsyncDisposable
+public sealed partial class CoreSession : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOpts = LineFraming.JsonOptions;
 
@@ -101,70 +101,6 @@ public sealed class CoreSession : IAsyncDisposable
         }
     }
 
-    public Task PlayAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Play });
-    public Task PauseAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Pause });
-    public Task SkipAsync(int delta = 1) => SendAsync(new MonoMessage { Type = MessageTypes.Skip, Index = delta });
-    public Task SeekAsync(long ms) => SendAsync(new MonoMessage { Type = MessageTypes.Seek, MediaTimeMs = ms });
-    public Task EnqueueAsync(string trackId) => SendAsync(new MonoMessage { Type = MessageTypes.Enqueue, TrackId = trackId });
-    public Task CatalogAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Catalog });
-    public Task SearchAsync(string q) => SendAsync(new MonoMessage { Type = MessageTypes.Search, Text = q });
-    public Task ScanAsync(string? path) => SendAsync(new MonoMessage { Type = MessageTypes.ScanLibrary, Path = path });
-    public Task ListRoomsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ListRooms });
-    public Task CreateRoomAsync(string name, int mode) => SendAsync(new MonoMessage { Type = MessageTypes.CreateRoom, RoomName = name, Mode = (Mono.Shared.RoomMode)mode });
-    public Task JoinRoomAsync(string roomId, string? invite = null) => SendAsync(new MonoMessage { Type = MessageTypes.JoinRoom, RoomId = roomId, InviteCode = invite });
-    public Task LeaveRoomAsync() => SendAsync(new MonoMessage { Type = MessageTypes.LeaveRoom });
-    public Task ReactAsync(string emoji) => SendAsync(new MonoMessage { Type = MessageTypes.React, Emoji = emoji });
-    public Task ChatAsync(string text) => SendAsync(new MonoMessage { Type = MessageTypes.Chat, Text = text });
-    public Task EndpointsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Endpoints });
-    public Task ListZonesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ListZones });
-    public Task CreateZoneAsync(string name) => SendAsync(new MonoMessage { Type = MessageTypes.CreateZone, Text = name });
-    public Task LinkStreamingAsync(int provider) => SendAsync(new MonoMessage { Type = MessageTypes.LinkStreaming, Provider = (Mono.Shared.StreamingProvider)provider, Token = "demo-token" });
-    public Task BeginStreamingOAuthAsync(int provider) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.LinkStreaming,
-        Provider = (Mono.Shared.StreamingProvider)provider,
-        Text = "oauth",
-        Token = "oauth"
-    });
-    public Task HistoryAsync() => SendAsync(new MonoMessage { Type = MessageTypes.History });
-    public Task PlaylistsAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Playlists });
-    public Task ArchivesAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Archives });
-    public Task SetDspAsync(int preset) => SendAsync(new MonoMessage { Type = MessageTypes.SetDsp, Dsp = (Mono.Shared.DspPresetKind)preset });
-    public Task SetEasyEqAsync(string json, bool graphic) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.SetEasyEq,
-        Body = json,
-        Flag = graphic
-    });
-    public Task SetConvolutionIrAsync(string? path) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.SetConvolutionIr,
-        Path = path
-    });
-    public Task SetSpeakerSetupAsync(string csv) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.SetSpeakerSetup,
-        Text = csv
-    });
-    public Task SetHeadroomAsync(float db) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.SetHeadroom,
-        Text = db.ToString(System.Globalization.CultureInfo.InvariantCulture)
-    });
-    public Task SetDeviceEqAsync(string profile) => SendAsync(new MonoMessage
-    {
-        Type = MessageTypes.SetDeviceEq,
-        Text = profile
-    });
-    public Task SyncProbeAsync() => SendAsync(new MonoMessage { Type = MessageTypes.SyncProbe });
-    public Task ResyncAsync() => SendAsync(new MonoMessage { Type = MessageTypes.Resync });
-    public Task ChooseAutoplayAsync(string trackId) => SendAsync(new MonoMessage { Type = MessageTypes.ChooseAutoplay, TrackId = trackId });
-    public Task WikiAsync(string artistId) => SendAsync(new MonoMessage { Type = MessageTypes.WikiBio, Text = artistId });
-    public Task ClearQueueAsync() => SendAsync(new MonoMessage { Type = MessageTypes.ClearQueue });
-    public Task EndSessionAsync(bool consent) => SendAsync(new MonoMessage { Type = MessageTypes.EndSession, Consent = consent });
-    public Task LinerPageAsync(int page) => SendAsync(new MonoMessage { Type = MessageTypes.LinerPage, Index = page });
-    public Task LinerScrollAsync(double y) => SendAsync(new MonoMessage { Type = MessageTypes.LinerScroll, OffsetMs = y });
-    public Task FollowHostAsync(bool on) => SendAsync(new MonoMessage { Type = MessageTypes.FollowHost, Flag = on });
 
     public async Task DisconnectAsync()
     {
