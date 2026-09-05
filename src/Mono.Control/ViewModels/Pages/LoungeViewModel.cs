@@ -155,4 +155,50 @@ public sealed partial class LoungeViewModel : PageViewModel
     [RelayCommand]
     private Task ReactAsync(string? emoji)
         => string.IsNullOrWhiteSpace(emoji) ? Task.CompletedTask : Safe(() => Session.ReactAsync(emoji));
+
+    // ── 초대 ────────────────────────────────────────────
+    [RelayCommand]
+    private Task RotateInviteAsync() => Safe(() => Session.InviteAsync(InviteAction.Rotate, 360));
+
+    [RelayCommand]
+    private Task ExtendInviteAsync() => Safe(() => Session.InviteAsync(InviteAction.Extend, 60));
+
+    [RelayCommand]
+    private Task RevokeInviteAsync() => Safe(() => Session.InviteAsync(InviteAction.Revoke));
+
+    // ── 멤버 ────────────────────────────────────────────
+    [RelayCommand]
+    private Task KickAsync(MemberEntry? m)
+        => m is null ? Task.CompletedTask : Safe(() => Session.KickAsync(m.PeerId));
+
+    [RelayCommand]
+    private Task MakeHostAsync(MemberEntry? m)
+        => m is null ? Task.CompletedTask : Safe(() => Session.TransferHostAsync(m.PeerId));
+
+    [RelayCommand]
+    private Task MakeDjAsync(MemberEntry? m)
+        => m is null ? Task.CompletedTask : Safe(() => Session.SetRoleAsync(m.PeerId, MemberRole.Dj));
+
+    [RelayCommand]
+    private Task MakeListenerAsync(MemberEntry? m)
+        => m is null ? Task.CompletedTask : Safe(() => Session.SetRoleAsync(m.PeerId, MemberRole.Listener));
+
+    /// <summary>참관으로 전환하면 오디오를 받지 않는다 — 포맷이 안 맞을 때 쓴다.</summary>
+    [RelayCommand]
+    private Task ToggleSpectateAsync(string? on) => Safe(() => Session.SpectateAsync(on == "1"));
+
+    // ── 정책 ────────────────────────────────────────────
+    /// <summary>flag 이름은 Core CommandProcessor 가 받는 값 그대로다.</summary>
+    [RelayCommand]
+    private Task SetFlagAsync(string? flag)
+        => string.IsNullOrEmpty(flag) ? Task.CompletedTask : Safe(() => Session.SetRoomFlagAsync(flag));
+
+    [RelayCommand]
+    private Task ApplyPolicyAsync() => Safe(() => Session.SetPolicyAsync((QualityPolicy)QualityPolicyIndex));
+
+    [RelayCommand]
+    private Task ApplySourceModeAsync() => Safe(() => Session.SetSourceModeAsync((PlaybackSourceMode)SourceModeIndex));
+
+    [RelayCommand]
+    private Task ApplyMaxMembersAsync() => Safe(() => Session.SetRoomFlagAsync("max", index: MaxMembers));
 }

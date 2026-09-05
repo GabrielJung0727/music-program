@@ -1,0 +1,122 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.LoungeAdminPanel"
+             x:DataType="pvm:LoungeViewModel">
+  <StackPanel Spacing="10" IsVisible="{Binding InRoom}">
+
+    <TextBlock Text="룸 운영" FontWeight="SemiBold"/>
+    <TextBlock Text="{Binding HostBlockedReason}" Classes="muted" FontSize="11"
+               IsVisible="{Binding !IsHost}"/>
+
+    <Border Classes="panel" CornerRadius="10" Padding="10">
+      <StackPanel Spacing="6">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding InviteExpiryText}" Classes="muted" FontSize="11"/>
+          <TextBlock Text="{Binding InviteCodeText}" FontWeight="SemiBold"/>
+        </DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost" Content="새 코드" Command="{Binding RotateInviteCommand}"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+          <Button Classes="ghost" Content="연장" Command="{Binding ExtendInviteCommand}"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+          <Button Classes="ghost" Content="폐기" Command="{Binding RevokeInviteCommand}"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="panel" CornerRadius="10" Padding="10">
+      <StackPanel Spacing="4">
+        <CheckBox Content="시킹 허용" IsChecked="{Binding SeekingAllowed}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="seek"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        <CheckBox Content="코멘트 허용" IsChecked="{Binding CommentsAllowed}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="comments"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        <CheckBox Content="큐 잠금" IsChecked="{Binding QueueLocked}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="queue_lock"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        <CheckBox Content="자동 다음곡" IsChecked="{Binding AutoAdvance}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="auto_advance"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        <CheckBox Content="스마트 오토플레이" IsChecked="{Binding SmartAutoplay}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="smart_autoplay"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+        <CheckBox Content="DSP 잠금" IsChecked="{Binding DspLocked}"
+                  Command="{Binding SetFlagCommand}" CommandParameter="dsp_lock"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}"/>
+      </StackPanel>
+    </Border>
+
+    <Border Classes="panel" CornerRadius="10" Padding="10">
+      <StackPanel Spacing="6">
+        <TextBlock Text="품질 정책" FontSize="11" Classes="muted"/>
+        <ComboBox SelectedIndex="{Binding QualityPolicyIndex}" HorizontalAlignment="Stretch"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}">
+          <ComboBoxItem Content="Bit-perfect 전용"/>
+          <ComboBoxItem Content="최저 공통 포맷"/>
+          <ComboBoxItem Content="불가 시 참관"/>
+        </ComboBox>
+        <Button Classes="ghost" Content="정책 적용" Command="{Binding ApplyPolicyCommand}"
+                IsEnabled="{Binding IsHost}" HorizontalAlignment="Left"/>
+
+        <TextBlock Text="소스 모드" FontSize="11" Classes="muted" Margin="0,6,0,0"/>
+        <ComboBox SelectedIndex="{Binding SourceModeIndex}" HorizontalAlignment="Stretch"
+                  IsEnabled="{Binding IsHost}" ToolTip.Tip="{Binding HostBlockedReason}">
+          <ComboBoxItem Content="Clock-sync (각자 재생)"/>
+          <ComboBoxItem Content="Fan-out (호스트가 전송)"/>
+        </ComboBox>
+        <Button Classes="ghost" Content="모드 적용" Command="{Binding ApplySourceModeCommand}"
+                IsEnabled="{Binding IsHost}" HorizontalAlignment="Left"/>
+
+        <TextBlock Text="최대 인원" FontSize="11" Classes="muted" Margin="0,6,0,0"/>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <NumericUpDown Value="{Binding MaxMembers}" Minimum="1" Maximum="128" Width="120"
+                         IsEnabled="{Binding IsHost}"/>
+          <Button Classes="ghost" Content="적용" Command="{Binding ApplyMaxMembersCommand}"
+                  IsEnabled="{Binding IsHost}"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <Button Classes="ghost" Content="참관으로" Command="{Binding ToggleSpectateCommand}" CommandParameter="1"
+              ToolTip.Tip="오디오를 받지 않고 화면만 봅니다"/>
+      <Button Classes="ghost" Content="청취로" Command="{Binding ToggleSpectateCommand}" CommandParameter="0"/>
+    </StackPanel>
+
+    <TextBlock Text="참가자" FontWeight="SemiBold" Margin="0,6,0,0"/>
+    <ItemsControl ItemsSource="{Binding Members}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="models:MemberEntry">
+          <Border Classes="panel" CornerRadius="8" Padding="8" Margin="0,0,0,4">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"/>
+              <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Classes="ghost" Content="DJ" Padding="8,2" FontSize="11"
+                        Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MakeDjCommand}"
+                        CommandParameter="{Binding}"
+                        IsEnabled="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).IsHost}"/>
+                <Button Classes="ghost" Content="청취자" Padding="8,2" FontSize="11"
+                        Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MakeListenerCommand}"
+                        CommandParameter="{Binding}"
+                        IsEnabled="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).IsHost}"/>
+                <Button Classes="ghost" Content="호스트 위임" Padding="8,2" FontSize="11"
+                        Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MakeHostCommand}"
+                        CommandParameter="{Binding}"
+                        IsEnabled="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).IsHost}"/>
+                <Button Classes="ghost" Content="킥" Padding="8,2" FontSize="11"
+                        Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).KickCommand}"
+                        CommandParameter="{Binding}"
+                        IsEnabled="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).IsHost}"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

@@ -4,6 +4,7 @@
              xmlns:pvm="using:Mono.Control.ViewModels.Pages"
              xmlns:models="using:Mono.Control.Models"
              xmlns:svg="using:Avalonia.Svg.Skia"
+             xmlns:local="using:Mono.Control.Views.Pages"
              x:Class="Mono.Control.Views.Pages.LoungePage"
              x:DataType="pvm:LoungeViewModel">
             <Grid ColumnDefinitions="*,320">
@@ -74,10 +75,15 @@
                       </Button>
                     </StackPanel>
                   </StackPanel>
-                  <StackPanel>
-                    <TextBlock Text="라운지 채팅" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <ListBox ItemsSource="{Binding ChatLines}" Height="360"/>
-                  </StackPanel>
+                  <ScrollViewer>
+                    <StackPanel Spacing="12">
+                      <local:LoungeAdminPanel/>
+                      <StackPanel>
+                        <TextBlock Text="라운지 채팅" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <ListBox ItemsSource="{Binding ChatLines}" Height="240"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </ScrollViewer>
                 </DockPanel>
               </Border>
             </Grid>
