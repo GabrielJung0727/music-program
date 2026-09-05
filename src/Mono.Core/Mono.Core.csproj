@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Mono.Core</RootNamespace>
     <AssemblyName>Mono.Core</AssemblyName>
+    <!-- 레거시 웹 UI(wwwroot)는 커밋 3277af2 에서 삭제됐다. 정적 웹 자산을 끄지 않으면
+         dotnet run 이 없는 wwwroot 를 찾다 기동 전에 죽는다. -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
