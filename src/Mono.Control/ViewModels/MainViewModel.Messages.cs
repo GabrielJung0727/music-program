@@ -198,6 +198,14 @@ public partial class MainViewModel
         Pins = snap.Pins;
         SeekingAllowed = snap.SeekingAllowed;
 
+        HeartCount = snap.ReactionCounts.GetValueOrDefault("❤️");
+        var mine = snap.CurrentTrack is null
+            ? 0
+            : snap.Reactions.Count(r => r.PeerId == _session.PeerId && r.TrackId == snap.CurrentTrack.Id);
+        HeartsLeft = Math.Max(0, MaxReactionsPerTrack - mine);
+        OnPropertyChanged(nameof(CanReact));
+        OnPropertyChanged(nameof(ReactBlockedReason));
+
         var keepOutput = SelectedOutput?.PeerId;
         Outputs.Clear();
         foreach (var o in snap.Outputs) Outputs.Add(OutputDevice.From(o));

@@ -147,6 +147,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _volumeBlockedReason = "";
     [ObservableProperty] private OutputDevice? _selectedOutput;
     [ObservableProperty] private string _outputChip = "출력 없음";
+    [ObservableProperty] private int _heartCount;
+    [ObservableProperty] private int _heartsLeft = 3;
+    [ObservableProperty] private bool _showQueue;
+    /// <summary>Core의 MaxReactionsPerUserPerTrack 과 같은 값이어야 한다.</summary>
+    private const int MaxReactionsPerTrack = 3;
+
+    public bool CanReact => HeartsLeft > 0 && CurrentSnapshot?.CurrentTrack is not null;
+
+    public string ReactBlockedReason => CurrentSnapshot?.CurrentTrack is null
+        ? "재생 중인 곡이 없습니다"
+        : HeartsLeft > 0 ? $"♥ 남은 횟수 {HeartsLeft}회" : "이 곡에는 이미 3번 반응했습니다";
+
     /// <summary>시킹이 막힌 이유. 비어 있으면 툴팁을 띄우지 않는다.</summary>
     public string SeekBlockedReason => SeekingAllowed ? "" : "호스트가 시킹을 잠갔습니다";
 
@@ -175,6 +187,11 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayPauseLabel));
     partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
+    partial void OnHeartsLeftChanged(int value)
+    {
+        OnPropertyChanged(nameof(CanReact));
+        OnPropertyChanged(nameof(ReactBlockedReason));
+    }
     partial void OnNowPlayingTabChanged(int value)
     {
         OnPropertyChanged(nameof(IsNpLyrics));
@@ -575,6 +592,27 @@ public partial class MainViewModel : ObservableObject
         if (device is null) return;
         SelectedOutput = device;
         Volume = device.VolumePercent;
+    }
+
+    /// <summary>하단 바의 ♥ — 지금 재생 위치에 하트 반응을 남긴다. 토글이 아니다.</summary>
+    [RelayCommand]
+    private Task HeartAsync() => Safe(() => _session.ReactAsync("❤️"));
+
+    [RelayCommand]
+    private void ToggleQueue() => ShowQueue = !ShowQueue;
+
+    [RelayCommand]
+    private Task RemoveFromQueueAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : Lounge.QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => _session.RemoveQueueAsync(i));
+    }
+
+    [RelayCommand]
+    private Task JumpToQueueAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : Lounge.QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => _session.JumpToAsync(i));
     }
 
     private async Task Safe(Func<Task> action)

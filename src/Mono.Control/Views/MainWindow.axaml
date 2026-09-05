@@ -98,23 +98,34 @@
       <!-- Bottom player -->
       <Border Grid.Row="1" Classes="playerbar" Padding="16,10">
         <Grid ColumnDefinitions="300,*,280">
-          <Button Classes="ghost" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left"
-                  Command="{Binding OpenNowPlayingCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <Border Classes="artslot" Width="56" Height="56" CornerRadius="6">
-                <Panel>
-                  <Image Classes="artph" Width="40" Height="40"
-                         Source="{DynamicResource Mono.Icon.ArtPlaceholder}"/>
-                  <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
-                </Panel>
-              </Border>
-              <StackPanel VerticalAlignment="Center" MaxWidth="200">
-                <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <Button Classes="ghost" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left"
+                    Command="{Binding OpenNowPlayingCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Border Classes="artslot" Width="56" Height="56" CornerRadius="6">
+                  <Panel>
+                    <Image Classes="artph" Width="40" Height="40"
+                           Source="{DynamicResource Mono.Icon.ArtPlaceholder}"/>
+                    <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
+                  </Panel>
+                </Border>
+                <StackPanel VerticalAlignment="Center" MaxWidth="200">
+                  <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+                </StackPanel>
               </StackPanel>
-            </StackPanel>
-          </Button>
+            </Button>
+            <Button Grid.Column="1" Classes="ghost" Padding="8,6" VerticalAlignment="Center"
+                    Command="{Binding HeartCommand}"
+                    IsEnabled="{Binding CanReact}"
+                    ToolTip.Tip="{Binding ReactBlockedReason}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="♥" FontSize="14"/>
+                <TextBlock Text="{Binding HeartCount}" FontSize="11" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
+          </Grid>
 
           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
@@ -131,6 +142,9 @@
               </Button>
               <Button Classes="ghost" Command="{Binding NextCommand}" ToolTip.Tip="다음" Padding="12,8">
                 <Image Classes="icon-lg" Source="{DynamicResource Mono.Icon.Next}"/>
+              </Button>
+              <Button Classes="ghost" Command="{Binding ToggleQueueCommand}" ToolTip.Tip="큐" Padding="12,8">
+                <TextBlock Text="큐" VerticalAlignment="Center"/>
               </Button>
             </StackPanel>
             <Grid ColumnDefinitions="40,*,40" Margin="40,0">
@@ -248,6 +262,44 @@
         </Grid>
       </Border>
     </Grid>
+
+    <!-- Queue drawer -->
+    <Border IsVisible="{Binding ShowQueue}" Background="{DynamicResource Mono.Panel}"
+            HorizontalAlignment="Right" Width="360" Margin="0,0,0,92"
+            BorderBrush="{DynamicResource Mono.Border}" BorderThickness="1,0,0,1">
+      <DockPanel Margin="16">
+        <DockPanel DockPanel.Dock="Top">
+          <Button DockPanel.Dock="Right" Classes="ghost" Content="닫기" Command="{Binding ToggleQueueCommand}"/>
+          <TextBlock Text="재생 큐" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
+        <ScrollViewer Margin="0,12,0,0">
+          <ItemsControl ItemsSource="{Binding Lounge.QueueTracks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:CatalogTrack">
+                <Border Classes="trackcard" Margin="0,0,0,6" Padding="10">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="ghost" Content="✕" Padding="8,4"
+                            ToolTip.Tip="큐에서 제거"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).RemoveFromQueueCommand}"
+                            CommandParameter="{Binding}"/>
+                    <Button Classes="ghost" Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left"
+                            ToolTip.Tip="이 곡으로 이동"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).JumpToQueueCommand}"
+                            CommandParameter="{Binding}">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                      </StackPanel>
+                    </Button>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
 
     <!-- Immersive Now Playing -->
     <Border IsVisible="{Binding ShowNowPlaying}" Background="#E6101014">
