@@ -68,6 +68,7 @@ public static class MessageTypes
     public const string Search = "search";
     public const string Graph = "graph";
     public const string ScanLibrary = "scan_library";
+    public const string Folders = "folders";
     public const string LinkStreaming = "link_streaming";
     public const string ReactionHeatmap = "reaction_heatmap";
     public const string WikiBio = "wiki_bio";

@@ -54,6 +54,24 @@ public sealed class LibraryScanner
         return count;
     }
 
+    /// <summary>
+    /// 여러 루트를 차례로 훑는다. 없는 폴더는 건너뛴다 —
+    /// 외장 드라이브가 빠져 있다고 나머지 스캔까지 멈출 이유가 없다.
+    /// </summary>
+    public int ScanAll(IEnumerable<string> roots)
+    {
+        var total = 0;
+        foreach (var root in roots.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
+        {
+            if (!Directory.Exists(root)) continue;
+            total += Scan(root);
+        }
+
+        LastScan = DateTimeOffset.UtcNow;
+        LastCount = total;
+        return total;
+    }
+
     private void Import(string file)
     {
         using var tf = TagLib.File.Create(file);

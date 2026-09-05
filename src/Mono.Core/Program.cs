@@ -7,6 +7,9 @@ builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.
 
 var data = Path.Combine(AppContext.BaseDirectory, "data");
 var library = builder.Configuration["Mono:LibraryRoot"] ?? Path.Combine(data, "library");
+// Mono:LibraryRoots 배열이 우선. 없으면 기존 단수 Mono:LibraryRoot 를 그대로 쓴다.
+var configuredRoots = builder.Configuration.GetSection("Mono:LibraryRoots").Get<string[]>() ?? [];
+var libraryRoots = configuredRoots.Length > 0 ? configuredRoots.ToList() : new List<string> { library };
 var art = Path.Combine(data, "art");
 Directory.CreateDirectory(data);
 Directory.CreateDirectory(library);
@@ -40,7 +43,7 @@ builder.Services.AddSingleton(sp => new CommandProcessor(
     sp.GetRequiredService<EndpointRegistry>(),
     sp.GetRequiredService<ZoneRegistry>(),
     sp.GetRequiredService<WikipediaService>(),
-    library));
+    libraryRoots));
 builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSignalR().AddJsonProtocol(o =>
     o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
