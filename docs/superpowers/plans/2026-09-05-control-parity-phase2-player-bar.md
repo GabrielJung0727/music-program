@@ -47,7 +47,7 @@
 **Interfaces:**
 - Produces: `Mono.Warn` · `Mono.Bad` 정적 리소스. 이후 태스크가 `{DynamicResource Mono.Warn}`로 쓴다.
 
-- [ ] **Step 1: Light 딕셔너리에 추가**
+- [x] **Step 1: Light 딕셔너리에 추가**
 
 `<SolidColorBrush x:Key="Mono.GhostFg" Color="#1A1A1E"/>` 아래에:
 
@@ -56,7 +56,7 @@
           <SolidColorBrush x:Key="Mono.Bad" Color="#CC4444"/>
 ```
 
-- [ ] **Step 2: Dark 딕셔너리에 추가**
+- [x] **Step 2: Dark 딕셔너리에 추가**
 
 `<SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F5"/>` 아래에:
 
@@ -65,7 +65,7 @@
           <SolidColorBrush x:Key="Mono.Bad" Color="#EE8888"/>
 ```
 
-- [ ] **Step 3: 빌드**
+- [x] **Step 3: 빌드**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -73,7 +73,7 @@ dotnet build Mono.slnx -v q --nologo
 
 기대: 경고 0, 오류 0.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/Mono.Control/App.axaml
@@ -100,7 +100,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `static IReadOnlyList<HeatBand> SeekLayers.Bands(IEnumerable<SnapshotHeatBucket> buckets, long durationMs)`
   - `static IReadOnlyList<PinMark> SeekLayers.Marks(IEnumerable<SnapshotPin> pins, long durationMs)`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/SeekLayerTests.cs`:
 
@@ -177,7 +177,7 @@ public class SeekLayerTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter SeekLayerTests
@@ -185,7 +185,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter SeekLayerTests
 
 기대: 컴파일 실패 — `SeekLayers`가 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `src/Mono.Protocol/SeekLayers.cs`:
 
@@ -237,7 +237,7 @@ public static class SeekLayers
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter SeekLayerTests
@@ -245,7 +245,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter SeekLayerTests
 
 기대: 5개 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Protocol/SeekLayers.cs tests/Mono.Tests/SeekLayerTests.cs
@@ -272,7 +272,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `bool SeekEnabled` (기본 true)
   - `event EventHandler<double>? Seeked` — 사용자가 놓은 위치(ms)
 
-- [ ] **Step 1: 컨트롤을 구현한다**
+- [x] **Step 1: 컨트롤을 구현한다**
 
 `src/Mono.Control/Controls/SeekBar.cs`:
 
@@ -402,7 +402,7 @@ public sealed class SeekBar : Control
 }
 ```
 
-- [ ] **Step 2: 빌드**
+- [x] **Step 2: 빌드**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -410,7 +410,7 @@ dotnet build Mono.slnx -v q --nologo
 
 기대: 경고 0, 오류 0.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add src/Mono.Control/Controls/SeekBar.cs
@@ -434,7 +434,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `MainViewModel.Heatmap` (`IReadOnlyList<SnapshotHeatBucket>`) · `.Pins` (`IReadOnlyList<SnapshotPin>`) · `.SeekingAllowed` (`bool`) · `.SeekBlockedReason` (`string`).
 
-- [ ] **Step 1: 뷰모델에 속성을 추가한다**
+- [x] **Step 1: 뷰모델에 속성을 추가한다**
 
 `MainViewModel.cs`의 `_currentSnapshot` 선언 아래:
 
@@ -449,7 +449,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
 ```
 
-- [ ] **Step 2: 스냅샷에서 채운다**
+- [x] **Step 2: 스냅샷에서 채운다**
 
 `MainViewModel.Messages.cs`의 `ApplyRoomState`에서 `Lounge.ApplySnapshot(snap);` 바로 위에:
 
@@ -459,7 +459,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
         SeekingAllowed = snap.SeekingAllowed;
 ```
 
-- [ ] **Step 3: XAML을 교체한다**
+- [x] **Step 3: XAML을 교체한다**
 
 `MainWindow.axaml` 여는 태그에 네임스페이스를 추가한다:
 
@@ -480,7 +480,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
                            Seeked="OnSeeked"/>
 ```
 
-- [ ] **Step 4: 코드비하인드를 바꾼다**
+- [x] **Step 4: 코드비하인드를 바꾼다**
 
 `MainWindow.axaml.cs`의 `SeekLost` 메서드를 지우고 이걸 넣는다:
 
@@ -494,7 +494,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `using Avalonia.Input;`가 다른 곳에서 쓰이지 않으면 지운다.
 
-- [ ] **Step 5: 빌드하고 띄운다**
+- [x] **Step 5: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -504,7 +504,7 @@ dotnet run --project src/Mono.Control
 확인: 하단 시크바가 그려진다 · 재생 중 채움이 움직인다 · 클릭하면 그 위치로 이동한다.
 Audiophile 룸을 만들면 핸들이 사라지고 클릭이 먹지 않으며 툴팁에 사유가 뜬다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -531,7 +531,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `Mono.Control.ViewModels.OutputDevice` — `PeerId` `Name` `Badge` `Note` `VolumePercent` `HardwareVolume` `Spectator` `Caps`
   - `MainViewModel.Outputs` (`ObservableCollection<OutputDevice>`) · `.SelectedOutput` · `.Volume` · `.VolumeEnabled` · `.VolumeBlockedReason` · `.OutputChip`
 
-- [ ] **Step 1: 장치 모델을 만든다**
+- [x] **Step 1: 장치 모델을 만든다**
 
 `src/Mono.Control/ViewModels/OutputDevice.cs`:
 
@@ -571,7 +571,7 @@ public sealed class OutputDevice
 }
 ```
 
-- [ ] **Step 2: 뷰모델에 상태를 더한다**
+- [x] **Step 2: 뷰모델에 상태를 더한다**
 
 `MainViewModel.cs`의 `_pins` 아래:
 
@@ -601,7 +601,7 @@ public sealed class OutputDevice
     }
 ```
 
-- [ ] **Step 3: 스냅샷에서 채운다**
+- [x] **Step 3: 스냅샷에서 채운다**
 
 `MainViewModel.Messages.cs`의 `ApplyRoomState`에서 `Heatmap = snap.Heatmap;` 아래:
 
@@ -632,7 +632,7 @@ public sealed class OutputDevice
         }
 ```
 
-- [ ] **Step 4: 하단 바 우측을 다시 짠다**
+- [x] **Step 4: 하단 바 우측을 다시 짠다**
 
 `MainWindow.axaml`의 `Grid.Column="2"` `StackPanel`(RoomChip·SyncText·SignalPathText·출력 연결 버튼이 있는 곳)의 내용을 이걸로 바꾼다:
 
@@ -706,7 +706,7 @@ public sealed class OutputDevice
           </StackPanel>
 ```
 
-- [ ] **Step 5: 볼륨 커밋 핸들러를 더한다**
+- [x] **Step 5: 볼륨 커밋 핸들러를 더한다**
 
 `MainWindow.axaml.cs`의 `OnSeeked` 아래:
 
@@ -720,7 +720,7 @@ public sealed class OutputDevice
 
 `using Avalonia.Input;`가 필요하다 — 지웠다면 되돌린다.
 
-- [ ] **Step 6: 빌드하고 띄운다**
+- [x] **Step 6: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -730,7 +730,7 @@ dotnet run --project src/Mono.Control
 확인: 하단 우측에 시그널 패스 칩·출력 칩·볼륨이 뜬다 · 「출력 연결」 후 장치가 목록에 나타난다 ·
 볼륨을 움직이고 놓으면 반영된다 · Audiophile 룸에서는 슬라이더가 비활성이고 툴팁에 사유가 뜬다.
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -757,7 +757,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces: `Mono.Control.ViewModels.ZoneItem` (`Id` `Name` `Mode` `ModeLabel` `MemberSummary`) ·
   `MainViewModel.Zones` (`ObservableCollection<ZoneItem>`).
 
-- [ ] **Step 1: 존 모델을 만든다**
+- [x] **Step 1: 존 모델을 만든다**
 
 `src/Mono.Control/ViewModels/ZoneItem.cs` — Core `ZonesMessage`의 형태를 그대로 받는다:
 
@@ -792,7 +792,7 @@ public sealed class ZoneMember
 }
 ```
 
-- [ ] **Step 2: 뷰모델에 목록을 더한다**
+- [x] **Step 2: 뷰모델에 목록을 더한다**
 
 `MainViewModel.cs`의 `public ObservableCollection<OutputDevice> Outputs { get; } = new();` 아래:
 
@@ -800,7 +800,7 @@ public sealed class ZoneMember
     public ObservableCollection<ZoneItem> Zones { get; } = new();
 ```
 
-- [ ] **Step 3: `list_zones` 응답을 받는다**
+- [x] **Step 3: `list_zones` 응답을 받는다**
 
 `MainViewModel.Messages.cs`의 `HandleMessage` switch에 케이스를 더한다:
 
@@ -828,7 +828,7 @@ public sealed class ZoneMember
 
 `MainViewModel.Messages.cs` 상단에 `using Mono.Control.ViewModels;`는 필요 없다 — 같은 네임스페이스다.
 
-- [ ] **Step 4: 하단 바가 열릴 때 존을 조회한다**
+- [x] **Step 4: 하단 바가 열릴 때 존을 조회한다**
 
 `MainViewModel.cs`의 `SelectOutputAsync` 아래에 더한다:
 
@@ -841,7 +841,7 @@ public sealed class ZoneMember
 Task 5 Step 4에서 만든 출력 칩 `Button`에 `Click` 대신 Flyout 열림을 쓰기 어려우므로,
 칩 버튼에 `Command="{Binding RefreshZonesCommand}"`를 더한다. Flyout은 그대로 열린다.
 
-- [ ] **Step 5: 장치 플라이아웃에 존 구역을 더한다**
+- [x] **Step 5: 장치 플라이아웃에 존 구역을 더한다**
 
 Task 5 Step 4의 출력 플라이아웃 `StackPanel` 안, 「이 PC에 출력 연결」 버튼 **위에** 넣는다:
 
@@ -866,7 +866,7 @@ Task 5 Step 4의 출력 플라이아웃 `StackPanel` 안, 「이 PC에 출력 �
 
 존을 **만들고 편집하는** UI는 5단계(존 관리)다. 여기서는 하단 바에서 현재 존 구성을 보는 것까지다.
 
-- [ ] **Step 6: 빌드하고 띄운다**
+- [x] **Step 6: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -875,7 +875,7 @@ dotnet run --project src/Mono.Control
 
 확인: Audio 화면에서 존을 만든 뒤 하단 출력 칩을 누르면 플라이아웃에 존이 모드·기기 수와 함께 뜬다.
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -897,7 +897,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `CoreSession.ReactAsync` · `Lounge.QueueTracks` · `CoreSession.RemoveQueueAsync` · `JumpToAsync` (1단계).
 - Produces: `MainViewModel.HeartCount` · `.HeartsLeft` · `.CanReact` · `.ReactBlockedReason` · `.ShowQueue` · `HeartCommand` · `ToggleQueueCommand` · `RemoveFromQueueCommand` · `JumpToQueueCommand`.
 
-- [ ] **Step 1: 뷰모델에 상태를 더한다**
+- [x] **Step 1: 뷰모델에 상태를 더한다**
 
 `MainViewModel.cs`의 `_outputChip` 아래:
 
@@ -943,7 +943,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 스냅샷에서 하트 수를 센다**
+- [x] **Step 2: 스냅샷에서 하트 수를 센다**
 
 `MainViewModel.Messages.cs`의 `ApplyRoomState`에서 `SeekingAllowed = snap.SeekingAllowed;` 아래:
 
@@ -957,7 +957,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
         OnPropertyChanged(nameof(ReactBlockedReason));
 ```
 
-- [ ] **Step 3: 하단 바 좌측에 ♥를, 중앙에 큐 토글을 더한다**
+- [x] **Step 3: 하단 바 좌측에 ♥를, 중앙에 큐 토글을 더한다**
 
 `MainWindow.axaml`에서 좌측 `Button`(아트·제목) 을 감싼 `StackPanel Grid.Column="0"` 뒤, 같은 셀 안에 ♥를 붙인다.
 좌측 셀의 `<Button Classes="ghost" ... OpenNowPlayingCommand>` 를 아래 `Grid`로 감싼다:
@@ -988,7 +988,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
               </Button>
 ```
 
-- [ ] **Step 4: 큐 드로어를 더한다**
+- [x] **Step 4: 큐 드로어를 더한다**
 
 `MainWindow.axaml` 최상위 `<Grid>` 안, 몰입 Now Playing `<Border>` **앞에** 넣는다(온보딩·몰입이 위에 오도록):
 
@@ -1031,7 +1031,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     </Border>
 ```
 
-- [ ] **Step 5: 빌드하고 띄운다**
+- [x] **Step 5: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1042,7 +1042,7 @@ dotnet run --project src/Mono.Control
 비활성 + "이 곡에는 이미 3번 반응했습니다" 툴팁 · 「큐」 버튼으로 드로어가 열리고 ✕ 로 제거,
 곡을 누르면 그 곡으로 이동 · 하트를 남긴 위치가 시크바 히트맵에 나타난다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -1055,13 +1055,17 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 2단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 70개 통과 (1단계 65 + 시크 레이어 5)
-- [ ] 출력 플라이아웃에 존 목록이 모드·기기 수와 함께 보인다
-- [ ] 하단 바에 문서 §3.2의 요소가 전부 있다: 아트·곡명·아티스트·**♥** / prev·play·next·**시크(+히트맵+핀)**·**큐 토글** / **시그널 패스**·**출력 존/장치**·**볼륨**·라운지 칩
-- [ ] Audiophile 룸에서 볼륨 슬라이더와 시크바가 비활성이고 각각 사유 툴팁이 뜬다
-- [ ] ♥ 4회째가 비활성 + 사유 툴팁
-- [ ] 콘솔 창 0개
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **70개** 통과 (1단계 65 + 시크 레이어 5)
+- [x] 하단 바에 문서 §3.2의 요소가 전부 있다 — 아트·곡명·아티스트·♥ / prev·play·next·시크(+히트맵+핀)·큐 토글 / 시그널 패스·출력 존/장치·볼륨·라운지 칩
+- [x] 출력 플라이아웃에 존 목록이 모드·기기 수와 함께 보인다
+- [x] 정책 사유 툴팁 3종(`SeekBlockedReason` · `VolumeBlockedReason` · `ReactBlockedReason`)이 바인딩돼 있다
+- [x] 콘솔 창 0개 — 앱 기동 시 stdout/stderr 비어 있음
+
+**검증하지 못한 것:** 화면 제어 권한이 거부되어 **실제 렌더 결과를 눈으로 확인하지 못했다.**
+확인된 것은 (1) 컴파일된 바인딩이라 잘못된 바인딩 경로는 빌드가 잡는다, (2) 앱이 예외 없이 뜨고
+Core에 붙는다, (3) 좌표 계산은 단위 테스트로 고정됐다 — 여기까지다.
+**레이아웃 정렬·색 대비·클릭 동작은 사람이 한 번 봐야 한다.**
 
 ## 다음 단계
 
