@@ -44,12 +44,55 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <TextBlock Text="선곡 요청" FontWeight="SemiBold" Margin="0,16,0,6"
+                           IsVisible="{Binding Requests.Count}"/>
+                <ItemsControl ItemsSource="{Binding Requests}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:RequestEntry">
+                      <Border Classes="trackcard" Margin="0,0,0,4" Padding="10">
+                        <DockPanel>
+                          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4"
+                                      VerticalAlignment="Center">
+                            <Button Classes="primary" Content="승인" Padding="10,2" FontSize="11"
+                                    Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).ApproveCommand}"
+                                    CommandParameter="{Binding}"/>
+                            <Button Classes="ghost" Content="거절" Padding="10,2" FontSize="11"
+                                    Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RejectCommand}"
+                                    CommandParameter="{Binding}"/>
+                          </StackPanel>
+                          <StackPanel>
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding FromName}" Classes="muted" FontSize="11"/>
+                          </StackPanel>
+                        </DockPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <TextBlock Text="큐" FontWeight="SemiBold" Margin="0,16,0,6"/>
                 <Button Classes="ghost" Content="큐 비우기" Command="{Binding ClearQueueCommand}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
                 <ItemsControl ItemsSource="{Binding QueueTracks}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:CatalogTrack">
-                      <TextBlock Margin="0,2" Text="{Binding Title}"/>
+                      <DockPanel Margin="0,2">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
+                                    VerticalAlignment="Center">
+                          <Button Classes="ghost" Content="▲" Padding="6,2" FontSize="11" ToolTip.Tip="위로"
+                                  Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MoveUpCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <Button Classes="ghost" Content="▼" Padding="6,2" FontSize="11" ToolTip.Tip="아래로"
+                                  Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MoveDownCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <Button Classes="ghost" Content="▶" Padding="6,2" FontSize="11" ToolTip.Tip="이 곡으로"
+                                  Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).JumpToCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <Button Classes="ghost" Content="✕" Padding="6,2" FontSize="11" ToolTip.Tip="제거"
+                                  Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RemoveFromQueueCommand}"
+                                  CommandParameter="{Binding}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                      </DockPanel>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>

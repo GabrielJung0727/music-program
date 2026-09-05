@@ -201,4 +201,58 @@ public sealed partial class LoungeViewModel : PageViewModel
 
     [RelayCommand]
     private Task ApplyMaxMembersAsync() => Safe(() => Session.SetRoomFlagAsync("max", index: MaxMembers));
+
+    // ── 큐 협업 ─────────────────────────────────────────
+    [RelayCommand]
+    private Task ApproveAsync(RequestEntry? r)
+        => r is null ? Task.CompletedTask : Safe(() => Session.ApproveRequestAsync(r.Id));
+
+    [RelayCommand]
+    private Task RejectAsync(RequestEntry? r)
+        => r is null ? Task.CompletedTask : Safe(() => Session.RejectRequestAsync(r.Id));
+
+    [RelayCommand]
+    private Task MoveUpAsync(CatalogTrack? t) => MoveAsync(t, -1);
+
+    [RelayCommand]
+    private Task MoveDownAsync(CatalogTrack? t) => MoveAsync(t, 1);
+
+    private Task MoveAsync(CatalogTrack? track, int delta)
+    {
+        var i = track is null ? -1 : QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => Session.MoveQueueAsync(i, delta));
+    }
+
+    [RelayCommand]
+    private Task RemoveFromQueueAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => Session.RemoveQueueAsync(i));
+    }
+
+    [RelayCommand]
+    private Task JumpToAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => Session.JumpToAsync(i));
+    }
+
+    // ── 핀 ──────────────────────────────────────────────
+    [RelayCommand]
+    private Task AddPinAsync()
+    {
+        var text = PinText.Trim();
+        if (text.Length == 0) return Task.CompletedTask;
+        PinText = "";
+        return Safe(() => Session.PinAsync(CurrentMediaMs, text));
+    }
+
+    [RelayCommand]
+    private Task RemovePinAsync(PinEntry? pin)
+        => pin is null ? Task.CompletedTask : Safe(() => Session.RemovePinAsync(pin.Id));
+
+    /// <summary>핀 위치로 이동. 시킹이 잠긴 룸이면 Core 가 사유를 돌려준다.</summary>
+    [RelayCommand]
+    private Task SeekPinAsync(PinEntry? pin)
+        => pin is null ? Task.CompletedTask : Safe(() => Session.SeekPinAsync(pin.Id));
 }
