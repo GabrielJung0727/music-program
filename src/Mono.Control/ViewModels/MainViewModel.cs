@@ -32,6 +32,7 @@ public partial class MainViewModel : ObservableObject
         _session = session;
         _supervisor = supervisor;
         Lounge = new LoungeViewModel(session);
+        Lounge.SelfPeerId = session.PeerId;
         Audio = new AudioViewModel(session);
         Library = new LibraryViewModel(session);
         _session.MessageReceived += OnMessage;
