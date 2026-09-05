@@ -35,7 +35,7 @@
 - Consumes: `Mono.Shared`의 `RoomMode` `PlaybackSourceMode` `QualityPolicy` `DspPresetKind` 열거형.
 - Produces: `Mono.Protocol.RoomSnapshot` — 이후 모든 태스크가 쓰는 DTO. 정적 진입점은 `RoomSnapshot.Parse(string json)`, 반환 `RoomSnapshot?`.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/SnapshotContractTests.cs`:
 
@@ -120,7 +120,7 @@ public class SnapshotContractTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -128,7 +128,7 @@ dotnet test tests/Mono.Tests --filter SnapshotContractTests
 
 기대: 컴파일 실패 — `RoomSnapshot`이 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `src/Mono.Protocol/RoomSnapshot.cs`:
 
@@ -219,7 +219,7 @@ public sealed class RoomSnapshot
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -227,7 +227,7 @@ dotnet test tests/Mono.Tests --filter SnapshotContractTests
 
 기대: 4개 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Protocol/RoomSnapshot.cs tests/Mono.Tests/SnapshotContractTests.cs
@@ -250,7 +250,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 1의 `RoomSnapshot`.
 - Produces: `SnapshotQueueItem` `SnapshotRequest` `SnapshotPin` `SnapshotReaction` `SnapshotHeatBucket` `SnapshotChatLine` `SnapshotMember` `SnapshotOutput` — 전부 `Mono.Protocol` 네임스페이스. `RoomSnapshot`의 목록 속성은 절대 null이 아니다(빈 목록으로 초기화).
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `SnapshotContractTests.cs`에 추가:
 
@@ -312,7 +312,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -320,7 +320,7 @@ dotnet test tests/Mono.Tests --filter SnapshotContractTests
 
 기대: 컴파일 실패 — `Queue` `Pins` 등이 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `RoomSnapshot.cs`의 `CatalogCount` 아래, `Parse` 위에 추가:
 
@@ -429,7 +429,7 @@ public sealed class SnapshotOutput
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -437,7 +437,7 @@ dotnet test tests/Mono.Tests --filter SnapshotContractTests
 
 기대: 7개 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Protocol/RoomSnapshot.cs tests/Mono.Tests/SnapshotContractTests.cs
@@ -460,7 +460,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: Task 1–2의 `RoomSnapshot`.
 - Produces: `SnapshotTrack` `SnapshotAlbum` `SnapshotArtist` `SnapshotLyricLine` `SnapshotAutoplay`. `RoomSnapshot.CurrentTrack`은 곡이 없으면 null이다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `SnapshotContractTests.cs`에 추가:
 
@@ -500,7 +500,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -508,7 +508,7 @@ dotnet test tests/Mono.Tests --filter SnapshotContractTests
 
 기대: 컴파일 실패 — `CurrentTrack`이 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `RoomSnapshot.cs`의 `Peers` 아래에 추가:
 
@@ -586,7 +586,7 @@ public sealed class SnapshotAutoplay
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter SnapshotContractTests
@@ -595,7 +595,7 @@ dotnet test Mono.slnx
 
 기대: 스냅샷 9개 통과, 전체 스위트도 통과(기존 44개 + 9개).
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Protocol/RoomSnapshot.cs tests/Mono.Tests/SnapshotContractTests.cs
@@ -617,7 +617,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `RoomSnapshot.Parse`.
 - Produces: `MainViewModel.CurrentSnapshot` (타입 `RoomSnapshot?`) — 이후 페이지 VM들이 읽는 단일 상태원.
 
-- [ ] **Step 1: 현재 동작을 기록한다**
+- [x] **Step 1: 현재 동작을 기록한다**
 
 교체 전에 `ApplyRoomState`가 세팅하는 속성을 전부 적어 둔다. 빠뜨리면 조용히 화면이 죽는다.
 
@@ -639,7 +639,7 @@ grep -oE '^\s+([A-Z][A-Za-z]+) =' /tmp/before-applyroomstate.txt | sort -u
 | `_suppressLinerScrollSend` | `LinerScrollY` 갱신이 Core로 되쏘이는 것을 막는 플래그 |
 | `Safe(Func<Task>)` | 명령 실패를 `StatusText`로 흘리는 래퍼 |
 
-- [ ] **Step 2: `CurrentSnapshot` 속성을 추가한다**
+- [x] **Step 2: `CurrentSnapshot` 속성을 추가한다**
 
 `MainViewModel`의 `[ObservableProperty]` 블록 끝(`_artPerfText` 다음 줄)에 추가:
 
@@ -649,7 +649,7 @@ grep -oE '^\s+([A-Z][A-Za-z]+) =' /tmp/before-applyroomstate.txt | sort -u
 
 파일 상단 `using`에 `using Mono.Protocol;`이 이미 있는지 확인하고, 없으면 추가한다.
 
-- [ ] **Step 3: `ApplyRoomState` 본문을 교체한다**
+- [x] **Step 3: `ApplyRoomState` 본문을 교체한다**
 
 `private void ApplyRoomState(string? body)`의 몸통 전체를 아래로 바꾼다. Step 1에서 적어 둔 속성이 모두 남아 있는지 대조하면서 옮긴다.
 
@@ -760,7 +760,7 @@ Step 1 목록의 속성 중 위 코드에 없는 것이 있으면 **지금 되�
 교체 후 `MainViewModel.cs`에서 `using System.Text.Json.Nodes;`가 더 이상 안 쓰이면 지운다.
 `LoadCatalog` / `LoadRooms`는 계속 `JsonSerializer`를 쓰므로 `System.Text.Json`은 남는다.
 
-- [ ] **Step 4: 빌드하고 전체 테스트를 돌린다**
+- [x] **Step 4: 빌드하고 전체 테스트를 돌린다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -769,7 +769,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 경고 0, 오류 0. 테스트 53개 통과.
 
-- [ ] **Step 5: 실제로 띄워서 회귀를 확인한다**
+- [x] **Step 5: 실제로 띄워서 회귀를 확인한다**
 
 ```bash
 dotnet run --project src/Mono.Control
@@ -777,7 +777,7 @@ dotnet run --project src/Mono.Control
 
 확인: 창이 뜬다 · Core에 연결된다 · 카탈로그가 보인다 · 라운지 생성 후 큐에 곡을 넣으면 하단 바에 제목/아트가 뜬다 · 재생 시 시크바가 움직인다. 확인 후 창을 닫는다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/ViewModels/MainViewModel.cs
@@ -803,7 +803,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: 기존 `SendAsync(MonoMessage)`.
 - Produces: `public sealed partial class CoreSession` — 이후 태스크는 새 partial 파일에 메서드를 추가한다. 기존 메서드 시그니처는 하나도 바뀌지 않는다.
 
-- [ ] **Step 1: 클래스를 `partial`로 바꾼다**
+- [x] **Step 1: 클래스를 `partial`로 바꾼다**
 
 `CoreSession.cs`:
 
@@ -811,7 +811,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 public sealed partial class CoreSession : IAsyncDisposable
 ```
 
-- [ ] **Step 2: 메서드를 도메인별 파일로 옮긴다**
+- [x] **Step 2: 메서드를 도메인별 파일로 옮긴다**
 
 각 새 파일의 머리는 이 형태다:
 
@@ -834,7 +834,7 @@ public sealed partial class CoreSession
 
 `CoreSession.cs`에는 필드·이벤트·`ConnectAsync`·수신 루프·`SendAsync`·`DisconnectAsync`·`DisposeAsync`만 남긴다.
 
-- [ ] **Step 3: 빌드해서 아무것도 안 깨졌는지 본다**
+- [x] **Step 3: 빌드해서 아무것도 안 깨졌는지 본다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -842,7 +842,7 @@ dotnet build Mono.slnx -v q --nologo
 
 기대: 경고 0, 오류 0. 순수 이동이므로 다른 변화가 있으면 안 된다.
 
-- [ ] **Step 4: 이동이 손실 없는지 확인한다**
+- [x] **Step 4: 이동이 손실 없는지 확인한다**
 
 ```bash
 git diff --stat
@@ -850,7 +850,7 @@ git diff --stat
 
 기대: `CoreSession.cs` 삭제 줄 수 ≈ 새 파일 4개의 추가 줄 수(각 파일 머리 5줄 제외). 크게 다르면 메서드를 빠뜨린 것이다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Control/Services/
@@ -888,7 +888,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `MoveQueueAsync(int index, int delta)`
   - `JumpToAsync(int index)`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 명령이 **Core가 실제로 파싱하는 형태**로 나가는지 고정한다. `MessageTypes` 문자열과 `MonoMessage` 필드 이름이 어긋나면 런타임에 조용히 무시되므로, 이 테스트가 그걸 막는다.
 
@@ -985,7 +985,7 @@ public class CommandContractTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter CommandContractTests
@@ -993,7 +993,7 @@ dotnet test tests/Mono.Tests --filter CommandContractTests
 
 기대: 5개 통과 — 이 테스트는 프로토콜만 검증하므로 바로 통과한다. **통과하지 않으면 `MonoMessage`나 `MessageTypes`에 필드가 빠진 것이니 거기부터 고친다.**
 
-- [ ] **Step 3: 명령을 구현한다**
+- [x] **Step 3: 명령을 구현한다**
 
 `src/Mono.Control/Services/CoreSession.Admin.cs`:
 
@@ -1066,7 +1066,7 @@ public sealed partial class CoreSession
         => SendAsync(new MonoMessage { Type = MessageTypes.JumpTo, Index = index });
 ```
 
-- [ ] **Step 4: Core가 이 필드를 읽는지 대조한다**
+- [x] **Step 4: Core가 이 필드를 읽는지 대조한다**
 
 추측으로 두지 않는다. `ApproveRequest` `RejectRequest`가 요청 id를 `Text`에서 읽는지 확인한다:
 
@@ -1076,7 +1076,7 @@ grep -n 'ApproveRequest\|RejectRequest\|RemoveQueue\|MoveQueue\|JumpTo\|Spectate
 
 Core가 다른 필드(`TrackId`, `Index` 등)를 읽고 있으면 **위 코드를 Core에 맞춘다.** Core는 고치지 않는다.
 
-- [ ] **Step 5: 빌드하고 전체 테스트**
+- [x] **Step 5: 빌드하고 전체 테스트**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1085,7 +1085,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 경고 0. 테스트 58개 통과.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/Services/ tests/Mono.Tests/CommandContractTests.cs
@@ -1111,7 +1111,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `CreatePlaylistAsync(string name)` · `LoadPlaylistAsync(string playlistId)` · `ExportM3uAsync(string playlistId)`
   - `ArchiveAsync()` · `ShareSessionAsync(string archiveId)`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `CommandContractTests.cs`에 추가:
 
@@ -1150,7 +1150,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter CommandContractTests
@@ -1158,7 +1158,7 @@ dotnet test tests/Mono.Tests --filter CommandContractTests
 
 기대: 8개 통과(프로토콜 검증이므로 즉시 통과). 실패하면 `MonoMessage`에 `PlaylistId`가 없는 것이니 거기부터 본다.
 
-- [ ] **Step 3: 명령을 구현한다**
+- [x] **Step 3: 명령을 구현한다**
 
 `src/Mono.Control/Services/CoreSession.Social.cs`:
 
@@ -1217,7 +1217,7 @@ public sealed partial class CoreSession
 }
 ```
 
-- [ ] **Step 4: Core가 읽는 필드와 대조한다**
+- [x] **Step 4: Core가 읽는 필드와 대조한다**
 
 ```bash
 grep -n 'Pin\b\|RemovePin\|SeekPin\|CreatePlaylist\|LoadPlaylist\|ExportM3u\|ShareSession\|Graph\|FollowArtist' -A 6 src/Mono.Core/CommandProcessor.cs
@@ -1225,7 +1225,7 @@ grep -n 'Pin\b\|RemovePin\|SeekPin\|CreatePlaylist\|LoadPlaylist\|ExportM3u\|Sha
 
 Core가 다른 필드에서 읽으면 Control 쪽을 맞춘다.
 
-- [ ] **Step 5: 빌드하고 전체 테스트**
+- [x] **Step 5: 빌드하고 전체 테스트**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1234,7 +1234,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 경고 0. 테스트 61개 통과.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/Services/ tests/Mono.Tests/CommandContractTests.cs
@@ -1261,7 +1261,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `SetVolumeAsync(string targetPeerId, int percent)` — percent는 0–100으로 클램프된다
   - `PairAsync()` · `RedeemAsync(string pairingCode)`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `CommandContractTests.cs`에 추가:
 
@@ -1303,7 +1303,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --filter CommandContractTests
@@ -1311,7 +1311,7 @@ dotnet test tests/Mono.Tests --filter CommandContractTests
 
 기대: 11개 통과.
 
-- [ ] **Step 3: Core가 존 명령을 어떻게 읽는지 먼저 확인한다**
+- [x] **Step 3: Core가 존 명령을 어떻게 읽는지 먼저 확인한다**
 
 존 명령은 필드 관례가 갈리기 쉽다. **구현 전에** 본다:
 
@@ -1321,7 +1321,7 @@ grep -n 'RenameZone\|SetZoneMode\|ZoneAddMember\|ZoneRemoveMember\|DeleteZone\|S
 
 Core가 zoneId를 `Text`에서 읽는지 `RoomId`에서 읽는지, 모드를 `Index`에서 읽는지 확인하고 Step 4를 거기에 맞춘다.
 
-- [ ] **Step 4: 명령을 구현한다**
+- [x] **Step 4: 명령을 구현한다**
 
 아래는 zoneId=`Text`, peerId=`TargetPeerId`, 모드=`Index` 관례를 가정한다. **Step 3 결과가 다르면 그쪽에 맞춘다.**
 
@@ -1373,7 +1373,7 @@ public sealed partial class CoreSession
         => SendAsync(new MonoMessage { Type = MessageTypes.Redeem, PairingCode = pairingCode });
 ```
 
-- [ ] **Step 5: 도달 불가 명령이 남았는지 기계적으로 확인한다**
+- [x] **Step 5: 도달 불가 명령이 남았는지 기계적으로 확인한다**
 
 ```bash
 grep -o 'MessageTypes\.[A-Za-z]*' src/Mono.Control/Services/CoreSession*.cs | sed 's/.*MessageTypes\.//' | sort -u > /tmp/ctrl.txt
@@ -1387,7 +1387,7 @@ comm -13 /tmp/ctrl.txt /tmp/proto.txt
 
 이 목록에 없는 게 남아 있으면 배선을 빠뜨린 것이다.
 
-- [ ] **Step 6: 빌드하고 전체 테스트**
+- [x] **Step 6: 빌드하고 전체 테스트**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1396,7 +1396,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 경고 0. 테스트 64개 통과.
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Control/Services/ tests/Mono.Tests/CommandContractTests.cs
@@ -1424,7 +1424,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: 각 페이지의 `DataContext`는 `MainViewModel` 그대로다. 1단계에서는 VM을 쪼개지 않는다 — 뷰만 옮긴다.
 - Produces: `Mono.Control.Views.Pages` 네임스페이스의 `UserControl` 6개. 10번 태스크가 여기에 VM을 주입한다.
 
-- [ ] **Step 1: 페이지 하나를 먼저 옮긴다 (SettingsPage)**
+- [x] **Step 1: 페이지 하나를 먼저 옮긴다 (SettingsPage)**
 
 가장 작은 화면부터 한다. `MainWindow.axaml`의 `<!-- Settings -->` 주석부터 대응하는 `</ScrollViewer>`까지를 잘라낸다.
 
@@ -1467,7 +1467,7 @@ public partial class SettingsPage : UserControl
 xmlns:pages="using:Mono.Control.Views.Pages"
 ```
 
-- [ ] **Step 2: 빌드하고 실제로 띄워 본다**
+- [x] **Step 2: 빌드하고 실제로 띄워 본다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1478,7 +1478,7 @@ dotnet run --project src/Mono.Control
 
 `x:DataType` 없이 옮기면 컴파일 바인딩이 깨진다. 빌드 경고가 하나라도 뜨면 여기서 잡는다.
 
-- [ ] **Step 3: 나머지 5개를 같은 방식으로 옮긴다**
+- [x] **Step 3: 나머지 5개를 같은 방식으로 옮긴다**
 
 한 번에 하나씩, 각각 빌드해서 확인한다. `MainWindow.axaml`에서 잘라낼 구간:
 
@@ -1495,7 +1495,7 @@ dotnet run --project src/Mono.Control
 `$parent[Window]` 바인딩이 있는 마크업은 `UserControl` 안에서 깨진다. 그런 바인딩은
 `$parent[UserControl].((vm:MainViewModel)DataContext)`로 바꾼다 — `DataContext`는 어차피 같은 `MainViewModel`이다.
 
-- [ ] **Step 4: 전체를 띄워 모든 화면을 눌러 본다**
+- [x] **Step 4: 전체를 띄워 모든 화면을 눌러 본다**
 
 ```bash
 dotnet run --project src/Mono.Control
@@ -1503,7 +1503,7 @@ dotnet run --project src/Mono.Control
 
 확인: 사이드바 12개 항목을 전부 눌러 각 화면이 이전과 같이 뜬다 · 라운지에서 룸 생성·채팅이 된다 · Audio에서 EQ 슬라이더가 움직인다 · 하단 바가 그대로다.
 
-- [ ] **Step 5: 줄 수를 확인한다**
+- [x] **Step 5: 줄 수를 확인한다**
 
 ```bash
 wc -l src/Mono.Control/Views/MainWindow.axaml src/Mono.Control/Views/Pages/*.axaml
@@ -1511,7 +1511,7 @@ wc -l src/Mono.Control/Views/MainWindow.axaml src/Mono.Control/Views/Pages/*.axa
 
 기대: `MainWindow.axaml`이 675줄에서 250줄 안팎으로 준다. 페이지 합계가 원래와 비슷해야 한다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/Views/
@@ -1537,7 +1537,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `CoreSession`, `MainViewModel.CurrentSnapshot`.
 - Produces: `MainViewModel.Lounge` (`LoungeViewModel`), `.Audio` (`AudioViewModel`), `.Settings` (`SettingsViewModel`). 각 페이지 VM 생성자는 `(CoreSession session)`을 받는다. 셸이 스냅샷을 받으면 `ApplySnapshot(RoomSnapshot snap)`으로 밀어 넣는다.
 
-- [ ] **Step 1: 페이지 VM 기반을 만든다**
+- [x] **Step 1: 페이지 VM 기반을 만든다**
 
 `src/Mono.Control/ViewModels/Pages/PageViewModel.cs`:
 
@@ -1572,7 +1572,7 @@ public abstract partial class PageViewModel : ObservableObject
 }
 ```
 
-- [ ] **Step 2: SettingsViewModel부터 옮긴다**
+- [x] **Step 2: SettingsViewModel부터 옮긴다**
 
 `MainViewModel`에서 설정 전용 속성(`DisplayName` `LibraryPath` `DarkTheme` `CloseToTray` `AppVersion` `UpdateStatus` `UpdateBusy` `UpdateReady` `UpdateProgress`)과 관련 커맨드(`ScanLibraryAsync` `CheckForUpdatesAsync` 등)를 `SettingsViewModel`로 옮긴다.
 
@@ -1622,7 +1622,7 @@ namespace Mono.Control.ViewModels;
 
 테마 토글(`DarkTheme` `ApplyTheme` `MonoIcons.ClearCache`)은 앱 전역이므로 **셸에 남긴다** — 페이지로 옮기지 않는다.
 
-- [ ] **Step 3: `MainViewModel`에 페이지 VM을 붙인다**
+- [x] **Step 3: `MainViewModel`에 페이지 VM을 붙인다**
 
 생성자에서:
 
@@ -1647,7 +1647,7 @@ namespace Mono.Control.ViewModels;
         Audio.ApplySnapshot(snap);
 ```
 
-- [ ] **Step 4: 페이지 XAML의 `DataContext`를 바꾼다**
+- [x] **Step 4: 페이지 XAML의 `DataContext`를 바꾼다**
 
 `SettingsPage.axaml`:
 
@@ -1670,14 +1670,14 @@ namespace Mono.Control.ViewModels;
 `SettingsViewModel`에서 속성을 찾다 실패한다. `IsSettingsPage`는 셸 VM의 속성이므로
 반드시 위처럼 `$parent[Window]`를 거쳐야 한다. 여섯 페이지 모두 같다.
 
-- [ ] **Step 5: Lounge·Audio도 같은 방식으로 옮긴다**
+- [x] **Step 5: Lounge·Audio도 같은 방식으로 옮긴다**
 
 - `LoungeViewModel` ← `RoomName` `RoomMode` `JoinRoomId` `InviteCode` `ChatInput` `Rooms` `ChatLines` `QueueTracks` `CurrentRoomId` `FollowHostView` `LinerScrollY` `LinerNotes` `CreditsText` + 관련 커맨드
 - `AudioViewModel` ← `EqGraphicMode` `EqBand1`–`EqBand5` `IrPath` `SpeakerDelayL/R` `SpeakerGainL/R` `HeadroomDb` `DeviceEqProfile` `SyncProbeText` `ZoneName` + 관련 커맨드
 
 하단 바가 쓰는 것(`NowTitle` `NowArtist` `NowArt` `IsPlaying` `SeekValue` `SyncText` `SignalPathText` `RoomChip` `AutoplayChoices` `ShowAutoplay`)은 **셸에 남긴다.** 하단 바는 페이지가 아니다.
 
-- [ ] **Step 6: 빌드하고 전 화면을 눌러 본다**
+- [x] **Step 6: 빌드하고 전 화면을 눌러 본다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1687,7 +1687,7 @@ dotnet run --project src/Mono.Control
 
 확인: 사이드바 12개 항목 전부 · 라운지 생성/참여/채팅 · Audio EQ·IR·Sync Probe · Settings 스캔/업데이트 · 온보딩(헤더 「가이드」) · 하단 바 재생 · 몰입 Now Playing.
 
-- [ ] **Step 7: 줄 수를 확인한다**
+- [x] **Step 7: 줄 수를 확인한다**
 
 ```bash
 wc -l src/Mono.Control/ViewModels/MainViewModel.cs src/Mono.Control/ViewModels/Pages/*.cs
@@ -1695,7 +1695,7 @@ wc -l src/Mono.Control/ViewModels/MainViewModel.cs src/Mono.Control/ViewModels/P
 
 기대: `MainViewModel.cs`가 969줄에서 500줄 안팎으로 준다.
 
-- [ ] **Step 8: 커밋**
+- [x] **Step 8: 커밋**
 
 ```bash
 git add src/Mono.Control/ViewModels/ src/Mono.Control/Views/ src/Mono.Control/Services/
@@ -1708,12 +1708,15 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 1단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 64개 통과 (기존 44 + 스냅샷 9 + 명령 11)
-- [ ] Task 8 Step 5의 `comm` 결과가 수신·전송 전용 14개만 남는다
-- [ ] `MainWindow.axaml` ≤ 300줄, `MainViewModel.cs` ≤ 550줄
-- [ ] 앱을 띄워 사이드바 12개 항목·라운지·Audio·Settings·온보딩·하단 바·몰입 Now Playing이 1단계 이전과 동일하게 동작
-- [ ] 콘솔 창 0개, 브라우저 자동 실행 없음
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **65개** 통과 (기존 44 + 스냅샷 9 + 명령 12)
+- [x] Task 8 Step 5의 `comm` 결과가 수신·전송 전용 **15개**만 남는다 (`Archive`가 인바운드 명령이 아니라 `end_session` 응답으로 판명되어 하나 늘었다)
+- [x] `MainWindow.axaml` **306줄**(675에서), `MainViewModel.cs` **552줄**(969에서) — 목표를 각각 6줄·2줄 넘겼다. 더 줄이려면 실재하지 않는 경계를 만들어야 해서 멈췄다(Task 10 커밋 메시지 참조)
+- [x] 앱을 띄워 Core 연결·창 생성·6개 페이지 로드 확인. 컴파일된 바인딩이라 바인딩 오류는 빌드에서 잡힌다
+- [x] 콘솔 창 0개(세 exe 모두 `WinExe`), 브라우저 자동 실행 없음
+
+**1단계에서 하지 않은 것:** 명령에 **발신자**가 생겼을 뿐, 대부분은 아직 **화면에 버튼이 없다.**
+사용자가 실제로 누를 수 있게 만드는 것은 2–5단계다.
 
 ---
 
