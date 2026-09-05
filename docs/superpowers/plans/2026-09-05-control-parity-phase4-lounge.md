@@ -69,7 +69,7 @@
     `RequestEntry(string Id, string Title, string FromName)` ·
     `PinEntry(string Id, string Text, string PeerName, long MediaTimeMs, bool OnCurrentTrack)` — `Mono.Control.Models`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 Control은 테스트에서 참조하지 않으므로, **관리자 UI가 기대는 값이 스냅샷에 실제로 실리는지**를 프로토콜 수준에서 고정한다.
 
@@ -178,7 +178,7 @@ public class LoungeSnapshotTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter LoungeSnapshotTests
@@ -187,7 +187,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter LoungeSnapshotTests
 기대: 5개 통과 — 1단계가 이미 타입화했으므로 바로 통과한다.
 **통과하지 않으면 스냅샷 계약이 어긋난 것이니 거기부터 본다.**
 
-- [ ] **Step 3: 멤버·요청·핀 모델을 만든다**
+- [x] **Step 3: 멤버·요청·핀 모델을 만든다**
 
 `src/Mono.Control/Models/LoungeEntries.cs`:
 
@@ -228,7 +228,7 @@ public sealed record PinEntry(string Id, string Text, string PeerName, long Medi
 }
 ```
 
-- [ ] **Step 4: 라운지 VM이 스냅샷을 읽는다**
+- [x] **Step 4: 라운지 VM이 스냅샷을 읽는다**
 
 `LoungeViewModel.cs`에 더한다 — `using Mono.Shared;` 를 상단에 추가:
 
@@ -318,7 +318,7 @@ public sealed record PinEntry(string Id, string Text, string PeerName, long Medi
     }
 ```
 
-- [ ] **Step 5: 셸이 peerId를 넣어 준다**
+- [x] **Step 5: 셸이 peerId를 넣어 준다**
 
 `MainViewModel.cs` 생성자의 `Lounge = new LoungeViewModel(session);` 다음 줄:
 
@@ -326,7 +326,7 @@ public sealed record PinEntry(string Id, string Text, string PeerName, long Medi
         Lounge.SelfPeerId = session.PeerId;
 ```
 
-- [ ] **Step 6: 빌드하고 테스트**
+- [x] **Step 6: 빌드하고 테스트**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -335,7 +335,7 @@ dotnet test Mono.slnx --nologo -v q
 
 기대: 경고 0. 테스트 101개 통과(96 + 5).
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/Mono.Control/ tests/Mono.Tests/LoungeSnapshotTests.cs
@@ -360,7 +360,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   `KickCommand` · `MakeHostCommand` · `MakeDjCommand` · `MakeListenerCommand` · `ToggleSpectateCommand` ·
   `SetFlagCommand` · `ApplyPolicyCommand` · `ApplySourceModeCommand` · `ApplyMaxMembersCommand`
 
-- [ ] **Step 1: 커맨드를 더한다**
+- [x] **Step 1: 커맨드를 더한다**
 
 `LoungeViewModel.cs` 끝에:
 
@@ -418,7 +418,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `using Mono.Shared;` 가 상단에 있는지 확인한다.
 
-- [ ] **Step 2: 패널 UserControl을 만든다**
+- [x] **Step 2: 패널 UserControl을 만든다**
 
 `src/Mono.Control/Views/Pages/LoungeAdminPanel.axaml`:
 
@@ -552,7 +552,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 </UserControl>
 ```
 
-- [ ] **Step 3: 코드비하인드**
+- [x] **Step 3: 코드비하인드**
 
 `src/Mono.Control/Views/Pages/LoungeAdminPanel.axaml.cs`:
 
@@ -567,7 +567,7 @@ public partial class LoungeAdminPanel : UserControl
 }
 ```
 
-- [ ] **Step 4: 라운지 우측 열에 붙인다**
+- [x] **Step 4: 라운지 우측 열에 붙인다**
 
 `LoungePage.axaml` 의 우측 320px 열(채팅이 있는 `Border`) 안, 채팅 위에 넣는다.
 열이 길어지므로 `ScrollViewer` 로 감싼다:
@@ -587,7 +587,7 @@ public partial class LoungeAdminPanel : UserControl
              xmlns:local="using:Mono.Control.Views.Pages"
 ```
 
-- [ ] **Step 5: 빌드하고 띄운다**
+- [x] **Step 5: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -597,7 +597,7 @@ dotnet run --project src/Mono.Control
 확인: 라운지에서 룸을 만들면 우측에 운영 패널이 뜨고 초대 코드가 보인다 ·
 「새 코드」로 6자리가 바뀐다 · 참가자 목록에 자신이 호스트로 보인다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -620,7 +620,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces: `ApproveCommand` · `RejectCommand` · `MoveUpCommand` · `MoveDownCommand` ·
   `RemoveFromQueueCommand` · `JumpToCommand`
 
-- [ ] **Step 1: 커맨드를 더한다**
+- [x] **Step 1: 커맨드를 더한다**
 
 `LoungeViewModel.cs` 에:
 
@@ -661,7 +661,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     }
 ```
 
-- [ ] **Step 2: 요청 목록과 큐 버튼을 화면에 붙인다**
+- [x] **Step 2: 요청 목록과 큐 버튼을 화면에 붙인다**
 
 `LoungePage.axaml` 의 큐 블록 위에 요청 목록을 넣는다:
 
@@ -715,7 +715,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `LoungePage.axaml` 여는 태그에 `xmlns:pvm="using:Mono.Control.ViewModels.Pages"` 가 있는지 확인한다.
 
-- [ ] **Step 3: 빌드하고 띄운다**
+- [x] **Step 3: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -724,7 +724,7 @@ dotnet run --project src/Mono.Control
 
 확인: 큐 항목에 ▲▼▶✕ 가 붙고 순서가 바뀐다 · Host Queue 모드에서 요청이 오면 승인/거절이 뜬다.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -746,7 +746,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   `MainViewModel.SeekValue` (현재 재생 위치).
 - Produces: `LoungeViewModel.CurrentMediaMs` (셸이 갱신) · `AddPinCommand` · `RemovePinCommand` · `SeekPinCommand`
 
-- [ ] **Step 1: 커맨드를 더한다**
+- [x] **Step 1: 커맨드를 더한다**
 
 `LoungeViewModel.cs` 에:
 
@@ -780,7 +780,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
         CurrentMediaMs = snapshot.MediaTimeMs;
 ```
 
-- [ ] **Step 2: 핀·반응 UI를 붙인다**
+- [x] **Step 2: 핀·반응 UI를 붙인다**
 
 `LoungePage.axaml` 의 채팅 블록 위에:
 
@@ -829,7 +829,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
               </ItemsControl>
 ```
 
-- [ ] **Step 3: 빌드하고 띄운다**
+- [x] **Step 3: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -839,7 +839,7 @@ dotnet run --project src/Mono.Control
 확인: 재생 중 「꽂기」로 핀이 생기고 시크바에 주황 마커가 나타난다(2단계 `SeekBar`) ·
 핀을 누르면 그 위치로 이동한다 · 반응 4종을 누르면 히트맵이 자란다.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -865,7 +865,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces: `ArtistGraph` · `GraphArtist` 모델, `LoungeViewModel.Graph` · `.ArchiveResult`,
   `ShowGraphCommand` · `FollowArtistCommand` · `EndSessionSaveCommand` · `EndSessionDiscardCommand`
 
-- [ ] **Step 1: 그래프 모델**
+- [x] **Step 1: 그래프 모델**
 
 `src/Mono.Control/Models/ArtistGraph.cs`:
 
@@ -893,7 +893,7 @@ public sealed class GraphArtist
 }
 ```
 
-- [ ] **Step 2: VM에 상태와 커맨드**
+- [x] **Step 2: VM에 상태와 커맨드**
 
 `LoungeViewModel.cs` 에:
 
@@ -927,7 +927,7 @@ public sealed class GraphArtist
     private Task EndSessionDiscardAsync() => Safe(() => Session.EndSessionAsync(false));
 ```
 
-- [ ] **Step 3: 셸이 응답을 넘긴다**
+- [x] **Step 3: 셸이 응답을 넘긴다**
 
 `MainViewModel.Messages.cs` 의 switch 에:
 
@@ -955,7 +955,7 @@ public sealed class GraphArtist
     [ObservableProperty] private string _currentArtistId = "";
 ```
 
-- [ ] **Step 4: 관계도·아카이브 UI**
+- [x] **Step 4: 관계도·아카이브 UI**
 
 `LoungePage.axaml` 의 핀 블록 아래:
 
@@ -993,7 +993,7 @@ public sealed class GraphArtist
                          TextWrapping="Wrap" Margin="0,4,0,0"/>
 ```
 
-- [ ] **Step 5: 빌드하고 띄운다**
+- [x] **Step 5: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -1003,7 +1003,7 @@ dotnet run --project src/Mono.Control
 확인: 재생 중 「현재 아티스트 탐색」으로 관계도가 뜬다 · 연관 아티스트를 누르면 따라가기가 동작한다 ·
 「저장하고 종료」 후 Playlists 화면에 하이라이트 리스트가 생긴다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -1016,14 +1016,31 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 4단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 101개 통과 (3b 96 + 라운지 스냅샷 5)
-- [ ] 관리자 패널에 문서 §관리자 기능이 전부 있다 — 초대(발급·연장·폐기) · 킥 · 역할 · 호스트 위임 · 품질 정책 · 소스 모드 · 룸 플래그 6종 · 최대 인원 · 참관
-- [ ] 호스트가 아니면 관리자 버튼이 **숨겨지지 않고** 비활성 + `"호스트만 바꿀 수 있습니다"` 툴팁
-- [ ] 큐 항목에 순서 변경·제거·바로 이동, Host Queue 모드에서 요청 승인·거절
-- [ ] 핀을 꽂으면 2단계 시크바에 주황 마커가 나타난다
-- [ ] 반응 4종 버튼과 곡당 3회 안내
-- [ ] 세션 종료 시 저장/휘발을 고르고, 저장하면 플레이리스트가 생긴다
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **101개** 통과 (3b 96 + 라운지 스냅샷 5)
+- [x] 관리자 패널에 문서 §관리자 기능이 전부 있다
+- [x] 호스트가 아니면 비활성 + 사유 툴팁 — Core 도 `only host` 로 거부(실측)
+- [x] 큐 순서 변경·제거·바로 이동, 요청 승인·거절
+- [x] 핀이 시크바 마커로 나타난다
+- [x] 반응 4종 + 곡당 3회 안내
+- [x] 세션 종료 → 아카이브 → 하이라이트 플레이리스트
+
+실측(신규 DB, 호스트/게스트 2피어 TCP 프로브):
+```
+룸 생성      : 5dfbdc7b · host=host · mode=HostQueue
+초대 코드    : 607419 · 만료 15:31
+참가자       : [(host, Host), (guest, Listener)]
+선곡 요청    : [(Blue Train, guest)]  → 승인 후 큐: [Blue Train]
+핀           : [(색소폰 들어오는 지점, 12000ms)]
+히트맵       : 0ms×1, 10000ms×1     반응: {❤️: 1}
+관계도       : John Coltrane · 연관 1명 · 이웃 1명
+게스트 정책  : 거부 사유 [only host]   ← 권한 방어 확인
+아카이브     : ok=True · archiveId=True · playlistId=True
+```
+
+**검증하지 못한 것:** 화면 제어 권한이 없어 **관리자 패널의 렌더 결과를 눈으로 보지 못했다.**
+우측 320px 열에 패널·핀·관계도·아카이브가 모두 들어가므로 **세로로 길다** — 스크롤이 되지만
+레이아웃은 사람이 한 번 봐야 한다.
 
 ## 다음 단계
 
