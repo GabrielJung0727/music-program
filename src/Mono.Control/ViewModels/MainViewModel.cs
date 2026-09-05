@@ -88,6 +88,7 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<CatalogTrack> FilteredTracks { get; } = new();
     public ObservableCollection<HomeRail> HomeRails { get; } = new();
     public ObservableCollection<GenreTile> GenreTiles { get; }
+    public ObservableCollection<OutputDevice> Outputs { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
     public ObservableCollection<string> LyricLines { get; } = new();
 
@@ -140,6 +141,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<SnapshotHeatBucket> _heatmap = [];
     [ObservableProperty] private IReadOnlyList<SnapshotPin> _pins = [];
     [ObservableProperty] private bool _seekingAllowed = true;
+    [ObservableProperty] private int _volume = 100;
+    [ObservableProperty] private bool _volumeEnabled = true;
+    [ObservableProperty] private string _volumeBlockedReason = "";
+    [ObservableProperty] private OutputDevice? _selectedOutput;
+    [ObservableProperty] private string _outputChip = "출력 없음";
     /// <summary>시킹이 막힌 이유. 비어 있으면 툴팁을 띄우지 않는다.</summary>
     public string SeekBlockedReason => SeekingAllowed ? "" : "호스트가 시킹을 잠갔습니다";
 
@@ -549,6 +555,21 @@ public partial class MainViewModel : ObservableObject
         HomeRails.Add(new HomeRail("Albums", Tracks.GroupBy(t => t.AlbumId ?? t.Album).Select(g => g.First()).Take(12)));
         HomeRails.Add(new HomeRail("Hi-Res & DSD", Tracks.Where(t => t.IsDsd || t.SampleRate >= 96000).Take(12)));
         HomeRails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
+    }
+
+    /// <summary>슬라이더를 놓을 때만 보낸다 — 드래그 중 매 픽셀마다 명령을 쏘지 않는다.</summary>
+    [RelayCommand]
+    private Task ApplyVolumeAsync()
+        => SelectedOutput is null
+            ? Task.CompletedTask
+            : Safe(() => _session.SetVolumeAsync(SelectedOutput.PeerId, Volume));
+
+    [RelayCommand]
+    private void SelectOutput(OutputDevice? device)
+    {
+        if (device is null) return;
+        SelectedOutput = device;
+        Volume = device.VolumePercent;
     }
 
     private async Task Safe(Func<Task> action)

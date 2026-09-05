@@ -24,6 +24,12 @@ public partial class MainWindow : Window
             _ = vm.SeekToCommand.ExecuteAsync(null);
     }
 
+    private void VolumeReleased(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+            _ = vm.ApplyVolumeCommand.ExecuteAsync(null);
+    }
+
     private async void PickLibraryClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

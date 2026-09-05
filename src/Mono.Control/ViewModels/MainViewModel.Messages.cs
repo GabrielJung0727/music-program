@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Models;
 using Mono.Control.Services;
 using Mono.Protocol;
+using Mono.Shared;
 
 namespace Mono.Control.ViewModels;
 
@@ -181,6 +182,30 @@ public partial class MainViewModel
         Heatmap = snap.Heatmap;
         Pins = snap.Pins;
         SeekingAllowed = snap.SeekingAllowed;
+
+        var keepOutput = SelectedOutput?.PeerId;
+        Outputs.Clear();
+        foreach (var o in snap.Outputs) Outputs.Add(OutputDevice.From(o));
+        SelectedOutput = Outputs.FirstOrDefault(o => o.PeerId == keepOutput) ?? Outputs.FirstOrDefault();
+
+        if (SelectedOutput is { } sel)
+        {
+            Volume = sel.VolumePercent;
+            OutputChip = $"{sel.Name} · {sel.Badge}";
+            // Core의 QualityPolicyEngine.AllowsDigitalVolume 과 같은 판정.
+            VolumeEnabled = sel.HardwareVolume
+                            || (snap.Mode != RoomMode.Audiophile
+                                && snap.QualityPolicy != QualityPolicy.RequireBitPerfect);
+            VolumeBlockedReason = VolumeEnabled
+                ? ""
+                : "이 룸은 디지털 볼륨 감쇠를 금지합니다 — 하드웨어 볼륨을 쓰세요";
+        }
+        else
+        {
+            OutputChip = "출력 없음";
+            VolumeEnabled = false;
+            VolumeBlockedReason = "출력 장치가 없습니다 — 「출력 연결」을 누르세요";
+        }
 
         Lounge.ApplySnapshot(snap);
         Audio.ApplySnapshot(snap);
