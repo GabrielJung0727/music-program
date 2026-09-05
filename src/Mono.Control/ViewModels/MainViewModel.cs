@@ -89,6 +89,7 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<HomeRail> HomeRails { get; } = new();
     public ObservableCollection<GenreTile> GenreTiles { get; }
     public ObservableCollection<OutputDevice> Outputs { get; } = new();
+    public ObservableCollection<ZoneItem> Zones { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
     public ObservableCollection<string> LyricLines { get; } = new();
 
@@ -563,6 +564,10 @@ public partial class MainViewModel : ObservableObject
         => SelectedOutput is null
             ? Task.CompletedTask
             : Safe(() => _session.SetVolumeAsync(SelectedOutput.PeerId, Volume));
+
+    /// <summary>출력 선택기를 열 때 존 목록을 새로 받는다 — 존은 룸 스냅샷에 실리지 않는다.</summary>
+    [RelayCommand]
+    private Task RefreshZonesAsync() => Safe(() => _session.ListZonesAsync());
 
     [RelayCommand]
     private void SelectOutput(OutputDevice? device)

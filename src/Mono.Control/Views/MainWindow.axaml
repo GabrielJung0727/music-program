@@ -187,7 +187,8 @@
                 </Button.Flyout>
               </Button>
 
-              <Button Classes="ghost" Padding="8,4" ToolTip.Tip="출력 존/장치">
+              <Button Classes="ghost" Padding="8,4" ToolTip.Tip="출력 존/장치"
+                      Command="{Binding RefreshZonesCommand}">
                 <TextBlock Text="{Binding OutputChip}" FontSize="11" MaxWidth="150" TextTrimming="CharacterEllipsis"/>
                 <Button.Flyout>
                   <Flyout>
@@ -205,6 +206,21 @@
                                 <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
                               </StackPanel>
                             </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="존" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                      <ItemsControl ItemsSource="{Binding Zones}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ZoneItem">
+                            <Border Classes="panel" CornerRadius="8" Padding="8" Margin="0,2,0,0">
+                              <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Classes="muted" FontSize="11">
+                                  <Run Text="{Binding ModeLabel}"/><Run Text=" · "/><Run Text="{Binding MemberSummary}"/>
+                                </TextBlock>
+                              </StackPanel>
+                            </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>

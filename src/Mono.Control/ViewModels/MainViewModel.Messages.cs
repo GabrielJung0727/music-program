@@ -47,6 +47,9 @@ public partial class MainViewModel
                 else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
                     StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
                 break;
+            case MessageTypes.ListZones:
+                LoadZones(msg.Body);
+                break;
             case MessageTypes.SyncProbe:
                 Audio.SyncProbeText = msg.Body ?? "";
                 StatusText = "Sync probe 수신";
@@ -83,6 +86,18 @@ public partial class MainViewModel
                 await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
         }
         Audio.ArtPerfText = ArtCache.StatsText();
+    }
+
+    private void LoadZones(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body)) { Zones.Clear(); return; }
+        try
+        {
+            var list = JsonSerializer.Deserialize<List<ZoneItem>>(body, Json) ?? [];
+            Zones.Clear();
+            foreach (var z in list) Zones.Add(z);
+        }
+        catch { /* 형식이 어긋나면 이전 목록을 유지한다 */ }
     }
 
     private void LoadRooms(string? body)
