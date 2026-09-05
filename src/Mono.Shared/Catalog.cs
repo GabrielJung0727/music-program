@@ -20,6 +20,12 @@ public sealed class Track
     public string? ArtworkPath { get; set; }
     public bool MergedLocalAndStreaming { get; set; }
     public int TrackNumber { get; set; }
+
+    /// <summary>파일 태그의 장르. Genres 화면과 장르 타일 집계에 쓴다.</summary>
+    public List<string> Genres { get; init; } = [];
+
+    /// <summary>파일 태그의 작곡가. Composers·Compositions 화면의 근거다.</summary>
+    public List<string> Composers { get; init; } = [];
 }
 
 public sealed class Album
