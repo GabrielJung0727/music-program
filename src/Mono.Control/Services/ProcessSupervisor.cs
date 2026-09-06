@@ -10,6 +10,9 @@ public sealed class ProcessSupervisor
 
     public bool CoreRunning => _core is { HasExited: false };
     public bool OutputRunning => _output is { HasExited: false };
+
+    /// <summary>Output 을 어느 룸으로 띄웠는지. 룸이 바뀌면 다시 띄워야 하므로 기억한다.</summary>
+    public string? OutputRoomId { get; private set; }
     public string? LastError { get; private set; }
 
     public string BaseDir => AppContext.BaseDirectory;
@@ -47,7 +50,11 @@ public sealed class ProcessSupervisor
 
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
-        if (OutputRunning) return true;
+        // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
+        // 나중에 룸이 생기면 그 룸으로 다시 띄워야 소리가 난다.
+        if (OutputRunning && OutputRoomId == roomId) return true;
+        if (OutputRunning) StopOutput();
+
         var exe = FindExe("Mono.Output.exe", "Mono.Output");
         if (exe is null)
         {
@@ -61,6 +68,7 @@ public sealed class ProcessSupervisor
         try
         {
             _output = StartSilent(exe, args);
+            OutputRoomId = roomId;
             return true;
         }
         catch (Exception ex)
@@ -72,6 +80,7 @@ public sealed class ProcessSupervisor
 
     public void StopOutput()
     {
+        OutputRoomId = null;
         TryKill(ref _output);
     }
 

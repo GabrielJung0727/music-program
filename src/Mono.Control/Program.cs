@@ -15,6 +15,7 @@ internal static class Program
     public static void Main(string[] args)
     {
         VelopackApp.Build().Run();
+        InstallCrashLog();
         if (args.Any(a => a is "--check-update" or "--apply-update"))
         {
             RunUpdateCli(args).GetAwaiter().GetResult();
@@ -22,6 +23,35 @@ internal static class Program
         }
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
+    /// <summary>
+    /// 처리되지 않은 예외를 파일로 남긴다. 없으면 창이 아무 말 없이 사라져
+    /// 사용자도 우리도 원인을 모른다.
+    /// </summary>
+    private static void InstallCrashLog()
+    {
+        var path = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Mono", "crash.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        void Write(string source, object? error)
+        {
+            try
+            {
+                File.AppendAllText(path,
+                    $"{DateTimeOffset.Now:o} [{source}] {error}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch { /* 로그조차 못 쓰면 할 수 있는 게 없다 */ }
+        }
+
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Write("domain", e.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Write("task", e.Exception);
+            e.SetObserved();
+        };
     }
 
     private static async Task RunUpdateCli(string[] args)

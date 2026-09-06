@@ -198,6 +198,23 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayPauseLabel));
     partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
+
+    /// <summary>
+    /// 룸에 들어가면 이미 떠 있는 Output 도 그 룸으로 옮긴다.
+    /// 룸을 만들기 전에 「출력 연결」을 누른 경우, 이게 없으면 Output 이 어떤 룸에도
+    /// 속하지 않은 채 남아 영영 소리가 나지 않는다.
+    /// </summary>
+    partial void OnCurrentRoomIdChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!_supervisor.OutputRunning) return;
+        if (_supervisor.OutputRoomId == value) return;
+
+        if (_supervisor.StartOutput(value))
+            StatusText = "출력을 이 룸으로 옮겼습니다";
+        else
+            StatusText = _supervisor.LastError ?? "출력 재연결 실패";
+    }
     partial void OnPathBadgeChanged(string value) => OnPropertyChanged(nameof(PathBadgeLabel));
     partial void OnHeartsLeftChanged(int value)
     {
@@ -434,10 +451,18 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ConnectOutputAsync()
     {
-        if (!_supervisor.StartOutput(string.IsNullOrWhiteSpace(CurrentRoomId) ? null : CurrentRoomId))
+        var room = string.IsNullOrWhiteSpace(CurrentRoomId) ? null : CurrentRoomId;
+        if (!_supervisor.StartOutput(room))
+        {
             StatusText = _supervisor.LastError ?? "Output 기동 실패";
-        else
-            StatusText = "Output 연결됨 (소리)";
+            return;
+        }
+
+        // 룸이 없으면 Core 에 엔드포인트로만 등록된다 — 라운지에 들어가야 소리가 난다.
+        StatusText = room is null
+            ? "출력 장치를 등록했습니다 — 라운지에 들어가면 소리가 납니다"
+            : "출력 연결됨 (소리)";
+        await Task.CompletedTask;
     }
 
     [RelayCommand]
