@@ -253,7 +253,8 @@ double DepthCeilingMs(MatpAudio frame)
     => RenderGate.DepthCeilingMs(
         clock.TargetBufferMs,
         renderer.LatencyMs,
-        RenderGate.FrameDurationMs(frame.Payload.Length, frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd));
+        RenderGate.FrameDurationMs(frame.Payload.Length, frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd),
+        renderer.CapacityMs);
 
 // 렌더 루프: PTS가 도래한 프레임만 DAC 버퍼로 넘긴다. 소셜/네트워크 처리와 스레드를 나눈다.
 void RenderLoop(CancellationToken ct)
@@ -378,7 +379,8 @@ void RenderLoop(CancellationToken ct)
                 lastLog = DateTimeOffset.UtcNow;
                 Console.WriteLine(
                     $"clock offset={clock.OffsetMs:F2}ms jitter={clock.JitterMs:F2}ms rtt={clock.RttMs:F2}ms " +
-                    $"target={clock.TargetBufferMs}ms depth={renderer.BufferedMs:F0}ms resync={resyncs} drop={drops} " +
+                    $"target={clock.TargetBufferMs}ms depth={renderer.BufferedMs:F0}ms " +
+                    $"latency={renderer.LatencyMs}ms cap={renderer.CapacityMs}ms resync={resyncs} drop={drops} " +
                     $"state={renderer.GetCurrentState()}" +
                     (renderer.LastError is { } err ? $" · {err}" : ""));
             }

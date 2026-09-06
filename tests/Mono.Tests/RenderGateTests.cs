@@ -20,6 +20,9 @@ public class RenderGateTests
     /// <summary>Windows 기본 타이머 분해능. 렌더 루프는 이 간격으로만 깨어난다.</summary>
     private const int WakeMs = 16;
 
+    /// <summary>장치 큐 용량(WASAPI 기본값).</summary>
+    private const int CapacityMs = 400;
+
     private sealed record SimResult(int UnderrunMs, int DeletedFrames, double MaxBufferedMs);
 
     /// <summary>
@@ -91,7 +94,7 @@ public class RenderGateTests
     {
         var target = ClockSync.JitterBufferMs(0.1, 0.05);   // 루프백: 하한값
         const int latency = 10;                              // WASAPI Exclusive
-        var ceiling = RenderGate.DepthCeilingMs(target, latency, ChunkMs);
+        var ceiling = RenderGate.DepthCeilingMs(target, latency, ChunkMs, CapacityMs);
 
         var r = Simulate(target, latency, primeMs: target, ceiling, backPressure: true);
 
@@ -124,7 +127,7 @@ public class RenderGateTests
     public void DepthCeilingLeavesRoomForOneChunkAndOneWake()
     {
         var target = ClockSync.JitterBufferMs(0, 0);
-        var ceiling = RenderGate.DepthCeilingMs(target, 10, ChunkMs);
+        var ceiling = RenderGate.DepthCeilingMs(target, 10, ChunkMs, CapacityMs);
         Assert.True(ceiling - target >= ChunkMs + RenderGate.WakeSlackMs,
             $"천장 여유 {ceiling - target:F0}ms 가 청크+웨이크({ChunkMs + RenderGate.WakeSlackMs}ms)보다 좁다");
     }
@@ -164,6 +167,33 @@ public class RenderGateTests
 
         var carried = RenderGate.DropStaleEpochs(queue, currentEpoch: 5);
         Assert.Equal(new long[] { 40, 60, 80 }, carried.Select(f => f.PtsMs));
+    }
+
+    /// <summary>
+    /// 회귀: ASIO 의 PlaybackLatency 는 "샘플" 단위인데 이를 밀리초로 착각해 쓰면
+    /// 지연이 수백 ms 로 뻥튀기된다. 그러면 천장이 장치 큐 용량을 넘어서 백프레셔가
+    /// 걸리기 전에 큐가 넘치고, 넘친 오디오는 조용히 버려져 딸깍 소리가 된다.
+    /// 천장은 어떤 경우에도 큐 용량 안에 머물러야 한다.
+    /// </summary>
+    [Theory]
+    [InlineData(512)]   // 256샘플 버퍼를 ms 로 착각했을 때쯤
+    [InlineData(1024)]
+    [InlineData(5000)]
+    public void DepthCeilingNeverExceedsTheDeviceQueue(double absurdLatencyMs)
+    {
+        const int capacity = 500;
+        var ceiling = RenderGate.DepthCeilingMs(50, absurdLatencyMs, ChunkMs, capacity);
+
+        Assert.True(ceiling <= capacity - ChunkMs,
+            $"천장 {ceiling}ms 가 큐 용량 {capacity}ms 를 넘어 오디오가 조용히 버려진다");
+    }
+
+    /// <summary>용량이 넉넉하면 천장은 원래 계산값을 그대로 쓴다.</summary>
+    [Fact]
+    public void DepthCeilingIsUnclampedWhenTheQueueIsRoomy()
+    {
+        var ceiling = RenderGate.DepthCeilingMs(50, 10, ChunkMs, CapacityMs);
+        Assert.Equal(50 + 10 + ChunkMs + RenderGate.WakeSlackMs, ceiling);
     }
 
     /// <summary>청크 길이는 Core 의 상수를 짐작하지 않고 프레임에서 직접 잰다.</summary>

@@ -15,6 +15,9 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     /// <summary>정지 후 핸들을 붙들고 있는 시간.</summary>
     private const int ReleaseHoldMs = 3000;
 
+    /// <summary>장치 큐가 담을 수 있는 최대 깊이.</summary>
+    public int CapacityMs => 500;
+
     private readonly AsioOut _asio;
     private readonly object _gate = new();
     private BufferedWaveProvider? _buffer;
@@ -121,10 +124,15 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                     BuildFormat(config.SampleRate, config.BitDepth, config.Channels))
                 {
                     DiscardOnBufferOverflow = true,
-                    BufferDuration = TimeSpan.FromMilliseconds(200)
+                    BufferDuration = TimeSpan.FromMilliseconds(CapacityMs)
                 };
                 _asio.Init(_buffer);
-                LatencyMs = Math.Max(3, _asio.PlaybackLatency);
+
+                // PlaybackLatency 는 "샘플" 단위다. 밀리초로 착각해서 쓰면 지연이 수백 ms 로
+                // 뻥튀기되고, 그만큼 백프레셔 천장이 버퍼 용량을 넘어서 버퍼가 넘치는 쪽으로
+                // 오디오가 조용히 버려진다(딸깍 소리).
+                var latencySamples = _asio.PlaybackLatency;
+                LatencyMs = Math.Max(3, (long)Math.Round(latencySamples * 1000.0 / Math.Max(1, config.SampleRate)));
                 _state = AudioDeviceState.ExclusiveStreaming;
                 return true;
             }

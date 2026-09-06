@@ -21,6 +21,9 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     /// <summary>정지 후 핸들을 붙들고 있는 시간. 잦은 재시작 레이턴시를 막는다.</summary>
     private const int ReleaseHoldMs = 3000;
 
+    /// <summary>장치 큐가 담을 수 있는 최대 깊이.</summary>
+    public int CapacityMs => 400;
+
     private static readonly int[] ProbeRates = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000];
     private static readonly int[] ProbeDepths = [16, 24, 32];
 
@@ -172,7 +175,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             _buffer = new BufferedWaveProvider(BuildFormat(config.SampleRate, config.BitDepth, config.Channels))
             {
                 DiscardOnBufferOverflow = true,
-                BufferDuration = TimeSpan.FromMilliseconds(400)
+                BufferDuration = TimeSpan.FromMilliseconds(CapacityMs)
             };
 
             var share = _mode == DeviceMode.BitPerfectExclusive

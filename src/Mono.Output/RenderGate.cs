@@ -32,11 +32,22 @@ public static class RenderGate
     }
 
     /// <summary>
-    /// 버퍼가 도달해도 되는 최대 깊이. 청크 하나와 루프가 깨어나는 간격을 모두 담지 못하면
-    /// 정상 재생에서도 매번 천장에 걸려, 지연을 줄이려다 오디오를 잘라먹게 된다.
+    /// 버퍼가 도달해도 되는 최대 깊이.
+    ///
+    /// 아래로는 청크 하나와 루프가 깨어나는 간격을 모두 담아야 한다 — 그보다 좁으면
+    /// 정상 재생에서도 매번 천장에 걸려 지연을 줄이려다 오디오를 잘라먹는다.
+    /// 위로는 장치 큐 용량을 넘으면 안 된다 — 넘으면 백프레셔가 걸리기 전에 큐가 넘쳐
+    /// 오디오가 조용히 버려진다(같은 결과: 파형 구멍, 딸깍 소리).
     /// </summary>
-    public static double DepthCeilingMs(double targetBufferMs, double rendererLatencyMs, double frameMs)
-        => targetBufferMs + rendererLatencyMs + frameMs + WakeSlackMs;
+    public static double DepthCeilingMs(
+        double targetBufferMs, double rendererLatencyMs, double frameMs, double capacityMs)
+    {
+        var wanted = targetBufferMs + rendererLatencyMs + frameMs + WakeSlackMs;
+
+        // 큐가 넘치지 않도록 청크 하나만큼 여유를 남긴다.
+        var headroom = capacityMs - frameMs;
+        return headroom > 0 ? Math.Min(wanted, headroom) : wanted;
+    }
 
     /// <summary>지금은 넣지 말고 큐에 두어야 하는가(백프레셔).</summary>
     public static bool ShouldHold(double bufferedMs, double ceilingMs) => bufferedMs > ceilingMs;

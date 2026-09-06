@@ -86,6 +86,9 @@ public interface IAudioOutputDevice : IDisposable
     int PrimeMs { get; set; }
 
     double BufferedMs { get; }
+
+    /// <summary>장치 큐가 담을 수 있는 최대 깊이(ms). 이걸 넘겨 밀어 넣으면 조용히 버려진다.</summary>
+    int CapacityMs { get; }
     bool Playing { get; }
     bool Exclusive { get; }
 
