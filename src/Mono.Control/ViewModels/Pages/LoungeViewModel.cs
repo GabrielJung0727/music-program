@@ -35,6 +35,9 @@ public sealed partial class LoungeViewModel : PageViewModel
 
     [ObservableProperty] private bool _isHost;
     [ObservableProperty] private bool _inRoom;
+    [ObservableProperty] private string _currentRoomName = "";
+    [ObservableProperty] private string _roomModeLabel = "";
+    [ObservableProperty] private string _roomIdShort = "";
     [ObservableProperty] private string _inviteCodeText = "초대 코드 없음";
     [ObservableProperty] private string _inviteExpiryText = "";
     [ObservableProperty] private bool _seekingAllowed = true;
@@ -86,6 +89,16 @@ public sealed partial class LoungeViewModel : PageViewModel
         foreach (var c in snapshot.Chat) ChatLines.Add($"{c.PeerName ?? c.PeerId}: {c.Text}");
 
         InRoom = !string.IsNullOrEmpty(snapshot.Id);
+        CurrentRoomName = string.IsNullOrWhiteSpace(snapshot.Name) ? "이름 없는 룸" : snapshot.Name;
+        RoomIdShort = snapshot.Id.Length > 8 ? snapshot.Id[..8] : snapshot.Id;
+        RoomModeLabel = snapshot.Mode switch
+        {
+            Mono.Shared.RoomMode.OpenLounge => "누구나 큐를 편집합니다",
+            Mono.Shared.RoomMode.Invite => "초대받은 사람만 들어옵니다",
+            Mono.Shared.RoomMode.HostQueue => "호스트가 선곡하고 나머지는 요청합니다",
+            Mono.Shared.RoomMode.Audiophile => "DSP 없이 소스 그대로 — 채팅은 접힙니다",
+            _ => ""
+        };
         IsHost = !string.IsNullOrEmpty(SelfPeerId) && snapshot.HostPeerId == SelfPeerId;
         CurrentMediaMs = snapshot.MediaTimeMs;
 
