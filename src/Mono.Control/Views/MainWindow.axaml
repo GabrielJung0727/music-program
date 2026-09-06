@@ -13,7 +13,8 @@
         Icon="/Assets/icons/app/mono-app.ico"
         Classes="mono"
         WindowStartupLocation="CenterScreen"
-        Closing="OnClosing">
+        Closing="OnClosing"
+        KeyDown="OnKeyDown">
 
   <Grid>
     <Grid RowDefinitions="*,Auto">
@@ -74,7 +75,7 @@
             </StackPanel>
           </DockPanel>
 
-          <TextBox Grid.Row="1" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
+          <TextBox Grid.Row="1" x:Name="SearchBox" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
                    Text="{Binding SearchText}" Margin="0,12,0,16" MaxWidth="480" HorizontalAlignment="Left"/>
 
           <Grid Grid.Row="2">

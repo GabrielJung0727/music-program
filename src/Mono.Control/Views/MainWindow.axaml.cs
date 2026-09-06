@@ -37,6 +37,40 @@ public partial class MainWindow : Window
             vm.SetLibraryPathFromPicker(path);
     }
 
+    /// <summary>
+    /// 문서 §6 단축키. 글자를 입력 중일 때는 Space·/ 를 가로채지 않는다 —
+    /// 채팅이나 검색을 치다가 재생이 멈추면 안 된다.
+    /// </summary>
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var typing = FocusManager?.GetFocusedElement() is TextBox;
+
+        switch (e.Key)
+        {
+            case Key.Space when !typing:
+                _ = vm.PlayPauseCommand.ExecuteAsync(null);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                // 위에 덮인 것부터 닫는다. 온보딩은 완료해야 닫힌다.
+                if (vm.ShowOnboarding) return;
+                if (vm.Library.SelectedAlbum is not null) vm.Library.CloseAlbumCommand.Execute(null);
+                else if (vm.ShowNowPlaying) vm.CloseNowPlayingCommand.Execute(null);
+                else if (vm.ShowQueue) vm.ToggleQueueCommand.Execute(null);
+                else return;
+                e.Handled = true;
+                break;
+
+            case Key.OemQuestion when !typing:
+            case Key.Divide when !typing:
+                SearchBox.Focus();
+                e.Handled = true;
+                break;
+        }
+    }
+
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (_forceClose || DataContext is not MainViewModel vm) return;
