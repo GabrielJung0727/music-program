@@ -63,6 +63,8 @@ public partial class MainViewModel : ObservableObject
         SelectedNav = NavItems[0];
 
 
+        _supervisor.Backend = Prefs.Get("audio_backend", "exclusive");
+        SelectedAudioBackend = AudioBackends.FirstOrDefault(b => b.Id == _supervisor.Backend) ?? AudioBackends[0];
         CloseToTray = Prefs.GetBool("close_to_tray");
         LibraryPath = Prefs.Get("library_path", "");
         DarkTheme = Prefs.GetBool("dark_theme");
@@ -113,6 +115,16 @@ public partial class MainViewModel : ObservableObject
     /// <summary>장치 점유 충돌·연결 해제처럼 사용자가 조치해야 하는 상황만 띄운다.</summary>
     [ObservableProperty] private bool _showDeviceAlert;
     [ObservableProperty] private string _deviceAlertText = "";
+
+    /// <summary>출력 드라이버. 장치마다 되는 게 다르므로 사용자가 고른다.</summary>
+    [ObservableProperty] private AudioBackendOption? _selectedAudioBackend;
+
+    public ObservableCollection<AudioBackendOption> AudioBackends { get; } =
+    [
+        new("exclusive", "WASAPI 배타 (비트퍼펙트)", "OS 믹서를 우회해 DAC 클럭에 1:1로 보냅니다. 장치를 독점합니다."),
+        new("asio", "ASIO (전문 인터페이스)", "RME·Focusrite 등 ASIO 드라이버가 있는 장치. 배타가 거절되는 인터페이스는 이쪽입니다."),
+        new("shared", "WASAPI 공유", "다른 앱과 함께 소리를 냅니다. OS가 리샘플링하므로 비트퍼펙트가 아닙니다.")
+    ];
     [ObservableProperty] private string _pathBadge = "";
     [ObservableProperty] private string _signalPathText = "Source → Core → Output";
     [ObservableProperty] private bool _isPlaying;
@@ -411,6 +423,27 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void DismissDeviceAlert() => ShowDeviceAlert = false;
+
+    partial void OnSelectedAudioBackendChanged(AudioBackendOption? value)
+    {
+        if (value is null) return;
+        if (_supervisor.Backend == value.Id) return;
+
+        _supervisor.Backend = value.Id;
+        Prefs.Set("audio_backend", value.Id);
+        ShowDeviceAlert = false;
+
+        // 이미 출력이 떠 있으면 새 백엔드로 다시 세워야 적용된다.
+        if (!_supervisor.OutputRunning)
+        {
+            StatusText = $"출력 드라이버: {value.Label}";
+            return;
+        }
+
+        StatusText = _supervisor.RestartOutput()
+            ? $"출력 드라이버를 {value.Label} 로 바꿨습니다"
+            : _supervisor.LastError ?? "출력 드라이버를 바꾸지 못했습니다";
+    }
 
     [RelayCommand]
     private void SelectGenre(GenreCount? genre)

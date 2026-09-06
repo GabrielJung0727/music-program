@@ -31,6 +31,13 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
         Exclusive = true;
     }
 
+    /// <summary>설치된 ASIO 드라이버 이름. 없으면 빈 배열.</summary>
+    public static string[] DriverNames()
+    {
+        try { return AsioOut.GetDriverNames(); }
+        catch { return []; }
+    }
+
     public static AsioAudioRenderer? TryCreate(string? deviceHint)
     {
         try

@@ -23,9 +23,32 @@ var preferAsio = args.Contains("--asio");
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
 const int matpPort = 7701;
 
-IAudioOutputDevice renderer = preferAsio
-    ? (IAudioOutputDevice?)AsioAudioRenderer.TryCreate(deviceHint) ?? new WasapiOutputDevice(deviceHint, deviceMode)
-    : new WasapiOutputDevice(deviceHint, deviceMode);
+// ASIO 드라이버 목록은 진단에 중요하다 — 전문 인터페이스에서 배타가 거절될 때
+// 대안이 실제로 있는지 없는지를 이 줄로 판별한다.
+var asioDrivers = AsioAudioRenderer.DriverNames();
+Console.WriteLine(asioDrivers.Length > 0
+    ? "ASIO 드라이버: " + string.Join(" · ", asioDrivers)
+    : "ASIO 드라이버 없음");
+
+IAudioOutputDevice renderer;
+if (preferAsio)
+{
+    var asio = AsioAudioRenderer.TryCreate(deviceHint);
+    if (asio is null)
+    {
+        // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 분명히 남긴다.
+        Console.WriteLine("ASIO 를 요청했지만 드라이버를 열지 못했습니다 — WASAPI 로 진행합니다.");
+        renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+    }
+    else
+    {
+        renderer = asio;
+    }
+}
+else
+{
+    renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+}
 var caps = renderer.GetSupportedFormats();
 var timeline = new Timeline();
 var clock = new ClockState();

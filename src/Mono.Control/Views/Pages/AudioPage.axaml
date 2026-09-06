@@ -25,6 +25,22 @@
                 </StackPanel>
                 <TextBlock Text="{Binding SyncProbeSummary}" Classes="muted" TextWrapping="Wrap"
                            IsVisible="{Binding HasSyncProbe}"/>
+
+                <TextBlock Text="출력 드라이버" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <ComboBox HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding $parent[Window].((vm:MainViewModel)DataContext).AudioBackends}"
+                          SelectedItem="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectedAudioBackend}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AudioBackendOption">
+                      <StackPanel Spacing="2" Margin="0,4">
+                        <TextBlock Text="{Binding Label}"/>
+                        <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                           Text="드라이버를 바꾸면 출력 워커만 다시 시작합니다. 재생 중이면 잠시 끊깁니다."/>
                 <TextBox Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).ZoneName}" Watermark="존 이름"/>
                 <Button Classes="ghost" Content="존 만들기" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CreateZoneCommand}" HorizontalAlignment="Left"/>
 

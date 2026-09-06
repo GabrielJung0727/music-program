@@ -8,10 +8,15 @@ public sealed class ProcessSupervisor
     /// <summary>드라이버가 얼어붙었을 때 워커를 끊고 다시 세우는 데 허용하는 시간.</summary>
     private const int CleanKillMs = 500;
 
+    /// <summary>재기동 폭주 방지: 이 창 안에서 이 횟수를 넘기면 멈추고 사용자에게 알린다.</summary>
+    private const int RestartBudget = 3;
+    private static readonly TimeSpan RestartWindow = TimeSpan.FromSeconds(30);
+
     private Process? _core;
     private Process? _output;
     private string? _outputHost;
     private bool _outputIntentionallyStopped;
+    private readonly Queue<DateTimeOffset> _restarts = new();
 
     public bool CoreRunning => _core is { HasExited: false };
     public bool OutputRunning => _output is { HasExited: false };
@@ -56,6 +61,13 @@ public sealed class ProcessSupervisor
     /// <summary>워커가 죽거나 얼면 이 이벤트로 알린다. UI 가 사유를 띄운다.</summary>
     public event Action<string>? OutputFaulted;
 
+    /// <summary>
+    /// 출력 드라이버 백엔드: exclusive · shared · asio.
+    /// RME 같은 전문 인터페이스는 하드웨어 클럭이 외부에서 고정돼 WASAPI 배타 요청이
+    /// 거절되는 일이 흔하다. 그런 장치는 ASIO 로 가야 비트퍼펙트가 성립한다.
+    /// </summary>
+    public string Backend { get; set; } = "exclusive";
+
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
         // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
@@ -72,6 +84,8 @@ public sealed class ProcessSupervisor
 
         var args = $"--host={host}";
         if (!string.IsNullOrWhiteSpace(roomId)) args += $" --room={roomId}";
+        if (Backend == "shared") args += " --shared";
+        else if (Backend == "asio") args += " --asio";
 
         try
         {
@@ -105,6 +119,7 @@ public sealed class ProcessSupervisor
     {
         var room = OutputRoomId;
         var host = _outputHost ?? "127.0.0.1";
+        lock (_restarts) _restarts.Clear();   // 사용자가 직접 누른 재시도는 예산을 새로 준다
         _outputIntentionallyStopped = true;
         KillFast(ref _output);
         OutputRoomId = null;
@@ -123,6 +138,15 @@ public sealed class ProcessSupervisor
                 if (_outputIntentionallyStopped) return;
 
                 var code = TryExitCode(process);
+
+                if (!TakeRestartBudget())
+                {
+                    // 계속 죽는다면 다시 세워 봐야 같은 결과다. 폭주를 멈추고 사용자에게 넘긴다.
+                    AppLog.Write("control", $"output worker keeps exiting (code={code}) — 재시작 중단");
+                    OutputFaulted?.Invoke("출력 워커가 반복해서 종료됩니다. 장치 설정을 확인하세요.");
+                    return;
+                }
+
                 AppLog.Write("control", $"output worker exited unexpectedly (code={code}) — 재시작");
                 OutputFaulted?.Invoke("출력 워커가 예기치 않게 종료되어 다시 시작했습니다.");
                 try { StartOutput(OutputRoomId, _outputHost ?? "127.0.0.1"); }
@@ -133,6 +157,19 @@ public sealed class ProcessSupervisor
         {
             // 감시를 못 걸어도 재생 자체는 계속돼야 한다.
             AppLog.Write("control", "output watchdog 등록 실패: " + ex.Message);
+        }
+    }
+
+    /// <summary>최근 창 안의 재기동 횟수를 세고 예산이 남았는지 본다.</summary>
+    private bool TakeRestartBudget()
+    {
+        lock (_restarts)
+        {
+            var now = DateTimeOffset.UtcNow;
+            while (_restarts.Count > 0 && now - _restarts.Peek() > RestartWindow) _restarts.Dequeue();
+            if (_restarts.Count >= RestartBudget) return false;
+            _restarts.Enqueue(now);
+            return true;
         }
     }
 

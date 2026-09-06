@@ -528,6 +528,8 @@
           <TextBlock Classes="muted" Text="{Binding DeviceAlertText}" TextWrapping="Wrap"/>
           <TextBlock Classes="muted" TextWrapping="Wrap"
                      Text="소리를 임의로 변형해 내보내지 않기 위해 재생을 멈췄습니다. 장치를 점유한 프로그램을 끄고 다시 시도하세요."/>
+          <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                     Text="RME·Focusrite 같은 전문 인터페이스는 하드웨어 클럭이 설정 패널에서 고정돼 있어 WASAPI 배타 요청을 거절합니다. 그런 장치는 장치 설정에서 출력 드라이버를 ASIO 로 바꾸세요."/>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="primary" Content="다시 시도" Command="{Binding RetryOutputCommand}"/>
             <Button Classes="ghost" Content="장치 설정으로 이동" Command="{Binding OpenDeviceSettingsCommand}"/>
