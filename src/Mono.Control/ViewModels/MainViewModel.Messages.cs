@@ -246,6 +246,21 @@ public partial class MainViewModel
             break;
         }
 
+        // 장치 점유 충돌·연결 해제는 조용히 넘기지 않는다. 자동 강등을 하지 않으므로
+        // 알리지 않으면 사용자는 왜 소리가 안 나는지 알 수 없다.
+        var blocked = snap.Members
+            .Select(m => m.Stats)
+            .FirstOrDefault(st => st is { DeviceState: 4 or 6 });
+        if (blocked is not null)
+        {
+            DeviceAlertText = blocked.DeviceError ?? "출력 장치를 사용할 수 없습니다.";
+            ShowDeviceAlert = true;
+        }
+        else if (ShowDeviceAlert)
+        {
+            ShowDeviceAlert = false;
+        }
+
         AutoplayChoices.Clear();
         if (snap.Autoplay is { } ap)
         {

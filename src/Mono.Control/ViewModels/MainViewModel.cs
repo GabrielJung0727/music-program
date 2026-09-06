@@ -109,6 +109,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private Bitmap? _nowArt;
     [ObservableProperty] private string _roomChip = "룸 없음";
     [ObservableProperty] private string _syncText = "sync —";
+
+    /// <summary>장치 점유 충돌·연결 해제처럼 사용자가 조치해야 하는 상황만 띄운다.</summary>
+    [ObservableProperty] private bool _showDeviceAlert;
+    [ObservableProperty] private string _deviceAlertText = "";
     [ObservableProperty] private string _pathBadge = "";
     [ObservableProperty] private string _signalPathText = "Source → Core → Output";
     [ObservableProperty] private bool _isPlaying;
@@ -387,6 +391,26 @@ public partial class MainViewModel : ObservableObject
     {
         if (item is not null) SelectedNav = item;
     }
+
+    /// <summary>점유가 풀렸을 때 다시 시도한다. 워커만 다시 세우므로 앱은 그대로다.</summary>
+    [RelayCommand]
+    private void RetryOutput()
+    {
+        ShowDeviceAlert = false;
+        StatusText = _supervisor.RestartOutput()
+            ? "출력을 다시 시작했습니다"
+            : _supervisor.LastError ?? "출력을 다시 시작하지 못했습니다";
+    }
+
+    [RelayCommand]
+    private void OpenDeviceSettings()
+    {
+        ShowDeviceAlert = false;
+        SelectedNav = NavItems.First(n => n.Id == "devices");
+    }
+
+    [RelayCommand]
+    private void DismissDeviceAlert() => ShowDeviceAlert = false;
 
     [RelayCommand]
     private void SelectGenre(GenreCount? genre)

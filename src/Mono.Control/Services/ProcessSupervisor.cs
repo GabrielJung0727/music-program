@@ -5,8 +5,13 @@ namespace Mono.Control.Services;
 /// <summary>Core·Output exe를 콘솔 없이 기동·종료한다.</summary>
 public sealed class ProcessSupervisor
 {
+    /// <summary>드라이버가 얼어붙었을 때 워커를 끊고 다시 세우는 데 허용하는 시간.</summary>
+    private const int CleanKillMs = 500;
+
     private Process? _core;
     private Process? _output;
+    private string? _outputHost;
+    private bool _outputIntentionallyStopped;
 
     public bool CoreRunning => _core is { HasExited: false };
     public bool OutputRunning => _output is { HasExited: false };
@@ -48,6 +53,9 @@ public sealed class ProcessSupervisor
         }
     }
 
+    /// <summary>워커가 죽거나 얼면 이 이벤트로 알린다. UI 가 사유를 띄운다.</summary>
+    public event Action<string>? OutputFaulted;
+
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
         // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
@@ -67,8 +75,11 @@ public sealed class ProcessSupervisor
 
         try
         {
+            _outputIntentionallyStopped = false;
             _output = StartSilent(exe, args);
             OutputRoomId = roomId;
+            _outputHost = host;
+            WatchOutput(_output);
             return true;
         }
         catch (Exception ex)
@@ -80,12 +91,79 @@ public sealed class ProcessSupervisor
 
     public void StopOutput()
     {
+        _outputIntentionallyStopped = true;
         OutputRoomId = null;
         TryKill(ref _output);
     }
 
+    /// <summary>
+    /// 드라이버가 응답하지 않을 때 워커만 끊고 다시 세운다.
+    /// 오디오 드라이버와 맞닿은 코드는 전부 이 프로세스 안에 있으므로,
+    /// 여기만 재시작하면 OS 재부팅 없이 장치 제어권을 되찾는다.
+    /// </summary>
+    public bool RestartOutput()
+    {
+        var room = OutputRoomId;
+        var host = _outputHost ?? "127.0.0.1";
+        _outputIntentionallyStopped = true;
+        KillFast(ref _output);
+        OutputRoomId = null;
+        AppLog.Write("control", "restarting output worker");
+        return StartOutput(room, host);
+    }
+
+    /// <summary>워커가 예기치 않게 죽으면 같은 룸으로 즉시 다시 세운다.</summary>
+    private void WatchOutput(Process process)
+    {
+        try
+        {
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) =>
+            {
+                if (_outputIntentionallyStopped) return;
+
+                var code = TryExitCode(process);
+                AppLog.Write("control", $"output worker exited unexpectedly (code={code}) — 재시작");
+                OutputFaulted?.Invoke("출력 워커가 예기치 않게 종료되어 다시 시작했습니다.");
+                try { StartOutput(OutputRoomId, _outputHost ?? "127.0.0.1"); }
+                catch (Exception ex) { LastError = ex.Message; }
+            };
+        }
+        catch (Exception ex)
+        {
+            // 감시를 못 걸어도 재생 자체는 계속돼야 한다.
+            AppLog.Write("control", "output watchdog 등록 실패: " + ex.Message);
+        }
+    }
+
+    private static string TryExitCode(Process p)
+    {
+        try { return p.ExitCode.ToString(); }
+        catch { return "?"; }
+    }
+
+    /// <summary>강제 종료를 CleanKillMs 안에 끝낸다. 드라이버가 얼어 있어도 UI 는 멈추지 않는다.</summary>
+    private static void KillFast(ref Process? process)
+    {
+        try
+        {
+            if (process is { HasExited: false })
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(CleanKillMs);
+            }
+        }
+        catch { /* 이미 죽었으면 무시 */ }
+        finally
+        {
+            process?.Dispose();
+            process = null;
+        }
+    }
+
     public void StopAll()
     {
+        _outputIntentionallyStopped = true;
         TryKill(ref _output);
         TryKill(ref _core);
     }

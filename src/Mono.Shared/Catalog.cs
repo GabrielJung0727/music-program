@@ -134,6 +134,13 @@ public sealed class PeerStats
     public int BufferMs { get; set; }
     public int Resyncs { get; set; }
     public bool Locked { get; set; }
+
+    /// <summary>출력 장치 상태 머신의 현재 값. 0=Idle 2=ExclusiveStreaming 4=DeviceBusyLocked 6=DeviceLostSuspend.</summary>
+    public int DeviceState { get; set; }
+
+    /// <summary>재생을 보류한 사유. 점유 충돌·장치 분리처럼 사용자가 조치해야 하는 것만 담는다.</summary>
+    public string? DeviceError { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 

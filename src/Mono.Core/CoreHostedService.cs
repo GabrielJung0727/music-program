@@ -301,7 +301,9 @@ public sealed class CoreHostedService : BackgroundService
                                 msg.RttMs ?? 0,
                                 msg.BufferMs ?? 0,
                                 msg.Resyncs ?? 0,
-                                msg.Locked ?? false);
+                                msg.Locked ?? false,
+                                msg.DeviceState ?? 0,
+                                msg.DeviceError);
                             if (room is not null)
                             {
                                 await _broadcaster.PublishAsync(room, ct);

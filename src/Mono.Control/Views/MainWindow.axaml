@@ -520,5 +520,21 @@
         </StackPanel>
       </Border>
     </Border>
+    <!-- 장치 점유 충돌 · 연결 해제. 자동 강등을 하지 않으므로 사용자가 직접 풀어야 한다. -->
+    <Border Classes="onboarding" IsVisible="{Binding ShowDeviceAlert}">
+      <Border Classes="obcard" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="480">
+        <StackPanel Spacing="14">
+          <TextBlock Classes="h1" FontSize="22" Text="비트퍼펙트 재생을 시작할 수 없습니다"/>
+          <TextBlock Classes="muted" Text="{Binding DeviceAlertText}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" TextWrapping="Wrap"
+                     Text="소리를 임의로 변형해 내보내지 않기 위해 재생을 멈췄습니다. 장치를 점유한 프로그램을 끄고 다시 시도하세요."/>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="primary" Content="다시 시도" Command="{Binding RetryOutputCommand}"/>
+            <Button Classes="ghost" Content="장치 설정으로 이동" Command="{Binding OpenDeviceSettingsCommand}"/>
+            <Button Classes="ghost" Content="닫기" Command="{Binding DismissDeviceAlertCommand}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
   </Grid>
 </Window>
