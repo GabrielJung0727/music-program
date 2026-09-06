@@ -84,6 +84,53 @@ public class AudioDeviceTests
         Assert.Equal(expected, config.BlockAlign);
     }
 
+    /// <summary>
+    /// ASIO 로는 32비트 float 로 넘긴다(NAudio 변환기 지원 폭이 가장 넓다).
+    /// 16/24비트 정수는 float32 의 24비트 가수에 정확히 담기므로 값이 변하면 안 된다.
+    /// </summary>
+    [Theory]
+    [InlineData((short)0)]
+    [InlineData((short)1)]
+    [InlineData((short)-1)]
+    [InlineData(short.MaxValue)]
+    [InlineData(short.MinValue)]
+    [InlineData((short)12345)]
+    public void SixteenBitSurvivesTheFloatConversionExactly(short value)
+    {
+        var pcm = BitConverter.GetBytes(value);
+        var floats = AsioAudioRenderer.ToFloatBytes(pcm, 16);
+
+        Assert.Equal(4, floats.Length);
+        var back = BitConverter.ToSingle(floats, 0) * 32768f;
+        Assert.Equal(value, (short)Math.Round(back));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(-1)]
+    [InlineData(8388607)]
+    [InlineData(-8388608)]
+    [InlineData(1234567)]
+    public void TwentyFourBitSurvivesTheFloatConversionExactly(int value)
+    {
+        var pcm = new[] { (byte)value, (byte)(value >> 8), (byte)(value >> 16) };
+        var floats = AsioAudioRenderer.ToFloatBytes(pcm, 24);
+
+        Assert.Equal(4, floats.Length);
+        var back = BitConverter.ToSingle(floats, 0) * 8388608f;
+        Assert.Equal(value, (int)Math.Round(back));
+    }
+
+    [Fact]
+    public void FloatConversionKeepsFrameCount()
+    {
+        // 20ms · 48000Hz · 스테레오 · 16bit = 1920프레임 × 2ch × 2byte
+        var pcm = new byte[48000 * 20 / 1000 * 2 * 2];
+        var floats = AsioAudioRenderer.ToFloatBytes(pcm, 16);
+        Assert.Equal(pcm.Length / 2 * 4, floats.Length);
+    }
+
     /// <summary>등록된 모드는 고정이다 — 비트퍼펙트가 공유 모드로 내려가면 안 된다.</summary>
     [Fact]
     public void BitPerfectIsTheDefaultAndSharedIsOptIn()

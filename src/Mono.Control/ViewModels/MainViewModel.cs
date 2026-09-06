@@ -63,6 +63,14 @@ public partial class MainViewModel : ObservableObject
         SelectedNav = NavItems[0];
 
 
+        // 워커가 죽으면 사용자에게 알린다. 알리지 않으면 출력이 소리 없이 사라졌다 나타났다 할 뿐이다.
+        _supervisor.OutputFaulted += reason => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            DeviceAlertText = reason;
+            ShowDeviceAlert = true;
+            StatusText = reason;
+        });
+
         _supervisor.Backend = Prefs.Get("audio_backend", "exclusive");
         SelectedAudioBackend = AudioBackends.FirstOrDefault(b => b.Id == _supervisor.Backend) ?? AudioBackends[0];
         CloseToTray = Prefs.GetBool("close_to_tray");
