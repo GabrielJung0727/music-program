@@ -96,6 +96,12 @@ public static class ArtCache
         }
     }
 
+    /// <summary>
+    /// 캐시에서 빼기만 하고 Dispose 하지 않는다.
+    /// 같은 Bitmap 인스턴스가 아직 CatalogTrack.Cover 를 거쳐 Image.Source 에 물려 있을 수 있고,
+    /// 해제하면 다음 레이아웃에서 Bitmap.get_Size() 가 NullReferenceException 으로 앱을 죽인다.
+    /// 참조가 사라지면 GC 가 회수한다.
+    /// </summary>
     private static void EvictIfNeeded()
     {
         lock (LruGate)
@@ -104,8 +110,7 @@ public static class ArtCache
             {
                 var last = Lru.Last!.Value;
                 Lru.RemoveLast();
-                if (Cache.TryRemove(last, out var e))
-                    e.Bitmap?.Dispose();
+                Cache.TryRemove(last, out _);
             }
         }
     }
