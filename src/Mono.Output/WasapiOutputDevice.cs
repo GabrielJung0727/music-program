@@ -95,9 +95,12 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         }
     }
 
+    private Capabilities? _caps;
+
     public Capabilities GetSupportedFormats()
     {
-        if (_device is null) return Capabilities.Unknown(DeviceName);
+        if (_caps is not null) return _caps;
+        if (_device is null) return _caps = Capabilities.Unknown(DeviceName);
 
         var share = _mode == DeviceMode.BitPerfectExclusive
             ? AudioClientShareMode.Exclusive
@@ -138,7 +141,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         }
 
         depths.Sort();
-        return new Capabilities(DeviceName, rates, depths, 2, supportsExclusive, HardwareVolume);
+        return _caps = new Capabilities(DeviceName, rates, depths, 2, supportsExclusive, HardwareVolume);
     }
 
     private bool Probe(int rate, int depth, int channels, AudioClientShareMode share)
@@ -190,6 +193,26 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                     ? new WasapiOut(share, latency)
                     : new WasapiOut(_device, share, true, latency);
                 attempt.Init(_buffer);
+
+                // NAudio 는 요청 포맷을 장치가 못 받으면 예외를 던지지 않는다. 배타 모드에서도
+                // 지원되는 포맷으로 바꿔 잡고 DMO 리샘플러를 조용히 끼워 넣는다. 그러면 상태는
+                // ExclusiveStreaming 인데 실제로는 비트퍼펙트가 아니다 — 우리가 막으려던 바로 그
+                // 강등이 라이브러리 안쪽에서 일어난다. 하드웨어가 실제로 쓰는 포맷을 직접 확인한다.
+                var actual = attempt.OutputWaveFormat;
+                Console.WriteLine(
+                    $"device open: 요청 {config.SampleRate}/{config.BitDepth}/{config.Channels} → " +
+                    $"실제 {actual.SampleRate}/{actual.BitsPerSample}/{actual.Channels} ({share})");
+
+                if (_mode == DeviceMode.BitPerfectExclusive && !Matches(actual, config))
+                {
+                    try { attempt.Dispose(); } catch { /* 이미 닫혔으면 무시 */ }
+                    _out = null;
+                    _buffer = null;
+                    _state = AudioDeviceState.DeviceBusyLocked;
+                    LastError = DescribeFormatMismatch(config, actual);
+                    return false;
+                }
+
                 _out = attempt;
                 Exclusive = share == AudioClientShareMode.Exclusive;
                 LatencyMs = latency;
@@ -209,6 +232,22 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 return false;
             }
         }
+    }
+
+    private static bool Matches(WaveFormat actual, DeviceConfig config)
+        => actual.SampleRate == config.SampleRate
+           && actual.BitsPerSample == config.BitDepth
+           && actual.Channels == config.Channels;
+
+    private string DescribeFormatMismatch(DeviceConfig config, WaveFormat actual)
+    {
+        var caps = GetSupportedFormats();
+        var rates = caps.SampleRates.Count > 0 ? string.Join(", ", caps.SampleRates) + "Hz" : "알 수 없음";
+        return $"이 장치는 {config.SampleRate}Hz/{config.BitDepth}bit 를 배타 모드로 받지 않습니다 "
+             + $"(드라이버가 {actual.SampleRate}Hz/{actual.BitsPerSample}bit 로 바꿔 리샘플링하려 합니다). "
+             + $"장치가 받는 규격: {rates}. "
+             + "인터페이스 설정에서 샘플레이트를 트랙에 맞추거나, 출력 드라이버를 ASIO 로 바꾸세요. "
+             + "리샘플링을 감수하고 그냥 들으시려면 출력 드라이버를 'WASAPI 공유'로 바꾸면 됩니다.";
     }
 
     private static string Describe(Exception ex, DeviceConfig config)

@@ -33,11 +33,11 @@ Console.WriteLine(asioDrivers.Length > 0
 IAudioOutputDevice renderer;
 if (preferAsio)
 {
-    var asio = AsioAudioRenderer.TryCreate(deviceHint);
+    var asio = AsioAudioRenderer.TryCreate(deviceHint, out var asioError);
     if (asio is null)
     {
-        // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 분명히 남긴다.
-        Console.WriteLine("ASIO 를 요청했지만 드라이버를 열지 못했습니다 — WASAPI 로 진행합니다.");
+        // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 사유까지 남긴다.
+        Console.WriteLine($"ASIO 를 열지 못했습니다 ({asioError}) — WASAPI 로 진행합니다.");
         renderer = new WasapiOutputDevice(deviceHint, deviceMode);
     }
     else

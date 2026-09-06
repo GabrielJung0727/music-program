@@ -20,6 +20,7 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
 
     private readonly AsioOut _asio;
     private readonly object _gate = new();
+    private AsioStaHost? _staHost;
     private BufferedWaveProvider? _buffer;
     private AudioDeviceState _state = AudioDeviceState.Idle;
     private long _releaseAtUnixMs;
@@ -41,22 +42,49 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
         catch { return []; }
     }
 
-    public static AsioAudioRenderer? TryCreate(string? deviceHint)
+    public static AsioAudioRenderer? TryCreate(string? deviceHint) => TryCreate(deviceHint, out _);
+
+    /// <summary>
+    /// ASIO 드라이버를 연다. 실패하면 사유를 돌려준다 — 사유를 삼키면 드라이버가 설치돼
+    /// 있는데도 왜 안 열리는지 알 수 없다.
+    ///
+    /// ASIO 드라이버는 COM 개체라 STA 아파트먼트를 요구하는 것이 많다. 이 프로세스의
+    /// 주 스레드는 MTA 이므로 전용 STA 스레드에서 만들고, 그 스레드를 개체 수명 동안
+    /// 살려 둔 채 메시지를 펌프한다. 스레드가 먼저 끝나면 아파트먼트가 사라져 개체가 죽는다.
+    /// </summary>
+    public static AsioAudioRenderer? TryCreate(string? deviceHint, out string? error)
     {
+        error = null;
+        string[] drivers;
         try
         {
-            var drivers = AsioOut.GetDriverNames();
-            if (drivers.Length == 0) return null;
-            var name = deviceHint is null
-                ? drivers[0]
-                : drivers.FirstOrDefault(d => d.Contains(deviceHint, StringComparison.OrdinalIgnoreCase)) ?? drivers[0];
-            var asio = new AsioOut(name);
-            return new AsioAudioRenderer(asio, name);
+            drivers = AsioOut.GetDriverNames();
         }
-        catch
+        catch (Exception ex)
         {
+            error = "드라이버 목록을 읽지 못했습니다 — " + ex.Message;
             return null;
         }
+
+        if (drivers.Length == 0)
+        {
+            error = "설치된 ASIO 드라이버가 없습니다.";
+            return null;
+        }
+
+        var name = deviceHint is null
+            ? drivers[0]
+            : drivers.FirstOrDefault(d => d.Contains(deviceHint, StringComparison.OrdinalIgnoreCase)) ?? drivers[0];
+
+        var host = new AsioStaHost(name);
+        if (host.Driver is null)
+        {
+            error = $"{name}: {host.Failure ?? "응답 없음"}";
+            host.Dispose();
+            return null;
+        }
+
+        return new AsioAudioRenderer(host.Driver, name) { _staHost = host };
     }
 
     public string DeviceName { get; }
@@ -279,5 +307,58 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     {
         try { _asio.Stop(); } catch { /* 무시 */ }
         _asio.Dispose();
+        _staHost?.Dispose();
+    }
+}
+
+/// <summary>
+/// ASIO 드라이버 COM 개체를 만들고 살려 두는 STA 스레드.
+/// 만든 스레드가 끝나면 아파트먼트가 사라져 개체가 함께 죽으므로, 이 스레드는
+/// 개체를 쓰는 동안 계속 살아 있어야 한다.
+/// </summary>
+internal sealed class AsioStaHost : IDisposable
+{
+    private readonly Thread _thread;
+    private readonly ManualResetEventSlim _ready = new(false);
+    private readonly ManualResetEventSlim _stop = new(false);
+
+    public AsioOut? Driver { get; private set; }
+    public string? Failure { get; private set; }
+
+    public AsioStaHost(string driverName)
+    {
+        _thread = new Thread(() =>
+        {
+            try { Driver = new AsioOut(driverName); }
+            catch (Exception ex) { Failure = $"{ex.GetType().Name}: {ex.Message}"; }
+            finally { _ready.Set(); }
+
+            // 아파트먼트를 유지한다. Dispose 될 때까지 이 스레드는 살아 있어야 한다.
+            _stop.Wait();
+        })
+        {
+            IsBackground = true,
+            Name = "mono-asio-sta"
+        };
+
+        if (OperatingSystem.IsWindows())
+        {
+            _thread.SetApartmentState(ApartmentState.STA);
+        }
+
+        _thread.Start();
+
+        if (!_ready.Wait(TimeSpan.FromSeconds(10)))
+        {
+            Failure = "드라이버가 10초 안에 응답하지 않았습니다.";
+        }
+    }
+
+    public void Dispose()
+    {
+        _stop.Set();
+        _thread.Join(1000);
+        _ready.Dispose();
+        _stop.Dispose();
     }
 }
