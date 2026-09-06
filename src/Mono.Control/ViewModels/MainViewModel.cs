@@ -148,6 +148,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _heartCount;
     [ObservableProperty] private int _heartsLeft = 3;
     [ObservableProperty] private bool _showQueue;
+    [ObservableProperty] private string _backupPath = "";
     /// <summary>Core의 MaxReactionsPerUserPerTrack 과 같은 값이어야 한다.</summary>
     private const int MaxReactionsPerTrack = 3;
 
@@ -635,6 +636,17 @@ public partial class MainViewModel : ObservableObject
     {
         var i = track is null ? -1 : Lounge.QueueTracks.IndexOf(track);
         return i < 0 ? Task.CompletedTask : Safe(() => _session.JumpToAsync(i));
+    }
+
+    [RelayCommand]
+    private Task BackupAsync() => Safe(() => _session.BackupAsync());
+
+    /// <summary>설정에서 전용 화면으로 보낸다 — 같은 내용을 두 곳에 만들지 않는다.</summary>
+    [RelayCommand]
+    private void GoToPage(string? navId)
+    {
+        var item = NavItems.FirstOrDefault(n => n.Id == navId);
+        if (item is not null) SelectedNav = item;
     }
 
     private async Task Safe(Func<Task> action)

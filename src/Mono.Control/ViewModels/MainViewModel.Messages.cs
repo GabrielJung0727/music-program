@@ -64,6 +64,10 @@ public partial class MainViewModel
                     ? (msg.Body ?? "세션을 종료했습니다")
                     : "세션을 저장하고 하이라이트 플레이리스트를 만들었습니다");
                 break;
+            case MessageTypes.Backup:
+                BackupPath = msg.Body ?? "";
+                StatusText = string.IsNullOrEmpty(BackupPath) ? "백업 실패" : "백업 완료";
+                break;
             case MessageTypes.Album:
                 LoadAlbum(msg.Body);
                 break;
