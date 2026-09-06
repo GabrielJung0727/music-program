@@ -31,7 +31,9 @@ public static class ClockSync
     /// WAN에서는 락 유지를 위해 최대 80ms까지 늘린다.
     /// </summary>
     public static int JitterBufferMs(double rttMs, double jitterMs)
-        => (int)Math.Clamp(5 + rttMs / 2 + jitterMs * 3, 5, 80);
+        // 하한은 청크 하나(20ms)와 렌더 루프 웨이크 퀀텀(~16ms)을 합친 흔들림을 흡수해야 한다.
+        // 그보다 얕으면 정상 재생에서도 버퍼가 바닥을 쳐서 언더런이 나고, 그 구멍이 딸깍 소리가 된다.
+        => (int)Math.Clamp(50 + rttMs / 2 + jitterMs * 3, 50, 200);
 
     /// <summary>오프셋 표본의 절대 편차 평활 — RFC3550식 지터 추정의 축약형.</summary>
     public static double UpdateJitter(double jitter, double previousOffset, double offset)

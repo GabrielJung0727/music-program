@@ -362,10 +362,24 @@ public class RoomAndClockTests
     [Fact]
     public void JitterBufferGrowsWithRttAndStaysBounded()
     {
-        // LAN: 5ms 목표에 가깝게
-        Assert.InRange(ClockSync.JitterBufferMs(1, 0.2), 5, 8);
-        // WAN: 락 유지를 위해 커지되 80ms를 넘지 않는다.
-        Assert.Equal(80, ClockSync.JitterBufferMs(400, 30));
+        // LAN: 하한 근처
+        Assert.InRange(ClockSync.JitterBufferMs(1, 0.2), 50, 53);
+        // WAN: 락 유지를 위해 커지되 200ms를 넘지 않는다.
+        Assert.Equal(200, ClockSync.JitterBufferMs(400, 30));
+    }
+
+    /// <summary>
+    /// 회귀: 지터 버퍼가 청크 하나(20ms)보다 얕으면, 지연을 줄이려는 깊이 제어가
+    /// 정상 재생 중에도 매 청크를 잘라내 딸깍/지직 소리를 만든다.
+    /// Core·Output 이 같은 PC 에 있을 때(rtt·jitter ~= 0)가 가장 위험한 경우다.
+    /// </summary>
+    [Fact]
+    public void JitterBufferHoldsAtLeastOneChunkOnLoopback()
+    {
+        const int chunkMs = 20;
+        Assert.True(ClockSync.JitterBufferMs(0, 0) > chunkMs,
+            $"loopback jitter buffer {ClockSync.JitterBufferMs(0, 0)}ms <= chunk {chunkMs}ms");
+        Assert.True(ClockSync.JitterBufferMs(0.1, 0.05) > chunkMs);
     }
 
     [Fact]

@@ -192,6 +192,12 @@ async Task ClockLoopAsync(CancellationToken ct)
     }
 }
 
+double DepthCeilingMs(MatpAudio frame)
+    => RenderGate.DepthCeilingMs(
+        clock.TargetBufferMs,
+        renderer.LatencyMs,
+        RenderGate.FrameDurationMs(frame.Payload.Length, frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd));
+
 // 렌더 루프: PTS가 도래한 프레임만 DAC 버퍼로 넘긴다. 소셜/네트워크 처리와 스레드를 나눈다.
 async Task RenderLoopAsync(CancellationToken ct)
 {
@@ -244,6 +250,9 @@ async Task RenderLoopAsync(CancellationToken ct)
             local?.Dispose();
             local = null;
 
+            // 프라임 깊이는 스케줄러가 앞당겨 잡아 둔 지터 버퍼와 같아야 동기가 맞는다.
+            renderer.PrimeMs = clock.TargetBufferMs;
+
             while (frames.TryPeek(out var head))
             {
                 var playAtLocal = timeline.PlayAtLocalUnixMs(head.PtsMs, clock.OffsetMs, clock.TargetBufferMs);
@@ -253,11 +262,20 @@ async Task RenderLoopAsync(CancellationToken ct)
                     break;
                 }
 
-                frames.TryDequeue(out var frame);
-                if (wait < -clock.TargetBufferMs * 4)
+                // 버퍼가 깊다고 프레임을 버리면 그 자리에 파형 불연속이 남아 딸깍/지직 소리가 난다.
+                // 큐에 그대로 두고 다음 루프에서 다시 시도한다(백프레셔). PTS 게이트가 이미 속도를 맞추므로
+                // 버퍼는 곧 빠지고 프레임은 온전히 들어간다.
+                if (renderer.Playing && RenderGate.ShouldHold(renderer.BufferedMs, DepthCeilingMs(head)))
                 {
-                    // 너무 늦게 도착 — 버리고 락을 유지한다.
-                    resyncs++;
+                    break;
+                }
+
+                frames.TryDequeue(out var frame);
+                if (wait < -RenderGate.LateToleranceMs)
+                {
+                    // 너무 늦게 도착 — 버리고 락을 유지한다. 깊이 제어로 버리는 일은 이제 없으므로
+                    // drop 카운터는 오직 이 경우(지각 도착)만 센다.
+                    drops++;
                     continue;
                 }
 
@@ -274,19 +292,11 @@ async Task RenderLoopAsync(CancellationToken ct)
                     continue;
                 }
 
-                // 목표 지연 = 지터 버퍼 + DAC 자체 지연. 그보다 깊어지면 락을 유지한 채 지연만 걷어낸다.
-                var targetDepth = clock.TargetBufferMs + renderer.LatencyMs;
-                if (renderer.Playing && renderer.BufferedMs > targetDepth + 60)
+                // 스톨 등으로 백프레셔가 감당 못 할 만큼 벌어졌을 때만 비운다. 정상 재생에서는 닿지 않는다.
+                if (renderer.Playing && RenderGate.ShouldFlush(renderer.BufferedMs, DepthCeilingMs(frame)))
                 {
-                    // 큰 이탈(스톨 이후)은 한 번에 비우고 다시 락한다.
                     renderer.Flush();
                     resyncs++;
-                    continue;
-                }
-
-                if (renderer.Playing && renderer.BufferedMs > targetDepth + 10)
-                {
-                    drops++;
                     continue;
                 }
 

@@ -104,6 +104,14 @@ public sealed class ProcessSupervisor
             RedirectStandardError = true
         };
         var p = Process.Start(psi) ?? throw new InvalidOperationException("프로세스 기동 실패: " + exePath);
+
+        // 파이프를 반드시 비워 준다. 읽지 않으면 4KB 버퍼가 차는 순간 자식이 Console.WriteLine 에서 멈춘다.
+        var tag = Path.GetFileNameWithoutExtension(exePath);
+        p.OutputDataReceived += (_, e) => AppLog.Write(tag, e.Data);
+        p.ErrorDataReceived += (_, e) => AppLog.Write(tag, e.Data);
+        p.BeginOutputReadLine();
+        p.BeginErrorReadLine();
+        AppLog.Write("control", $"started {tag} {args}".TrimEnd());
         return p;
     }
 

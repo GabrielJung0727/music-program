@@ -46,6 +46,9 @@ public sealed class AsioAudioRenderer : IAudioRenderer
     public int MaxBitDepth { get; }
     public bool HardwareVolume { get; }
     public long LatencyMs { get; private set; }
+
+    /// <summary>재생을 시작하기 전에 채워 둘 버퍼 깊이. 지터 버퍼 목표치와 같게 둔다.</summary>
+    public int PrimeMs { get; set; } = 50;
     public bool Exclusive { get; }
     public bool Playing => _asio.PlaybackState == PlaybackState.Playing;
 
@@ -76,12 +79,24 @@ public sealed class AsioAudioRenderer : IAudioRenderer
             if (volumePercent < 100)
                 payload = Attenuate(pcm, bits, volumePercent);
             _buffer!.AddSamples(payload, 0, payload.Length);
+
+            // 빈 버퍼로 시작하면 첫 순간부터 언더런이다. 목표 깊이를 채운 뒤에 연다.
+            if (_asio.PlaybackState != PlaybackState.Playing
+                && _buffer.BufferedDuration.TotalMilliseconds >= PrimeMs)
+            {
+                _asio.Play();
+            }
         }
     }
 
     public void Flush()
     {
-        lock (_gate) _buffer?.ClearBuffer();
+        lock (_gate)
+        {
+            _buffer?.ClearBuffer();
+            // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
+            try { _asio.Pause(); } catch { /* 장치가 이미 닫혔으면 무시 */ }
+        }
     }
 
     public void SetHardwareVolume(int percent) { /* ASIO: 앱 디지털 감쇠 */ }
@@ -104,7 +119,6 @@ public sealed class AsioAudioRenderer : IAudioRenderer
             BufferDuration = TimeSpan.FromMilliseconds(200)
         };
         _asio.Init(_buffer);
-        _asio.Play();
         LatencyMs = Math.Max(3, _asio.PlaybackLatency);
     }
 

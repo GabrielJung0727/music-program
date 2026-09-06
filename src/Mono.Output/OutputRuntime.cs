@@ -86,6 +86,10 @@ public interface IAudioRenderer : IDisposable
     int MaxBitDepth { get; }
     bool HardwareVolume { get; }
     long LatencyMs { get; }
+
+    /// <summary>재생을 시작하기 전에 채워 둘 버퍼 깊이(ms).</summary>
+    int PrimeMs { get; set; }
+
     bool Exclusive { get; }
     bool Playing { get; }
     double BufferedMs { get; }
@@ -137,6 +141,9 @@ public sealed class Renderer : IAudioRenderer, IDisposable
     public int MaxBitDepth { get; }
     public bool HardwareVolume { get; }
     public long LatencyMs { get; private set; } = 10;
+
+    /// <summary>재생을 시작하기 전에 채워 둘 버퍼 깊이. 지터 버퍼 목표치와 같게 둔다.</summary>
+    public int PrimeMs { get; set; } = 50;
     public bool Exclusive { get; private set; }
     public bool Playing => _out?.PlaybackState == PlaybackState.Playing;
 
@@ -179,6 +186,16 @@ public sealed class Renderer : IAudioRenderer, IDisposable
             }
 
             _buffer!.AddSamples(payload, 0, payload.Length);
+
+            // 빈 버퍼로 재생을 시작하면 첫 순간부터 언더런이다. 목표 깊이만큼 채운 뒤에 연다.
+            // PlayAtLocalUnixMs 가 이미 이 깊이(TargetBufferMs)만큼 앞당겨 스케줄하므로 동기도 맞는다.
+            if (_out is not null
+                && _out.PlaybackState != PlaybackState.Playing
+                && _buffer.BufferedDuration.TotalMilliseconds >= PrimeMs)
+            {
+                _out.Play();
+            }
+
             DriftMs = _buffer.BufferedDuration.TotalMilliseconds - LatencyMs;
         }
     }
@@ -188,6 +205,8 @@ public sealed class Renderer : IAudioRenderer, IDisposable
         lock (_gate)
         {
             _buffer?.ClearBuffer();
+            // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
+            try { _out?.Pause(); } catch { /* 장치가 이미 닫혔으면 무시 */ }
         }
     }
 
@@ -227,7 +246,6 @@ public sealed class Renderer : IAudioRenderer, IDisposable
             {
                 var exclusive = new WasapiOut(_device, AudioClientShareMode.Exclusive, true, 10);
                 exclusive.Init(_buffer);
-                exclusive.Play();
                 _out = exclusive;
                 Exclusive = true;
                 LatencyMs = 10;
@@ -243,7 +261,6 @@ public sealed class Renderer : IAudioRenderer, IDisposable
             ? new WasapiOut(AudioClientShareMode.Shared, 20)
             : new WasapiOut(_device, AudioClientShareMode.Shared, true, 20);
         shared.Init(_buffer);
-        shared.Play();
         _out = shared;
         Exclusive = false;
         LatencyMs = 20;
