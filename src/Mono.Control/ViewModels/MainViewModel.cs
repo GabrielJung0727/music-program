@@ -537,13 +537,6 @@ public partial class MainViewModel : ObservableObject
             _ = Safe(() => _session.LinerScrollAsync(value));
     }
 
-    [RelayCommand]
-    private async Task ToggleFollowHostAsync()
-    {
-        FollowHostView = !FollowHostView;
-        await Task.CompletedTask;
-    }
-
     private async Task RefreshNowArtAsync(string url)
     {
         var bmp = await ArtCache.GetAsync(url);

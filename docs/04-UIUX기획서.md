@@ -435,6 +435,8 @@ dotnet publish src/Mono.Output  -c Release -r win-x64 --self-contained true -p:P
 | **P0** | ~~Avalonia Control 셸 + WinExe Core/Output~~ ✅ |
 | **P1** | ~~Now Playing 몰입, Easy EQ UI, 시그널 패스, Home 레일, 트레이 종료 정책~~ ✅ |
 | **P2** | ~~Device EQ, Convolution IR, Speaker Setup, Genres 타일, 레거시 wwwroot 삭제~~ ✅ (파트너 SDK·LAN 실측은 별도) |
+| **완료** | 1–5단계: 스냅샷 계약 · 하단 바(볼륨·존·♥·큐·히트맵·핀) · 라이브러리 화면 5종 · 라운지 관리자 패널 · Now Playing 5모드 · 설정 10트리 · 단축키 · 존 관리 · 페어링 · 백업 |
+| **남음** | 코드 서명 인증서 · 파트너 SDK 실계정 QA · LAN 2기기 sync_probe 실측 · ASIO/네이티브 DSD 청음 · 세션 보존 기간 UI |
 
 ---
 
