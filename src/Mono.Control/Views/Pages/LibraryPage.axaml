@@ -25,19 +25,17 @@
                     <DataTemplate x:DataType="models:CatalogTrack">
                       <Border Classes="trackcard">
                         <StackPanel Spacing="6">
-                          <Button Classes="ghost" Padding="0" BorderThickness="0" Background="Transparent"
-                                  ToolTip.Tip="앨범 열기"
-                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).Library.OpenAlbumCommand}"
-                                  CommandParameter="{Binding}">
-                            <Border Classes="artslot" Height="140">
-                              <Panel>
-                                <Image Classes="artph"
-                                       Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
-                                       IsVisible="{Binding !HasArt}"/>
-                                <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                              </Panel>
-                            </Border>
-                          </Button>
+                          <Border Classes="artslot" Height="140">
+                            <Panel>
+                              <Image Classes="artph"
+                                     Source="{DynamicResource Mono.Icon.ArtPlaceholder}"
+                                     IsVisible="{Binding !HasArt}"/>
+                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
+                              <Button Classes="artopen" ToolTip.Tip="앨범 열기"
+                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).Library.OpenAlbumCommand}"
+                                      CommandParameter="{Binding}"/>
+                            </Panel>
+                          </Border>
                           <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
                           <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
                           <TextBlock Text="{Binding Badge}" Classes="muted" FontSize="11"/>

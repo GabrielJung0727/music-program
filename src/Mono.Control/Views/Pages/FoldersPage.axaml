@@ -12,7 +12,7 @@
       <ItemsControl ItemsSource="{Binding Folders}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="models:FolderEntry">
-            <Border Classes="trackcard" Margin="0,0,0,6" Padding="12">
+            <Border Classes="row" Margin="0,0,0,6" Padding="12">
               <StackPanel>
                 <TextBlock Text="{Binding Path}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                 <TextBlock Text="{Binding Status}" Classes="muted" FontSize="11"/>

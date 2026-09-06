@@ -30,7 +30,44 @@ public sealed partial class AudioViewModel : PageViewModel
     [ObservableProperty] private double _speakerGainR;
     [ObservableProperty] private double _headroomDb = -3;
     [ObservableProperty] private string _deviceEqProfile = "harman";
+    /// <summary>Core 가 돌려준 sync_probe 원문. 화면에는 요약만 보여 준다.</summary>
     [ObservableProperty] private string _syncProbeText = "";
+
+    [ObservableProperty] private string _syncProbeSummary = "";
+
+    public bool HasSyncProbe => !string.IsNullOrEmpty(SyncProbeSummary);
+
+    partial void OnSyncProbeSummaryChanged(string value) => OnPropertyChanged(nameof(HasSyncProbe));
+
+    /// <summary>
+    /// 원시 JSON 대신 읽을 수 있는 한 줄로 바꾼다.
+    /// Core 가 note 에 이미 한국어 안내를 담아 주므로 그걸 앞세운다.
+    /// </summary>
+    partial void OnSyncProbeTextChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) { SyncProbeSummary = ""; return; }
+        try
+        {
+            var verdict = System.Text.Json.JsonDocument.Parse(value).RootElement.GetProperty("verdict");
+            var peers = verdict.GetProperty("peerCount").GetInt32();
+            var locked = verdict.GetProperty("lockedCount").GetInt32();
+            var spread = verdict.GetProperty("offsetSpreadMs").GetDouble();
+            var target = verdict.GetProperty("targetMs").GetDouble();
+            var meets = verdict.GetProperty("meetsTarget").GetBoolean();
+            var note = verdict.TryGetProperty("note", out var n) ? n.GetString() : null;
+
+            var head = peers == 0
+                ? "연결된 출력 기기가 없습니다."
+                : $"기기 {peers}대 중 {locked}대 동기화 · 편차 {spread:0.0}ms (목표 {target:0}ms) · "
+                  + (meets ? "목표 달성" : "목표 미달");
+
+            SyncProbeSummary = string.IsNullOrWhiteSpace(note) ? head : head + Environment.NewLine + note;
+        }
+        catch
+        {
+            SyncProbeSummary = "동기화 측정 결과를 읽지 못했습니다.";
+        }
+    }
     [ObservableProperty] private string _artPerfText = "";
 
     public ObservableCollection<ZoneItem> Zones { get; } = new();

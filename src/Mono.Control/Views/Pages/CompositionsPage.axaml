@@ -14,7 +14,7 @@
       <ItemsControl ItemsSource="{Binding Compositions}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="models:CompositionEntry">
-            <Border Classes="trackcard" Margin="0,0,0,6" Padding="12">
+            <Border Classes="row" Margin="0,0,0,6" Padding="12">
               <Grid ColumnDefinitions="*,220,110">
                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                 <TextBlock Grid.Column="1" Text="{Binding Composer}" Classes="muted"
