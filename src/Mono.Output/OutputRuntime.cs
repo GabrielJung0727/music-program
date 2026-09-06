@@ -242,9 +242,10 @@ public sealed class Renderer : IAudioRenderer, IDisposable
 
         if (!_forceShared && _device is not null)
         {
+            WasapiOut? exclusive = null;
             try
             {
-                var exclusive = new WasapiOut(_device, AudioClientShareMode.Exclusive, true, 10);
+                exclusive = new WasapiOut(_device, AudioClientShareMode.Exclusive, true, 10);
                 exclusive.Init(_buffer);
                 _out = exclusive;
                 Exclusive = true;
@@ -254,6 +255,8 @@ public sealed class Renderer : IAudioRenderer, IDisposable
             catch (Exception)
             {
                 // 배타 모드가 이 포맷을 못 받으면 공유 모드로 내려간다.
+                // 실패한 클라이언트를 놓아주지 않으면 장치를 배타로 문 채 남아 공유 모드까지 막는다.
+                try { exclusive?.Dispose(); } catch { /* 이미 닫혔으면 무시 */ }
             }
         }
 

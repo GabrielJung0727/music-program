@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using Mono.Protocol;
+
 namespace Mono.Output;
 
 /// <summary>
@@ -40,4 +43,22 @@ public static class RenderGate
 
     /// <summary>백프레셔로 감당할 수 없을 만큼 벌어져 버퍼를 비워야 하는가.</summary>
     public static bool ShouldFlush(double bufferedMs, double ceilingMs) => bufferedMs > ceilingMs + 200;
+
+    /// <summary>
+    /// epoch 가 바뀌었을 때 큐에서 살릴 프레임을 고른다.
+    ///
+    /// 곡을 넘기면 Core 는 새 곡의 룩어헤드(약 320ms)를 한 번에 보낸다. 수신 루프는 이미
+    /// 새 epoch 기준으로 받아들이므로, 큐를 통째로 비우면 그 앞부분이 통째로 사라져
+    /// 새 곡이 한참 뒤에서 튀어나온다. 지난 epoch 것만 버린다.
+    /// </summary>
+    public static List<MatpAudio> DropStaleEpochs(ConcurrentQueue<MatpAudio> queue, long currentEpoch)
+    {
+        var carried = new List<MatpAudio>();
+        while (queue.TryDequeue(out var queued))
+        {
+            if (queued.Epoch == currentEpoch) carried.Add(queued);
+        }
+
+        return carried;
+    }
 }

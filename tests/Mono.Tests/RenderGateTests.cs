@@ -1,3 +1,4 @@
+using System.Linq;
 using Mono.Output;
 using Mono.Protocol;
 using Xunit;
@@ -126,6 +127,43 @@ public class RenderGateTests
         var ceiling = RenderGate.DepthCeilingMs(target, 10, ChunkMs);
         Assert.True(ceiling - target >= ChunkMs + RenderGate.WakeSlackMs,
             $"천장 여유 {ceiling - target:F0}ms 가 청크+웨이크({ChunkMs + RenderGate.WakeSlackMs}ms)보다 좁다");
+    }
+
+    /// <summary>
+    /// 회귀: 곡을 넘기면 Core 는 새 곡의 룩어헤드를 한 번에 보낸다(실측 13프레임 · PTS 7~247ms).
+    /// 수신 루프는 이미 새 epoch 로 그것들을 받아들인 뒤이므로, epoch 전환에서 큐를 통째로
+    /// 비우면 새 곡의 앞부분이 통째로 사라진다.
+    /// </summary>
+    [Fact]
+    public void EpochChangeKeepsTheIncomingTrackAndDropsOnlyTheOldOne()
+    {
+        var queue = new System.Collections.Concurrent.ConcurrentQueue<MatpAudio>();
+
+        // 지난 곡의 잔여 프레임
+        for (var pts = 2760L; pts <= 2820; pts += 20)
+            queue.Enqueue(new MatpAudio(pts, 44100, 16, 2, false, 0, new byte[3528]));
+
+        // 곡을 넘기자마자 도착한 새 곡의 룩어헤드 버스트
+        for (var pts = 7L; pts <= 247; pts += 20)
+            queue.Enqueue(new MatpAudio(pts, 96000, 24, 2, false, 1, new byte[11520]));
+
+        var carried = RenderGate.DropStaleEpochs(queue, currentEpoch: 1);
+
+        Assert.Empty(queue);                                  // 큐는 비워졌고
+        Assert.Equal(13, carried.Count);                      // 새 곡 13프레임은 살아남았다
+        Assert.All(carried, f => Assert.Equal(1, f.Epoch));
+        Assert.Equal(7, carried[0].PtsMs);                    // 앞부분이 잘리지 않았다
+    }
+
+    [Fact]
+    public void DropStaleEpochsKeepsArrivalOrder()
+    {
+        var queue = new System.Collections.Concurrent.ConcurrentQueue<MatpAudio>();
+        foreach (var pts in new long[] { 40, 60, 80 })
+            queue.Enqueue(new MatpAudio(pts, 48000, 24, 2, false, 5, []));
+
+        var carried = RenderGate.DropStaleEpochs(queue, currentEpoch: 5);
+        Assert.Equal(new long[] { 40, 60, 80 }, carried.Select(f => f.PtsMs));
     }
 
     /// <summary>청크 길이는 Core 의 상수를 짐작하지 않고 프레임에서 직접 잰다.</summary>

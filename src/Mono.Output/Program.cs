@@ -211,7 +211,15 @@ async Task RenderLoopAsync(CancellationToken ct)
             {
                 var firstLock = lastEpoch == long.MinValue;
                 lastEpoch = timeline.Epoch;
-                frames.Clear();
+
+                // 지난 epoch 의 프레임만 걷어낸다. 통째로 비우면 곡을 넘긴 직후 Core 가 한꺼번에
+                // 보내 둔 새 곡의 룩어헤드(약 320ms)까지 함께 지워져, 새 곡이 앞부분을 잃고
+                // 한참 뒤에서 튀어나온다. 수신 루프는 이미 새 epoch 기준으로 받아들이고 있다.
+                foreach (var keep in RenderGate.DropStaleEpochs(frames, timeline.Epoch))
+                {
+                    frames.Enqueue(keep);
+                }
+
                 renderer.Flush();
                 local?.Dispose();
                 local = null;
