@@ -16,8 +16,28 @@ public sealed class AppUpdater
     public const string GitHubRepo = "https://github.com/GabrielJung0727/music-program";
     public const string PackId = "Mono";
 
-    public string CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+    /// <summary>
+    /// 화면에 보여 줄 현재 버전. 설치본에서는 Velopack 이 아는 패키지 버전이 진실이다 —
+    /// 어셈블리 버전은 csproj 에 값을 박아 두면 publish 의 -p:Version 을 이겨서 옛 숫자가 남는다.
+    /// </summary>
+    public string CurrentVersion
+    {
+        get
+        {
+            try
+            {
+                var manager = CreateManager();
+                if (manager.IsInstalled && manager.CurrentVersion is { } v)
+                    return v.ToString();
+            }
+            catch
+            {
+                // 설치본이 아니거나 피드에 못 붙는 경우 — 어셈블리 버전으로 물러난다.
+            }
+
+            return Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+        }
+    }
 
     public UpdateInfo? Pending { get; private set; }
 

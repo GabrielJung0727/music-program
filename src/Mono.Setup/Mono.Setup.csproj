@@ -9,7 +9,9 @@
     <AssemblyName>Mono.Setup</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>mono-app.ico</ApplicationIcon>
-    <Version>0.1.4</Version>
+    <!-- publish.ps1 이 -p:Version 으로 덮어쓴다. AssemblyVersion 을 따로 박으면
+         그쪽이 이겨서 About 에 옛 버전이 찍힌다. -->
+    <Version>0.1.5</Version>
     <AssemblyTitle>mono</AssemblyTitle>
     <Product>mono</Product>
     <Company>mono</Company>
