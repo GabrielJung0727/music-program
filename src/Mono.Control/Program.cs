@@ -29,6 +29,21 @@ internal static class Program
     /// 처리되지 않은 예외를 파일로 남긴다. 없으면 창이 아무 말 없이 사라져
     /// 사용자도 우리도 원인을 모른다.
     /// </summary>
+    /// <summary>진단 로그 한 줄. Avalonia 초기화 이후 App 에서도 쓴다.</summary>
+    public static void LogDiagnostic(string source, object? detail)
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Mono", "crash.log");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path,
+                $"{DateTimeOffset.Now:o} [{source}] {detail}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch { /* 로그조차 못 쓰면 할 수 있는 게 없다 */ }
+    }
+
     private static void InstallCrashLog()
     {
         var path = Path.Combine(
@@ -47,6 +62,7 @@ internal static class Program
         }
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Write("domain", e.ExceptionObject);
+
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
             Write("task", e.Exception);
