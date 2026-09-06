@@ -391,6 +391,12 @@
                   <TextBlock Text="크레딧" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
+              <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="3">
+                <TextBlock Text="앨범" VerticalAlignment="Center" Foreground="White"/>
+              </Button>
+              <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="4">
+                <TextBlock Text="연혁" VerticalAlignment="Center" Foreground="White"/>
+              </Button>
             </StackPanel>
           </DockPanel>
           <Grid ColumnDefinitions="320,*" Margin="0,24,0,0">
@@ -419,6 +425,29 @@
                   <CheckBox Content="호스트 보기 따라가기" IsChecked="{Binding FollowHostView}" Foreground="White"/>
                   <TextBlock Text="{Binding CreditsText}" TextWrapping="Wrap" Foreground="#EEFFFFFF"/>
                   <TextBlock Text="{Binding LinerNotes}" TextWrapping="Wrap" Foreground="#CCFFFFFF"/>
+                </StackPanel>
+              </ScrollViewer>
+
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpAlbum}">
+                <ItemsControl ItemsSource="{Binding AlbumTracks}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:CatalogTrack">
+                      <Grid ColumnDefinitions="*,70" Margin="0,0,0,4">
+                        <TextBlock Text="{Binding Title}" Foreground="White"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Grid.Column="1" Text="{Binding DurationText}" Foreground="#CCFFFFFF"
+                                   HorizontalAlignment="Right"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpWiki}">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding WikiText}" Foreground="White" TextWrapping="Wrap"/>
+                  <TextBlock FontSize="11" Foreground="#99FFFFFF" TextWrapping="Wrap"
+                             Text="위키백과 요약 — 한국어가 없으면 영어로 대체합니다."/>
                 </StackPanel>
               </ScrollViewer>
             </StackPanel>

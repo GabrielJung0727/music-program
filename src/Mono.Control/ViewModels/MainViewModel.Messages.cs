@@ -290,6 +290,19 @@ public partial class MainViewModel
             VolumeBlockedReason = "출력 장치가 없습니다 — 「출력 연결」을 누르세요";
         }
 
+        AlbumTracks.Clear();
+        foreach (var t in snap.AlbumTracks)
+        {
+            AlbumTracks.Add(new CatalogTrack
+            {
+                Id = t.Id,
+                Title = t.Title,
+                Artist = t.ArtistName,
+                DurationMs = t.DurationMs,
+                Badge = t.Badge
+            });
+        }
+
         Lounge.CurrentArtistId = snap.CurrentTrack?.ArtistId ?? "";
         Lounge.ApplySnapshot(snap);
         Audio.ApplySnapshot(snap);

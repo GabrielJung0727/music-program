@@ -87,6 +87,8 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<OutputDevice> Outputs { get; } = new();
     public ObservableCollection<ZoneItem> Zones { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
+    /// <summary>몰입 모드의 앨범 탭. 지금 곡이 실린 앨범의 수록곡이다.</summary>
+    public ObservableCollection<CatalogTrack> AlbumTracks { get; } = new();
     public ObservableCollection<string> LyricLines { get; } = new();
 
     [ObservableProperty] private NavItem? _selectedNav;
@@ -184,6 +186,8 @@ public partial class MainViewModel : ObservableObject
     public bool IsNpLyrics => NowPlayingTab == 0;
     public bool IsNpArtist => NowPlayingTab == 1;
     public bool IsNpCredits => NowPlayingTab == 2;
+    public bool IsNpAlbum => NowPlayingTab == 3;
+    public bool IsNpWiki => NowPlayingTab == 4;
     public bool IsObStep0 => OnboardingStep == 0;
     public bool IsObStep1 => OnboardingStep == 1;
     public bool IsObStep2 => OnboardingStep == 2;
@@ -204,6 +208,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsNpLyrics));
         OnPropertyChanged(nameof(IsNpArtist));
         OnPropertyChanged(nameof(IsNpCredits));
+        OnPropertyChanged(nameof(IsNpAlbum));
+        OnPropertyChanged(nameof(IsNpWiki));
     }
     partial void OnUpdateReadyChanged(bool value) => OnPropertyChanged(nameof(UpdateButtonLabel));
     partial void OnDarkThemeChanged(bool value)
