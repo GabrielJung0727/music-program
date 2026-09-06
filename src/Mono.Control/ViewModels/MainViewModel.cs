@@ -1,14 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Models;
 using Mono.Control.Services;
+using Mono.Control.ViewModels.Pages;
 using Mono.Protocol;
+using Mono.Shared;
 
 namespace Mono.Control.ViewModels;
 
@@ -24,11 +25,16 @@ public partial class MainViewModel : ObservableObject
     private bool _playingClock;
     private CancellationTokenSource? _artCts;
     private string? _genreFilter;
+    private CancellationTokenSource? _searchCts;
 
     public MainViewModel(CoreSession session, ProcessSupervisor supervisor)
     {
         _session = session;
         _supervisor = supervisor;
+        Lounge = new LoungeViewModel(session);
+        Lounge.SelfPeerId = session.PeerId;
+        Audio = new AudioViewModel(session);
+        Library = new LibraryViewModel(session);
         _session.MessageReceived += OnMessage;
         _session.ConnectionChanged += () => Dispatcher.UIThread.Post(() =>
         {
@@ -48,43 +54,41 @@ public partial class MainViewModel : ObservableObject
             new("artists", "Artists", "My Library", "nav-artists"),
             new("tracks", "Tracks", "My Library", "nav-tracks"),
             new("playlists", "Playlists", "My Library", "nav-playlists"),
+            new("composers", "Composers", "My Library", "nav-artists"),
+            new("compositions", "Compositions", "My Library", "nav-tracks"),
+            new("folders", "Folders", "My Library", "nav-albums"),
             new("devices", "Audio", "Setup", "nav-audio"),
             new("settings", "Settings", "Setup", "nav-settings"),
         ];
         SelectedNav = NavItems[0];
 
-        GenreTiles =
-        [
-            new("all", "All", "#2C2C34", "전체 라이브러리", "genre-local"),
-            new("hires", "Hi-Res", "#1F4E5F", "96kHz+", "genre-hires"),
-            new("dsd", "DSD", "#5C3D2E", "네이티브 DSD", "genre-dsd"),
-            new("jazz", "Jazz", "#3D4F5F", "시드·스캔 재즈", "genre-jazz"),
-            new("tidal", "TIDAL", "#111111", "스트리밍", "genre-tidal"),
-            new("qobuz", "Qobuz", "#1A3A5C", "Studio / Hi-Res", "genre-qobuz"),
-            new("local", "Local", "#3A4A3A", "로컬 파일", "genre-local"),
-        ];
 
         CloseToTray = Prefs.GetBool("close_to_tray");
         LibraryPath = Prefs.Get("library_path", "");
         DarkTheme = Prefs.GetBool("dark_theme");
         ApplyTheme();
         AppVersion = _updater.CurrentVersion;
-        UpdateStatus = $"현재 버전 {AppVersion}";
+        UpdateStatus = "";
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _clockTimer.Tick += (_, _) => TickClock();
         _clockTimer.Start();
     }
 
+    /// <summary>화면별 상태. 셸은 스냅샷을 받아 이들에게 밀어 넣는다.</summary>
+    public LoungeViewModel Lounge { get; }
+    public AudioViewModel Audio { get; }
+    public LibraryViewModel Library { get; }
+
     public ObservableCollection<NavItem> NavItems { get; }
     public ObservableCollection<CatalogTrack> Tracks { get; } = new();
     public ObservableCollection<CatalogTrack> FilteredTracks { get; } = new();
     public ObservableCollection<HomeRail> HomeRails { get; } = new();
-    public ObservableCollection<GenreTile> GenreTiles { get; }
-    public ObservableCollection<RoomListItem> Rooms { get; } = new();
-    public ObservableCollection<string> ChatLines { get; } = new();
-    public ObservableCollection<CatalogTrack> QueueTracks { get; } = new();
+    public ObservableCollection<OutputDevice> Outputs { get; } = new();
+    public ObservableCollection<ZoneItem> Zones { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
+    /// <summary>몰입 모드의 앨범 탭. 지금 곡이 실린 앨범의 수록곡이다.</summary>
+    public ObservableCollection<CatalogTrack> AlbumTracks { get; } = new();
     public ObservableCollection<string> LyricLines { get; } = new();
 
     [ObservableProperty] private NavItem? _selectedNav;
@@ -98,11 +102,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _displayName = Environment.UserName;
     [ObservableProperty] private string _libraryPath = "";
     [ObservableProperty] private string _zoneName = "내 방";
-    [ObservableProperty] private string _roomName = "Night Lounge";
-    [ObservableProperty] private int _roomMode;
-    [ObservableProperty] private string _joinRoomId = "";
-    [ObservableProperty] private string _inviteCode = "";
-    [ObservableProperty] private string _chatInput = "";
     [ObservableProperty] private string _nowTitle = "트랙을 큐에 넣으세요";
     [ObservableProperty] private string _nowArtist = "";
     [ObservableProperty] private string _nowBadge = "";
@@ -129,20 +128,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showNowPlaying;
     [ObservableProperty] private int _nowPlayingTab;
     [ObservableProperty] private bool _closeToTray;
-    [ObservableProperty] private bool _eqGraphicMode;
-    [ObservableProperty] private double _eqBand1;
-    [ObservableProperty] private double _eqBand2;
-    [ObservableProperty] private double _eqBand3;
-    [ObservableProperty] private double _eqBand4;
-    [ObservableProperty] private double _eqBand5;
-    [ObservableProperty] private string _irPath = "";
-    [ObservableProperty] private double _speakerDelayL;
-    [ObservableProperty] private double _speakerDelayR;
-    [ObservableProperty] private double _speakerGainL;
-    [ObservableProperty] private double _speakerGainR;
-    [ObservableProperty] private double _headroomDb = -3;
-    [ObservableProperty] private string _deviceEqProfile = "harman";
-    [ObservableProperty] private string _syncProbeText = "";
     [ObservableProperty] private string _appVersion = "";
     [ObservableProperty] private string _updateStatus = "";
     [ObservableProperty] private bool _updateBusy;
@@ -150,7 +135,35 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _updateProgress;
     [ObservableProperty] private bool _followHostView;
     [ObservableProperty] private double _linerScrollY;
-    [ObservableProperty] private string _artPerfText = "";
+    /// <summary>Core가 마지막으로 보낸 룸 스냅샷 — 페이지 뷰모델이 읽는 단일 상태원.</summary>
+    [ObservableProperty] private RoomSnapshot? _currentSnapshot;
+    [ObservableProperty] private IReadOnlyList<SnapshotHeatBucket> _heatmap = [];
+    [ObservableProperty] private IReadOnlyList<SnapshotPin> _pins = [];
+    [ObservableProperty] private bool _seekingAllowed = true;
+    [ObservableProperty] private int _volume = 100;
+    [ObservableProperty] private bool _volumeEnabled = true;
+    [ObservableProperty] private string _volumeBlockedReason = "";
+    [ObservableProperty] private OutputDevice? _selectedOutput;
+    [ObservableProperty] private string _outputChip = "출력 없음";
+    [ObservableProperty] private int _heartCount;
+    [ObservableProperty] private int _heartsLeft = 3;
+    [ObservableProperty] private bool _showQueue;
+    [ObservableProperty] private string _backupPath = "";
+    /// <summary>Core의 MaxReactionsPerUserPerTrack 과 같은 값이어야 한다.</summary>
+    private const int MaxReactionsPerTrack = 3;
+
+    public bool CanReact => HeartsLeft > 0 && CurrentSnapshot?.CurrentTrack is not null;
+
+    public string ReactBlockedReason => CurrentSnapshot?.CurrentTrack is null
+        ? "재생 중인 곡이 없습니다"
+        : HeartsLeft > 0 ? $"♥ 남은 횟수 {HeartsLeft}회" : "이 곡에는 이미 3번 반응했습니다";
+
+    /// <summary>룸에 들어가기 전에는 배지가 비어 있다. 빈 버튼을 두지 않는다.</summary>
+    public string PathBadgeLabel => string.IsNullOrWhiteSpace(PathBadge) ? "시그널 패스" : PathBadge;
+
+    /// <summary>시킹이 막힌 이유. 비어 있으면 툴팁을 띄우지 않는다.</summary>
+    public string SeekBlockedReason => SeekingAllowed ? "" : "호스트가 시킹을 잠갔습니다";
+
     private bool _suppressLinerScrollSend;
 
     public bool IsLoungePage => SelectedNav?.Id == "lounge";
@@ -158,7 +171,14 @@ public partial class MainViewModel : ObservableObject
     public bool IsSettingsPage => SelectedNav?.Id == "settings";
     public bool IsHomePage => SelectedNav?.Id == "home";
     public bool IsGenresPage => SelectedNav?.Id == "genres";
-    public bool IsLibraryGrid => IsContentLibrary && !IsHomePage && !IsGenresPage;
+    public bool IsComposersPage => SelectedNav?.Id == "composers";
+    public bool IsCompositionsPage => SelectedNav?.Id == "compositions";
+    public bool IsFoldersPage => SelectedNav?.Id == "folders";
+    public bool IsHistoryPage => SelectedNav?.Id == "history";
+    public bool IsPlaylistsPage => SelectedNav?.Id == "playlists";
+    public bool IsLibraryGrid => IsContentLibrary && !IsHomePage && !IsGenresPage
+                                && !IsComposersPage && !IsCompositionsPage && !IsFoldersPage
+                                && !IsHistoryPage && !IsPlaylistsPage;
     public bool IsLibraryToolsVisible => SelectedNav?.Id is "home" or "albums" or "artists" or "tracks" or "genres" or "qobuz" or "tidal";
     public bool IsContentLibrary => !IsLoungePage && !IsDevicesPage && !IsSettingsPage;
     public string PlayPauseLabel => IsPlaying ? "⏸" : "▶";
@@ -167,6 +187,8 @@ public partial class MainViewModel : ObservableObject
     public bool IsNpLyrics => NowPlayingTab == 0;
     public bool IsNpArtist => NowPlayingTab == 1;
     public bool IsNpCredits => NowPlayingTab == 2;
+    public bool IsNpAlbum => NowPlayingTab == 3;
+    public bool IsNpWiki => NowPlayingTab == 4;
     public bool IsObStep0 => OnboardingStep == 0;
     public bool IsObStep1 => OnboardingStep == 1;
     public bool IsObStep2 => OnboardingStep == 2;
@@ -175,11 +197,37 @@ public partial class MainViewModel : ObservableObject
     public bool IsObStep5 => OnboardingStep == 5;
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PlayPauseLabel));
+    partial void OnSeekingAllowedChanged(bool value) => OnPropertyChanged(nameof(SeekBlockedReason));
+
+    /// <summary>
+    /// 룸에 들어가면 이미 떠 있는 Output 도 그 룸으로 옮긴다.
+    /// 룸을 만들기 전에 「출력 연결」을 누른 경우, 이게 없으면 Output 이 어떤 룸에도
+    /// 속하지 않은 채 남아 영영 소리가 나지 않는다.
+    /// </summary>
+    partial void OnCurrentRoomIdChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!_supervisor.OutputRunning) return;
+        if (_supervisor.OutputRoomId == value) return;
+
+        if (_supervisor.StartOutput(value))
+            StatusText = "출력을 이 룸으로 옮겼습니다";
+        else
+            StatusText = _supervisor.LastError ?? "출력 재연결 실패";
+    }
+    partial void OnPathBadgeChanged(string value) => OnPropertyChanged(nameof(PathBadgeLabel));
+    partial void OnHeartsLeftChanged(int value)
+    {
+        OnPropertyChanged(nameof(CanReact));
+        OnPropertyChanged(nameof(ReactBlockedReason));
+    }
     partial void OnNowPlayingTabChanged(int value)
     {
         OnPropertyChanged(nameof(IsNpLyrics));
         OnPropertyChanged(nameof(IsNpArtist));
         OnPropertyChanged(nameof(IsNpCredits));
+        OnPropertyChanged(nameof(IsNpAlbum));
+        OnPropertyChanged(nameof(IsNpWiki));
     }
     partial void OnUpdateReadyChanged(bool value) => OnPropertyChanged(nameof(UpdateButtonLabel));
     partial void OnDarkThemeChanged(bool value)
@@ -187,6 +235,8 @@ public partial class MainViewModel : ObservableObject
         Prefs.SetBool("dark_theme", value);
         OnPropertyChanged(nameof(ThemeButtonLabel));
         ApplyTheme();
+        MonoIcons.ClearCache();
+        OnPropertyChanged(nameof(NavItems));
     }
     partial void OnLibraryPathChanged(string value) => Prefs.Set("library_path", value ?? "");
     partial void OnOnboardingStepChanged(int value)
@@ -199,7 +249,31 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsObStep5));
     }
 
-    partial void OnSearchTextChanged(string value) => ApplyFilter();
+    /// <summary>
+    /// 검색은 Core 가 한다 — 아티스트 별칭 테이블을 거쳐야 "요네즈 켄시"가 米津玄師를 찾는다.
+    /// 타자마다 쏘지 않도록 250ms 묶고, 빈 문자열이면 전체 카탈로그로 돌아간다.
+    /// </summary>
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var ct = _searchCts.Token;
+        var q = value?.Trim() ?? "";
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(250, ct);
+                await (q.Length == 0 ? _session.CatalogAsync() : _session.SearchAsync(q));
+            }
+            catch (OperationCanceledException) { /* 다음 타자가 덮어썼다 */ }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => StatusText = ex.Message);
+            }
+        }, ct);
+    }
     partial void OnSelectedNavChanged(NavItem? value)
     {
         OnPropertyChanged(nameof(IsLoungePage));
@@ -207,6 +281,11 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsHomePage));
         OnPropertyChanged(nameof(IsGenresPage));
+        OnPropertyChanged(nameof(IsComposersPage));
+        OnPropertyChanged(nameof(IsCompositionsPage));
+        OnPropertyChanged(nameof(IsFoldersPage));
+        OnPropertyChanged(nameof(IsHistoryPage));
+        OnPropertyChanged(nameof(IsPlaylistsPage));
         OnPropertyChanged(nameof(IsLibraryGrid));
         OnPropertyChanged(nameof(IsLibraryToolsVisible));
         OnPropertyChanged(nameof(IsContentLibrary));
@@ -219,6 +298,9 @@ public partial class MainViewModel : ObservableObject
             "Tracks" => "My Tracks",
             "Playlists" => "My Playlists",
             "Genres" => "Genres",
+            "Composers" => "My Composers",
+            "Compositions" => "My Compositions",
+            "Folders" => "Folders",
             "라운지" => "라운지",
             "Audio" => "Audio devices",
             "Settings" => "Settings",
@@ -229,14 +311,18 @@ public partial class MainViewModel : ObservableObject
         ApplyFilter();
         if (value.Id is "lounge") _ = Safe(() => _session.ListRoomsAsync());
         if (value.Id is "history") _ = Safe(() => _session.HistoryAsync());
+        if (value.Id is "folders") _ = Safe(() => _session.FoldersAsync());
         if (value.Id is "playlists") _ = Safe(() => _session.PlaylistsAsync());
         if (value.Id is "devices") _ = Safe(async () => { await _session.EndpointsAsync(); await _session.ListZonesAsync(); });
     }
 
     public async Task StartAsync()
     {
+        // Setup 위저드에서 onboarded=1 을 쓰면 첫 실행 온보딩을 건너뛴다. 가이드로만 재실행.
         ShowOnboarding = !Prefs.GetBool("onboarded");
         DisplayName = Prefs.Get("name", Environment.UserName);
+        LibraryPath = Prefs.Get("library_path", LibraryPath);
+        ZoneName = Prefs.Get("zone_name", string.IsNullOrWhiteSpace(ZoneName) ? "This PC" : ZoneName);
         _session.DisplayName = DisplayName;
 
         StatusText = "Core 확인 중…";
@@ -255,6 +341,30 @@ public partial class MainViewModel : ObservableObject
 
         await Safe(() => _session.CatalogAsync());
         await Safe(() => _session.ListRoomsAsync());
+
+        if (Prefs.GetBool("connect_local_output"))
+            await ConnectOutputAsync();
+
+        if (Prefs.GetBool("scan_library_on_start") && !string.IsNullOrWhiteSpace(LibraryPath))
+            await ScanLibraryAsync();
+
+        switch (Prefs.Get("streaming_choice", "none"))
+        {
+            case "tidal":
+                await Safe(() => _session.BeginStreamingOAuthAsync(1));
+                break;
+            case "qobuz":
+                await Safe(() => _session.BeginStreamingOAuthAsync(2));
+                break;
+            case "demo":
+                await Safe(() => _session.LinkStreamingAsync(1));
+                break;
+        }
+
+        // 한 번만 적용
+        if (Prefs.Get("streaming_choice", "none") != "none")
+            Prefs.Set("streaming_choice", "done");
+
         _ = CheckForUpdatesAsync();
     }
 
@@ -270,11 +380,7 @@ public partial class MainViewModel : ObservableObject
         StatusText = "라이브러리 경로: " + path;
     }
 
-    public void SetIrPathFromPicker(string path)
-    {
-        IrPath = path;
-        _ = Safe(() => _session.SetConvolutionIrAsync(path));
-    }
+    public void SetIrPathFromPicker(string path) => Audio.SetIrPathFromPicker(path);
 
     [RelayCommand]
     private void SelectNav(NavItem? item)
@@ -283,21 +389,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectGenre(GenreTile? tile)
+    private void SelectGenre(GenreCount? genre)
     {
-        if (tile is null) return;
-        _genreFilter = tile.Id == "all" ? null : tile.Id;
-        PageSubtitle = tile.Subtitle;
+        _genreFilter = genre?.Name;
+        PageSubtitle = genre is null ? "" : $"{genre.Name} · {genre.TrackCount}곡";
+        SelectedNav = NavItems.First(n => n.Id == "tracks");
         ApplyFilter();
     }
 
-    [RelayCommand]
-    private async Task JoinListedRoomAsync(RoomListItem? room)
-    {
-        if (room is null) return;
-        JoinRoomId = room.Id;
-        await JoinRoomAsync();
-    }
 
     [RelayCommand]
     private void NextOnboarding()
@@ -352,10 +451,18 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ConnectOutputAsync()
     {
-        if (!_supervisor.StartOutput(string.IsNullOrWhiteSpace(CurrentRoomId) ? null : CurrentRoomId))
+        var room = string.IsNullOrWhiteSpace(CurrentRoomId) ? null : CurrentRoomId;
+        if (!_supervisor.StartOutput(room))
+        {
             StatusText = _supervisor.LastError ?? "Output 기동 실패";
-        else
-            StatusText = "Output 연결됨 (소리)";
+            return;
+        }
+
+        // 룸이 없으면 Core 에 엔드포인트로만 등록된다 — 라운지에 들어가야 소리가 난다.
+        StatusText = room is null
+            ? "출력 장치를 등록했습니다 — 라운지에 들어가면 소리가 납니다"
+            : "출력 연결됨 (소리)";
+        await Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -374,40 +481,12 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ResyncAsync() => await Safe(() => _session.ResyncAsync());
 
-    [RelayCommand]
-    private async Task SyncProbeAsync() => await Safe(() => _session.SyncProbeAsync());
 
-    [RelayCommand]
-    private async Task CreateRoomAsync() => await Safe(() => _session.CreateRoomAsync(RoomName, RoomMode));
 
-    [RelayCommand]
-    private async Task JoinRoomAsync()
-    {
-        if (string.IsNullOrWhiteSpace(JoinRoomId)) return;
-        await Safe(() => _session.JoinRoomAsync(JoinRoomId.Trim(), string.IsNullOrWhiteSpace(InviteCode) ? null : InviteCode.Trim()));
-    }
 
-    [RelayCommand]
-    private async Task LeaveRoomAsync() => await Safe(() => _session.LeaveRoomAsync());
 
-    [RelayCommand]
-    private async Task RefreshRoomsAsync() => await Safe(() => _session.ListRoomsAsync());
 
-    [RelayCommand]
-    private async Task SendChatAsync()
-    {
-        if (string.IsNullOrWhiteSpace(ChatInput)) return;
-        var t = ChatInput.Trim();
-        ChatInput = "";
-        await Safe(() => _session.ChatAsync(t));
-    }
 
-    [RelayCommand]
-    private async Task ReactAsync(string? emoji)
-    {
-        if (string.IsNullOrWhiteSpace(emoji)) return;
-        await Safe(() => _session.ReactAsync(emoji));
-    }
 
     [RelayCommand]
     private async Task PlayTrackAsync(CatalogTrack? track)
@@ -416,7 +495,7 @@ public partial class MainViewModel : ObservableObject
         await Safe(async () =>
         {
             if (string.IsNullOrWhiteSpace(CurrentRoomId))
-                await _session.CreateRoomAsync(RoomName, RoomMode);
+                await _session.CreateRoomAsync(Lounge.RoomName, Lounge.RoomMode);
             await _session.EnqueueAsync(track.Id);
             await _session.PlayAsync();
         });
@@ -436,117 +515,15 @@ public partial class MainViewModel : ObservableObject
         await Safe(() => _session.ChooseAutoplayAsync(track.Id));
     }
 
-    [RelayCommand]
-    private async Task ClearQueueAsync() => await Safe(() => _session.ClearQueueAsync());
 
-    [RelayCommand]
-    private async Task SetDspAsync(string? preset)
-    {
-        if (!int.TryParse(preset, out var p)) return;
-        await Safe(() => _session.SetDspAsync(p));
-    }
 
-    [RelayCommand]
-    private async Task ApplyEasyEqAsync()
-    {
-        var bands = new[]
-        {
-            new { f = 60f, g = (float)EqBand1, q = 0.7f },
-            new { f = 250f, g = (float)EqBand2, q = 0.9f },
-            new { f = 1000f, g = (float)EqBand3, q = 1.0f },
-            new { f = 4000f, g = (float)EqBand4, q = 1.1f },
-            new { f = 12000f, g = (float)EqBand5, q = 0.8f },
-        };
-        var json = JsonSerializer.Serialize(bands);
-        await Safe(() => _session.SetEasyEqAsync(json, EqGraphicMode));
-        StatusText = EqGraphicMode ? "Graphic EQ 적용" : "Parametric EQ 적용";
-    }
 
-    [RelayCommand]
-    private async Task ApplySpeakerSetupAsync()
-    {
-        var csv = string.Join(",",
-            SpeakerDelayL.ToString(CultureInfo.InvariantCulture),
-            SpeakerDelayR.ToString(CultureInfo.InvariantCulture),
-            SpeakerGainL.ToString(CultureInfo.InvariantCulture),
-            SpeakerGainR.ToString(CultureInfo.InvariantCulture));
-        await Safe(() => _session.SetSpeakerSetupAsync(csv));
-    }
 
-    [RelayCommand]
-    private async Task ApplyHeadroomAsync() => await Safe(() => _session.SetHeadroomAsync((float)HeadroomDb));
 
-    [RelayCommand]
-    private async Task ApplyDeviceEqAsync(string? profile)
-    {
-        var p = string.IsNullOrWhiteSpace(profile) ? DeviceEqProfile : profile!;
-        DeviceEqProfile = p;
-        await Safe(() => _session.SetDeviceEqAsync(p));
-    }
 
-    [RelayCommand]
-    private async Task ClearIrAsync()
-    {
-        IrPath = "";
-        await Safe(() => _session.SetConvolutionIrAsync(null));
-    }
 
     [RelayCommand]
     private void ToggleTheme() => DarkTheme = !DarkTheme;
-
-    [RelayCommand]
-    private async Task CheckForUpdatesAsync()
-    {
-        if (UpdateBusy) return;
-        UpdateBusy = true;
-        UpdateProgress = 0;
-        try
-        {
-            UpdateStatus = "업데이트 확인 중…";
-            UpdateStatus = await _updater.CheckAsync();
-            UpdateReady = _updater.Pending is not null;
-        }
-        catch (Exception ex)
-        {
-            UpdateReady = false;
-            UpdateStatus = "업데이트 확인 실패: " + ex.Message;
-        }
-        finally
-        {
-            UpdateBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ApplyUpdateAsync()
-    {
-        if (UpdateBusy) return;
-        if (_updater.Pending is null)
-        {
-            await CheckForUpdatesAsync();
-            if (_updater.Pending is null) return;
-        }
-
-        UpdateBusy = true;
-        try
-        {
-            UpdateStatus = "업데이트 받는 중…";
-            var progress = new Progress<int>(p =>
-            {
-                UpdateProgress = p;
-                UpdateStatus = $"업데이트 받는 중… {p}%";
-            });
-            await _updater.DownloadAsync(progress);
-            UpdateStatus = "창을 닫고 설치한 뒤 다시 켭니다…";
-            await ShutdownAsync();
-            _updater.ApplyAndRestart();
-        }
-        catch (Exception ex)
-        {
-            UpdateStatus = "업데이트 실패: " + ex.Message;
-            UpdateBusy = false;
-        }
-    }
 
     private void ApplyTheme()
     {
@@ -571,79 +548,6 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task SeekToAsync() => await Safe(() => _session.SeekAsync((long)SeekValue));
 
-    private void OnMessage(MonoMessage msg) => Dispatcher.UIThread.Post(() => HandleMessage(msg));
-
-    private void HandleMessage(MonoMessage msg)
-    {
-        if (!string.IsNullOrWhiteSpace(msg.Error))
-            StatusText = msg.Error!;
-
-        switch (msg.Type)
-        {
-            case MessageTypes.Welcome:
-                StatusText = "환영합니다";
-                break;
-            case MessageTypes.Catalog:
-            case MessageTypes.Search:
-                LoadCatalog(msg.Body);
-                break;
-            case MessageTypes.ListRooms:
-                LoadRooms(msg.Body);
-                break;
-            case MessageTypes.RoomState:
-                ApplyRoomState(msg.Body);
-                break;
-            case MessageTypes.WikiBio:
-                WikiText = msg.Body ?? msg.Text ?? "";
-                ArtistBio = WikiText;
-                break;
-            case MessageTypes.Chat:
-                if (!string.IsNullOrWhiteSpace(msg.Text))
-                    ChatLines.Add($"{msg.DisplayName ?? msg.PeerId}: {msg.Text}");
-                break;
-            case MessageTypes.LinkStreaming:
-                StatusText = (msg.Ok ?? false) ? "스트리밍 연동 응답" : (msg.Error ?? "스트리밍");
-                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
-                    StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
-                break;
-            case MessageTypes.SyncProbe:
-                SyncProbeText = msg.Body ?? "";
-                StatusText = "Sync probe 수신";
-                break;
-        }
-    }
-
-    private void LoadCatalog(string? body)
-    {
-        Tracks.Clear();
-        if (string.IsNullOrWhiteSpace(body)) { ApplyFilter(); return; }
-        try
-        {
-            var list = JsonSerializer.Deserialize<List<CatalogTrack>>(body, Json) ?? [];
-            foreach (var t in list) Tracks.Add(t);
-        }
-        catch { /* ignore malformed */ }
-        ApplyFilter();
-        PageSubtitle = $"{Tracks.Count} tracks";
-        _ = PrefetchArtAsync();
-    }
-
-    private async Task PrefetchArtAsync()
-    {
-        _artCts?.Cancel();
-        _artCts = new CancellationTokenSource();
-        var ct = _artCts.Token;
-        foreach (var t in Tracks.ToList())
-        {
-            if (ct.IsCancellationRequested) break;
-            if (string.IsNullOrWhiteSpace(t.AbsoluteArtUrl)) continue;
-            var bmp = await ArtCache.GetAsync(t.AbsoluteArtUrl, ct, decodeWidth: 160);
-            if (bmp is not null)
-                await Dispatcher.UIThread.InvokeAsync(() => t.Cover = bmp);
-        }
-        ArtPerfText = ArtCache.StatsText();
-    }
-
     partial void OnFollowHostViewChanged(bool value)
     {
         if (_suppressLinerScrollSend) return;
@@ -656,157 +560,6 @@ public partial class MainViewModel : ObservableObject
         // 호스트가 follow를 켠 상태에서 스크롤하면 게스트에게 방송
         if (FollowHostView)
             _ = Safe(() => _session.LinerScrollAsync(value));
-    }
-
-    [RelayCommand]
-    private async Task ToggleFollowHostAsync()
-    {
-        FollowHostView = !FollowHostView;
-        await Task.CompletedTask;
-    }
-
-    private void LoadRooms(string? body)
-    {
-        Rooms.Clear();
-        if (string.IsNullOrWhiteSpace(body)) return;
-        try
-        {
-            var list = JsonSerializer.Deserialize<List<RoomListItem>>(body, Json) ?? [];
-            foreach (var r in list) Rooms.Add(r);
-        }
-        catch { /* ignore */ }
-    }
-
-    private void ApplyRoomState(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body)) return;
-        try
-        {
-            var node = JsonNode.Parse(body)?.AsObject();
-            if (node is null) return;
-
-            CurrentRoomId = node["id"]?.GetValue<string>() ?? "";
-            RoomChip = $"{node["name"]?.GetValue<string>() ?? "룸"} · {CurrentRoomId[..Math.Min(6, CurrentRoomId.Length)]}";
-            IsPlaying = node["playing"]?.GetValue<bool>() ?? false;
-            PathBadge = node["pathBadge"]?.GetValue<string>()
-                        ?? ((node["bitPerfect"]?.GetValue<bool>() ?? false) ? "Bit-perfect" : "Processed");
-            NowBadge = PathBadge;
-
-            var dsp = node["dspPreset"]?.ToString() ?? "Off";
-            var dspOn = node["dspEnabled"]?.GetValue<bool>() ?? false;
-            var ir = node["convolutionIrPath"]?.GetValue<string>();
-            var deviceEq = node["deviceEqProfile"]?.GetValue<string>();
-            SignalPathText = dspOn
-                ? $"Decode → DSP({dsp}{(string.IsNullOrWhiteSpace(deviceEq) ? "" : "/" + deviceEq)}{(string.IsNullOrWhiteSpace(ir) ? "" : "+IR")}) → Output · {PathBadge}"
-                : $"Decode → Bit-perfect → Output · {PathBadge}";
-            if (!string.IsNullOrWhiteSpace(ir)) IrPath = ir;
-
-            var media = node["mediaTimeMs"]?.GetValue<long>() ?? 0;
-            var duration = Math.Max(1, node["durationMs"]?.GetValue<long>() ?? 1);
-            SeekMaximum = duration;
-            _baseMedia = media;
-            _baseLocal = Environment.TickCount64;
-            _playingClock = IsPlaying;
-            SeekValue = media;
-            UpdateTimeTexts(media, duration);
-
-            LinerNotes = node["linerNotes"]?.GetValue<string>() ?? "";
-            CreditsText = node["credits"]?.GetValue<string>() ?? "";
-            _suppressLinerScrollSend = true;
-            FollowHostView = node["followHostView"]?.GetValue<bool>() ?? FollowHostView;
-            if (node["linerScrollY"] is JsonValue scrollNode && scrollNode.TryGetValue<double>(out var scrollY))
-                LinerScrollY = scrollY;
-            _suppressLinerScrollSend = false;
-            CurrentLyric = node["currentLyric"]?.GetValue<string>() ?? "";
-            LyricLines.Clear();
-            if (node["lyrics"] is JsonArray ly)
-            {
-                foreach (var line in ly)
-                {
-                    var text = line?["text"]?.GetValue<string>();
-                    if (!string.IsNullOrWhiteSpace(text)) LyricLines.Add(text!);
-                }
-            }
-
-            if (node["currentTrack"] is JsonObject ct)
-            {
-                NowTitle = ct["title"]?.GetValue<string>() ?? "트랙";
-                NowArtist = string.Join(" · ", new[]
-                {
-                    ct["artistName"]?.GetValue<string>(),
-                    ct["albumTitle"]?.GetValue<string>()
-                }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                var art = ct["artUrl"]?.GetValue<string>();
-                NowArtUrl = string.IsNullOrWhiteSpace(art) ? "" : "http://127.0.0.1:7702" + art;
-                _ = RefreshNowArtAsync(NowArtUrl);
-                var artistId = ct["artistId"]?.GetValue<string>();
-                if (!string.IsNullOrWhiteSpace(artistId) && string.IsNullOrWhiteSpace(ArtistBio))
-                    _ = Safe(() => _session.WikiAsync(artistId!));
-            }
-
-            if (node["artist"] is JsonObject ar)
-                ArtistBio = ar["bio"]?.GetValue<string>() ?? ArtistBio;
-
-            QueueTracks.Clear();
-            if (node["queue"] is JsonArray qArr)
-            {
-                foreach (var q in qArr)
-                {
-                    QueueTracks.Add(new CatalogTrack
-                    {
-                        Id = q?["trackId"]?.GetValue<string>() ?? "",
-                        Title = q?["title"]?.GetValue<string>() ?? "Track",
-                        Artist = q?["artist"]?.GetValue<string>(),
-                        DurationMs = q?["durationMs"]?.GetValue<long>() ?? 0,
-                        Badge = q?["badge"]?.GetValue<string>(),
-                        ArtUrl = q?["artUrl"]?.GetValue<string>()
-                    });
-                }
-            }
-
-            if (node["members"] is JsonArray members)
-            {
-                foreach (var m in members)
-                {
-                    var stats = m?["stats"];
-                    if (stats is null) continue;
-                    var off = stats["offsetMs"]?.GetValue<double>();
-                    var jit = stats["jitterMs"]?.GetValue<double>();
-                    if (off is not null)
-                    {
-                        SyncText = $"sync {off:+0.00;-0.00}ms · jitter {jit:0.00}ms";
-                        break;
-                    }
-                }
-            }
-
-            ChatLines.Clear();
-            if (node["chat"] is JsonArray chat)
-            {
-                foreach (var c in chat)
-                    ChatLines.Add($"{c?["peerName"]}: {c?["text"]}");
-            }
-
-            AutoplayChoices.Clear();
-            ShowAutoplay = false;
-            if (node["autoplay"] is JsonObject ap && ap["candidates"] is JsonArray cands)
-            {
-                ShowAutoplay = true;
-                foreach (var c in cands)
-                {
-                    AutoplayChoices.Add(new CatalogTrack
-                    {
-                        Id = c?["id"]?.GetValue<string>() ?? "",
-                        Title = c?["title"]?.GetValue<string>() ?? "",
-                        Artist = c?["artist"]?.GetValue<string>() ?? c?["artistName"]?.GetValue<string>()
-                    });
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusText = "스냅샷 파싱: " + ex.Message;
-        }
     }
 
     private async Task RefreshNowArtAsync(string url)
@@ -843,17 +596,8 @@ public partial class MainViewModel : ObservableObject
             src = Tracks.Where(t => t.Source == 2 || t.GenreHint.Contains("Qobuz", StringComparison.OrdinalIgnoreCase));
         else if (nav is "tidal")
             src = Tracks.Where(t => t.Source == 1 || t.GenreHint.Contains("Tidal", StringComparison.OrdinalIgnoreCase));
-        else if (nav is "genres" && _genreFilter is not null)
-            src = FilterByGenre(Tracks, _genreFilter);
-
-        var q = SearchText.Trim();
-        if (q.Length > 0)
-        {
-            src = src.Where(t =>
-                (t.Title?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (t.Artist?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (t.Album?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false));
-        }
+        else if (_genreFilter is not null)
+            src = Tracks.Where(t => t.Genres.Contains(_genreFilter, StringComparer.OrdinalIgnoreCase));
 
         var list = src.Take(500).ToList();
         foreach (var t in list) FilteredTracks.Add(t);
@@ -861,20 +605,6 @@ public partial class MainViewModel : ObservableObject
         RebuildHomeRails();
     }
 
-    private static IEnumerable<CatalogTrack> FilterByGenre(IEnumerable<CatalogTrack> tracks, string id) => id switch
-    {
-        "hires" => tracks.Where(t => t.SampleRate >= 96000 && !t.IsDsd),
-        "dsd" => tracks.Where(t => t.IsDsd),
-        "jazz" => tracks.Where(t =>
-            (t.Artist?.Contains("Coltrane", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Miles", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Brubeck", StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (t.Artist?.Contains("Hiromi", StringComparison.OrdinalIgnoreCase) ?? false)),
-        "tidal" => tracks.Where(t => t.Source == 1),
-        "qobuz" => tracks.Where(t => t.Source == 2),
-        "local" => tracks.Where(t => t.Source == 0),
-        _ => tracks
-    };
 
     private void RebuildHomeRails()
     {
@@ -886,51 +616,60 @@ public partial class MainViewModel : ObservableObject
         HomeRails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
     }
 
+    /// <summary>슬라이더를 놓을 때만 보낸다 — 드래그 중 매 픽셀마다 명령을 쏘지 않는다.</summary>
+    [RelayCommand]
+    private Task ApplyVolumeAsync()
+        => SelectedOutput is null
+            ? Task.CompletedTask
+            : Safe(() => _session.SetVolumeAsync(SelectedOutput.PeerId, Volume));
+
+    /// <summary>출력 선택기를 열 때 존 목록을 새로 받는다 — 존은 룸 스냅샷에 실리지 않는다.</summary>
+    [RelayCommand]
+    private Task RefreshZonesAsync() => Safe(() => _session.ListZonesAsync());
+
+    [RelayCommand]
+    private void SelectOutput(OutputDevice? device)
+    {
+        if (device is null) return;
+        SelectedOutput = device;
+        Volume = device.VolumePercent;
+    }
+
+    /// <summary>하단 바의 ♥ — 지금 재생 위치에 하트 반응을 남긴다. 토글이 아니다.</summary>
+    [RelayCommand]
+    private Task HeartAsync() => Safe(() => _session.ReactAsync("❤️"));
+
+    [RelayCommand]
+    private void ToggleQueue() => ShowQueue = !ShowQueue;
+
+    [RelayCommand]
+    private Task RemoveFromQueueAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : Lounge.QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => _session.RemoveQueueAsync(i));
+    }
+
+    [RelayCommand]
+    private Task JumpToQueueAsync(CatalogTrack? track)
+    {
+        var i = track is null ? -1 : Lounge.QueueTracks.IndexOf(track);
+        return i < 0 ? Task.CompletedTask : Safe(() => _session.JumpToAsync(i));
+    }
+
+    [RelayCommand]
+    private Task BackupAsync() => Safe(() => _session.BackupAsync());
+
+    /// <summary>설정에서 전용 화면으로 보낸다 — 같은 내용을 두 곳에 만들지 않는다.</summary>
+    [RelayCommand]
+    private void GoToPage(string? navId)
+    {
+        var item = NavItems.FirstOrDefault(n => n.Id == navId);
+        if (item is not null) SelectedNav = item;
+    }
+
     private async Task Safe(Func<Task> action)
     {
         try { await action(); }
         catch (Exception ex) { StatusText = ex.Message; }
     }
-}
-
-internal static class Prefs
-{
-    private static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
-    private static string FilePath => Path.Combine(Dir, "prefs.ini");
-
-    private static Dictionary<string, string> Load()
-    {
-        var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(FilePath)) return d;
-        foreach (var line in File.ReadAllLines(FilePath))
-        {
-            var i = line.IndexOf('=');
-            if (i <= 0) continue;
-            d[line[..i]] = line[(i + 1)..];
-        }
-        return d;
-    }
-
-    private static void Save(Dictionary<string, string> d)
-    {
-        Directory.CreateDirectory(Dir);
-        File.WriteAllLines(FilePath, d.Select(kv => kv.Key + "=" + kv.Value));
-    }
-
-    public static string Get(string key, string fallback)
-    {
-        var d = Load();
-        return d.TryGetValue(key, out var v) ? v : fallback;
-    }
-
-    public static void Set(string key, string value)
-    {
-        var d = Load();
-        d[key] = value;
-        Save(d);
-    }
-
-    public static bool GetBool(string key) => Get(key, "") == "1";
-    public static void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
 }

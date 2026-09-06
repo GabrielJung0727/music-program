@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             x:Class="Mono.Control.Views.Pages.SettingsPage"
+             x:DataType="vm:MainViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="18" MaxWidth="620" HorizontalAlignment="Left">
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="General" FontWeight="SemiBold"/>
+        <TextBlock Text="표시 이름" Classes="muted" FontSize="11"/>
+        <TextBox Text="{Binding DisplayName}"/>
+        <CheckBox Content="창을 닫아도 트레이에 남기기" IsChecked="{Binding CloseToTray}"/>
+        <CheckBox Content="다크 테마" IsChecked="{Binding DarkTheme}"/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Storage" FontWeight="SemiBold"/>
+        <TextBlock Text="라이브러리 경로" Classes="muted" FontSize="11"/>
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Classes="ghost" Content="폴더…" Margin="4,0,0,0"
+                  Click="PickLibraryClick"/>
+          <TextBox Text="{Binding LibraryPath}"/>
+        </DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
+          <Button Classes="ghost" Content="폴더 목록 보기"
+                  Command="{Binding GoToPageCommand}" CommandParameter="folders"/>
+        </StackPanel>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="Mono 는 스캔한 폴더의 원본 파일을 수정하지 않습니다."/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Services" FontWeight="SemiBold"/>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost" Content="Tidal 연동" Command="{Binding LinkTidalCommand}"/>
+          <Button Classes="ghost" Content="Qobuz 연동" Command="{Binding LinkQobuzCommand}"/>
+        </StackPanel>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="토큰은 Core 만 보관합니다. 파트너 키가 없으면 데모 카탈로그로 연결됩니다."/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Audio" FontWeight="SemiBold"/>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
+          <Button Classes="ghost" Content="장치 · 존 설정"
+                  Command="{Binding GoToPageCommand}" CommandParameter="devices"/>
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Library" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="같은 앨범의 로컬·스트리밍 버전은 하나로 병합해 표시합니다. 검색은 아티스트 별칭 테이블을 거치므로 한국어 표기로 원어 아티스트를 찾을 수 있습니다."/>
+        <Button Classes="ghost" Content="작곡가 보기" HorizontalAlignment="Left"
+                Command="{Binding GoToPageCommand}" CommandParameter="composers"/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Lounge" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="룸 모드·초대·권한·보존 정책은 라운지 화면의 「룸 운영」 패널에서 바꿉니다."/>
+        <Button Classes="ghost" Content="라운지 열기" HorizontalAlignment="Left"
+                Command="{Binding GoToPageCommand}" CommandParameter="lounge"/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="DSP" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="Easy EQ · 크로스피드 · 룸 IR · 스피커 보정은 Audio 화면에 있습니다. Audiophile 룸에서는 DSP 가 꺼진 채 잠깁니다."/>
+        <Button Classes="ghost" Content="DSP 설정" HorizontalAlignment="Left"
+                Command="{Binding GoToPageCommand}" CommandParameter="devices"/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Backups" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="카탈로그·히스토리·기기·존 DB 만 묶습니다. 음원 파일은 포함되지 않습니다."/>
+        <Button Classes="ghost" Content="지금 백업" HorizontalAlignment="Left"
+                Command="{Binding BackupCommand}"/>
+        <TextBlock Text="{Binding BackupPath}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Shortcuts" FontWeight="SemiBold"/>
+        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto">
+          <TextBlock Text="Space" FontFamily="Consolas"/>
+          <TextBlock Grid.Column="1" Text="재생 / 일시정지" Classes="muted"/>
+          <TextBlock Grid.Row="1" Text="/" FontFamily="Consolas"/>
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="검색창으로 이동" Classes="muted"/>
+          <TextBlock Grid.Row="2" Text="Esc" FontFamily="Consolas"/>
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="몰입 모드 · 큐 · 앨범 창 닫기" Classes="muted"/>
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="About" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding AppVersion, StringFormat=mono {0}}" Classes="muted"/>
+        <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                   Text="포트 7700 Control↔Core · 7701 MATP. 방화벽에서 두 포트를 허용해야 다른 기기가 붙습니다."/>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="ghost" Content="{Binding UpdateButtonLabel}"
+                  Command="{Binding CheckForUpdatesCommand}" IsVisible="{Binding !UpdateReady}"/>
+          <Button Classes="primary" Content="업데이트 설치" Command="{Binding ApplyUpdateCommand}"
+                  IsVisible="{Binding UpdateReady}"/>
+        </StackPanel>
+        <ProgressBar Value="{Binding UpdateProgress}" Maximum="100" IsVisible="{Binding UpdateBusy}"/>
+        <TextBlock Text="{Binding UpdateStatus}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

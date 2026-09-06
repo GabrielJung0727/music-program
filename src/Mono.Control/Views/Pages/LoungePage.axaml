@@ -1,0 +1,290 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             xmlns:svg="using:Avalonia.Svg.Skia"
+             xmlns:local="using:Mono.Control.Views.Pages"
+             x:Class="Mono.Control.Views.Pages.LoungePage"
+             x:DataType="pvm:LoungeViewModel">
+  <Grid ColumnDefinitions="*,360">
+
+    <!-- ── 방 밖: 만들거나 들어가거나 ─────────────────────────── -->
+    <ScrollViewer IsVisible="{Binding !InRoom}">
+      <StackPanel MaxWidth="760" HorizontalAlignment="Left" Spacing="24" Margin="0,8,24,0">
+
+        <TextBlock TextWrapping="Wrap" FontSize="15" LineHeight="24"
+                   Text="같이 들을 방을 만들거나, 열려 있는 방에 들어가세요. 같은 곡이 모두의 DAC에서 동시에 재생됩니다."/>
+
+        <Grid ColumnDefinitions="*,16,*">
+          <Border Classes="panel" CornerRadius="12" Padding="18">
+            <StackPanel Spacing="10">
+              <TextBlock Text="방 만들기" FontWeight="SemiBold" FontSize="14"/>
+              <TextBox Text="{Binding RoomName}" Watermark="룸 이름"/>
+              <ComboBox SelectedIndex="{Binding RoomMode}" HorizontalAlignment="Stretch">
+                <ComboBoxItem Content="Open Lounge — 누구나 큐를 편집"/>
+                <ComboBoxItem Content="Invite — 초대받은 사람만"/>
+                <ComboBoxItem Content="Host Queue — 호스트가 선곡"/>
+                <ComboBoxItem Content="Audiophile — 소스 그대로, DSP 없음"/>
+              </ComboBox>
+              <Button Classes="primary" Content="방 만들기" HorizontalAlignment="Stretch"
+                      Command="{Binding CreateRoomCommand}"/>
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Column="2" Classes="panel" CornerRadius="12" Padding="18">
+            <StackPanel Spacing="10">
+              <TextBlock Text="방에 들어가기" FontWeight="SemiBold" FontSize="14"/>
+              <TextBox Text="{Binding JoinRoomId}" Watermark="룸 ID"/>
+              <TextBox Text="{Binding InviteCode}" Watermark="초대 코드 (필요한 경우)"/>
+              <Button Classes="ghost" Content="들어가기" HorizontalAlignment="Stretch"
+                      Command="{Binding JoinRoomCommand}"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <StackPanel Spacing="8">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="새로고침"
+                    Command="{Binding RefreshRoomsCommand}"/>
+            <TextBlock Text="열려 있는 방" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          </DockPanel>
+          <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !Rooms.Count}"
+                     Text="아직 열려 있는 방이 없습니다. 위에서 하나 만들어 보세요."/>
+          <ItemsControl ItemsSource="{Binding Rooms}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:RoomListItem">
+                <Border Classes="row">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="ghost" Content="들어가기"
+                            VerticalAlignment="Center"
+                            Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).JoinListedRoomCommand}"
+                            CommandParameter="{Binding}"/>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                      <TextBlock Classes="muted" FontSize="11" Text="{Binding Id}"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ── 방 안: 큐가 주인공 ────────────────────────────────── -->
+    <ScrollViewer IsVisible="{Binding InRoom}">
+      <StackPanel MaxWidth="820" HorizontalAlignment="Left" Spacing="24" Margin="0,4,24,0">
+
+        <Border Classes="panel" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="나가기" VerticalAlignment="Top"
+                    Command="{Binding LeaveRoomCommand}"/>
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding CurrentRoomName}" FontWeight="SemiBold" FontSize="17"/>
+              <TextBlock Text="{Binding RoomModeLabel}" Classes="muted"/>
+              <TextBlock Classes="muted" FontSize="11">
+                <Run Text="룸 "/><Run Text="{Binding RoomIdShort}"/><Run Text="  ·  초대 "/><Run
+                  Text="{Binding InviteCodeText}"/><Run Text=" "/><Run Text="{Binding InviteExpiryText}"/>
+              </TextBlock>
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
+        <StackPanel Spacing="8" IsVisible="{Binding Requests.Count}">
+          <TextBlock Text="선곡 요청" FontWeight="SemiBold"/>
+          <TextBlock Classes="muted" FontSize="11" Text="승인하면 큐 맨 뒤에 들어갑니다."/>
+          <ItemsControl ItemsSource="{Binding Requests}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:RequestEntry">
+                <Border Classes="row">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                                VerticalAlignment="Center">
+                      <Button Classes="primary" Content="승인" Padding="12,4"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).ApproveCommand}"
+                              CommandParameter="{Binding}"/>
+                      <Button Classes="ghost" Content="거절" Padding="12,4"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RejectCommand}"
+                              CommandParameter="{Binding}"/>
+                    </StackPanel>
+                    <StackPanel>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding FromName}" Classes="muted" FontSize="11"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="큐 비우기"
+                    Command="{Binding ClearQueueCommand}"/>
+            <TextBlock Text="재생 큐" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          </DockPanel>
+          <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !QueueTracks.Count}"
+                     Text="큐가 비어 있습니다. Albums 나 Tracks 에서 「큐」를 눌러 곡을 담으세요."/>
+          <ItemsControl ItemsSource="{Binding QueueTracks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:CatalogTrack">
+                <Border Classes="row" Padding="12,8">
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2"
+                                VerticalAlignment="Center">
+                      <Button Classes="ghost" Content="▲" Padding="8,3" FontSize="11" ToolTip.Tip="위로"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MoveUpCommand}"
+                              CommandParameter="{Binding}"/>
+                      <Button Classes="ghost" Content="▼" Padding="8,3" FontSize="11" ToolTip.Tip="아래로"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).MoveDownCommand}"
+                              CommandParameter="{Binding}"/>
+                      <Button Classes="ghost" Content="▶" Padding="8,3" FontSize="11" ToolTip.Tip="이 곡으로 이동"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).JumpToCommand}"
+                              CommandParameter="{Binding}"/>
+                      <Button Classes="ghost" Content="✕" Padding="8,3" FontSize="11" ToolTip.Tip="큐에서 빼기"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RemoveFromQueueCommand}"
+                              CommandParameter="{Binding}"/>
+                    </StackPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding DurationText}" Classes="muted"
+                               FontSize="11" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <StackPanel VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                                 TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11"
+                                 TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- ── 우측: 사람과 대화 ─────────────────────────────────── -->
+    <Border Grid.Column="1" Classes="panel" Padding="16" Margin="0,0,0,0"
+            IsVisible="{Binding InRoom}">
+      <DockPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Classes="primary" Content="전송" Margin="6,0,0,0"
+                    Command="{Binding SendChatCommand}"/>
+            <TextBox Text="{Binding ChatInput}" Watermark="감상평 남기기"/>
+          </DockPanel>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="❤️" ToolTip.Tip="하트" Padding="10,6">
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Heart}"/>
+            </Button>
+            <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🎉" ToolTip.Tip="파티" Padding="10,6">
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Party}"/>
+            </Button>
+            <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="👏" ToolTip.Tip="박수" Padding="10,6">
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Clap}"/>
+            </Button>
+            <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🔥" ToolTip.Tip="파이어" Padding="10,6">
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Fire}"/>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="muted" FontSize="11" Text="반응은 곡당 3번까지 남길 수 있습니다."/>
+        </StackPanel>
+
+        <ScrollViewer>
+          <StackPanel Spacing="16">
+
+            <StackPanel Spacing="6">
+              <TextBlock Text="핀" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                         Text="지금 재생 위치에 감상을 남깁니다. 시크바에 마커로 표시됩니다."/>
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="ghost" Content="꽂기" Margin="6,0,0,0"
+                        Command="{Binding AddPinCommand}"/>
+                <TextBox Text="{Binding PinText}" Watermark="이 구간 감상"/>
+              </DockPanel>
+              <ItemsControl ItemsSource="{Binding Pins}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="models:PinEntry">
+                    <Border Classes="row" Padding="10,8">
+                      <DockPanel>
+                        <Button DockPanel.Dock="Right" Classes="ghost" Content="✕" Padding="6,2" FontSize="11"
+                                VerticalAlignment="Center"
+                                Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).RemovePinCommand}"
+                                CommandParameter="{Binding}"/>
+                        <Button Classes="ghost" Background="Transparent" BorderThickness="0" Padding="0"
+                                HorizontalContentAlignment="Left" ToolTip.Tip="이 구간으로 이동"
+                                Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).SeekPinCommand}"
+                                CommandParameter="{Binding}">
+                          <StackPanel>
+                            <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
+                          </StackPanel>
+                        </Button>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <TextBlock Text="뮤지션 관계도" FontWeight="SemiBold"/>
+              <Button Classes="ghost" Content="지금 아티스트 살펴보기" HorizontalAlignment="Left"
+                      Command="{Binding ShowGraphCommand}" CommandParameter="{Binding CurrentArtistId}"/>
+              <StackPanel IsVisible="{Binding HasGraph}" Spacing="4">
+                <TextBlock Text="{Binding Graph.Artist.Name}" FontWeight="SemiBold" FontSize="12"/>
+                <TextBlock Text="{Binding Graph.Artist.Bio}" Classes="muted" FontSize="11"
+                           TextWrapping="Wrap" MaxHeight="80"/>
+                <TextBlock Text="같이 들을 만한 아티스트" Classes="muted" FontSize="11" Margin="0,4,0,0"
+                           IsVisible="{Binding Graph.HasRelated}"/>
+                <ItemsControl ItemsSource="{Binding Graph.Related}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:GraphArtist">
+                      <Button Classes="ghost" Margin="0,2,0,0" HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Left" Content="{Binding Name}"
+                              ToolTip.Tip="다음 곡 후보로 제안합니다"
+                              Command="{Binding $parent[UserControl].((pvm:LoungeViewModel)DataContext).FollowArtistCommand}"
+                              CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </StackPanel>
+
+            <Expander Header="룸 운영">
+              <local:LoungeAdminPanel Margin="0,8,0,0"/>
+            </Expander>
+
+            <StackPanel Spacing="6">
+              <TextBlock Text="세션 마치기" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                         Text="저장하면 좋았던 곡(♥·핀·완청)이 하이라이트 플레이리스트가 됩니다."/>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Button Classes="primary" Content="저장하고 마치기" Command="{Binding EndSessionSaveCommand}"/>
+                <Button Classes="ghost" Content="저장 없이" Command="{Binding EndSessionDiscardCommand}"/>
+              </StackPanel>
+              <TextBlock Text="{Binding ArchiveResult}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <TextBlock Text="대화" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted" FontSize="11" IsVisible="{Binding !ChatLines.Count}"
+                         TextWrapping="Wrap" Text="아직 아무 말도 없습니다."/>
+              <ItemsControl ItemsSource="{Binding ChatLines}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,4" FontSize="12"/>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

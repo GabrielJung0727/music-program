@@ -109,14 +109,18 @@ public class RoomAndClockTests
         Assert.Equal(RoomManager.MaxReactionsPerUserPerTrack, rooms.Get(room.Id)!.Reactions.Count);
     }
 
+    private static IEnumerable<string> TrackIds(IEnumerable<object> view)
+        => view.Select(v => System.Text.Json.JsonSerializer
+            .Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(
+                System.Text.Json.JsonSerializer.Serialize(v, LineFraming.JsonOptions))!["id"].GetString()!);
+
     [Fact]
     public void SearchMatchesArtistAliasAcrossScripts()
     {
         var (_, catalog, _, _) = NewStack();
-        var byAlias = catalog.Search("요네즈 켄시");
-        Assert.Contains(byAlias, t => t.Id == "tr-kanden");
-        var byNative = catalog.Search("米津玄師");
-        Assert.Contains(byNative, t => t.Id == "tr-kanden");
+        // Search 는 catalog 와 같은 뷰 모양을 돌려준다. id 는 그 안에서 읽는다.
+        Assert.Contains("tr-kanden", TrackIds(catalog.Search("요네즈 켄시")));
+        Assert.Contains("tr-kanden", TrackIds(catalog.Search("米津玄師")));
     }
 
     [Fact]
@@ -461,6 +465,16 @@ public class RoomAndClockTests
         var json = rooms.SnapshotJson(rooms.Get(room.Id)!);
         Assert.Contains("\"offsetMs\":1.5", json);
         Assert.Contains("\"bufferMs\":6", json);
+    }
+
+    [Fact]
+    public void BeginOAuthWithoutPartnerKeysUsesDemoToken()
+    {
+        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_ID", null);
+        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_SECRET", null);
+        var (_, _, _, streaming) = NewStack();
+        streaming.BeginOAuth(StreamingProvider.Tidal);
+        Assert.True(streaming.IsConnected(StreamingProvider.Tidal));
     }
 
     [Fact]

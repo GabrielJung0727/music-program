@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.GenresPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="16">
+      <TextBlock Text="{Binding EmptyGenresHint}" Classes="muted" TextWrapping="Wrap"
+                 IsVisible="{Binding HasEmptyGenresHint}"/>
+
+      <ItemsControl ItemsSource="{Binding Genres}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:GenreCount">
+            <Button Classes="genretile"
+                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectGenreCommand}"
+                    CommandParameter="{Binding}">
+              <StackPanel VerticalAlignment="Bottom">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11"/>
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

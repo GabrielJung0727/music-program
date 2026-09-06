@@ -7,6 +7,9 @@ builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.
 
 var data = Path.Combine(AppContext.BaseDirectory, "data");
 var library = builder.Configuration["Mono:LibraryRoot"] ?? Path.Combine(data, "library");
+// Mono:LibraryRoots 배열이 우선. 없으면 기존 단수 Mono:LibraryRoot 를 그대로 쓴다.
+var configuredRoots = builder.Configuration.GetSection("Mono:LibraryRoots").Get<string[]>() ?? [];
+var libraryRoots = configuredRoots.Length > 0 ? configuredRoots.ToList() : new List<string> { library };
 var art = Path.Combine(data, "art");
 Directory.CreateDirectory(data);
 Directory.CreateDirectory(library);
@@ -16,6 +19,7 @@ builder.Services.AddSingleton(new CatalogStore(Path.Combine(data, "catalog.db"))
 builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db")));
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
 builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
+builder.Services.AddSingleton(new BackupService(data));
 var wikiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 // 위키미디어 API 정책상 User-Agent 없는 요청은 403으로 거부된다.
 wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi lounge app; https://github.com/mono-audio)");
@@ -40,7 +44,8 @@ builder.Services.AddSingleton(sp => new CommandProcessor(
     sp.GetRequiredService<EndpointRegistry>(),
     sp.GetRequiredService<ZoneRegistry>(),
     sp.GetRequiredService<WikipediaService>(),
-    library));
+    sp.GetRequiredService<BackupService>(),
+    libraryRoots));
 builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSignalR().AddJsonProtocol(o =>
     o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);

@@ -20,7 +20,8 @@ public sealed class CommandProcessor
     private readonly EndpointRegistry _endpoints;
     private readonly ZoneRegistry _zones;
     private readonly WikipediaService _wiki;
-    private readonly string _libraryRoot;
+    private readonly BackupService _backups;
+    private readonly IReadOnlyList<string> _libraryRoots;
     private readonly ConcurrentDictionary<string, string> _peerRoom = new();
 
     public CommandProcessor(
@@ -33,7 +34,8 @@ public sealed class CommandProcessor
         EndpointRegistry endpoints,
         ZoneRegistry zones,
         WikipediaService wiki,
-        string libraryRoot)
+        BackupService backups,
+        IReadOnlyList<string> libraryRoots)
     {
         _rooms = rooms;
         _catalog = catalog;
@@ -44,7 +46,8 @@ public sealed class CommandProcessor
         _endpoints = endpoints;
         _zones = zones;
         _wiki = wiki;
-        _libraryRoot = libraryRoot;
+        _backups = backups;
+        _libraryRoots = libraryRoots;
     }
 
     public CommandResult Execute(string peerId, MonoMessage msg, string? displayName)
@@ -458,7 +461,9 @@ public sealed class CommandProcessor
 
             case MessageTypes.ScanLibrary:
             {
-                var scanned = _scanner.Scan(string.IsNullOrWhiteSpace(msg.Path) ? _libraryRoot : msg.Path);
+                var scanned = string.IsNullOrWhiteSpace(msg.Path)
+                    ? _scanner.ScanAll(_libraryRoots)
+                    : _scanner.Scan(msg.Path);
                 return new CommandResult(null, new MonoMessage
                 {
                     Type = MessageTypes.ScanLibrary,
@@ -467,6 +472,40 @@ public sealed class CommandProcessor
                     Body = $"scanned {scanned} files · catalog {_catalog.Tracks.Count} tracks"
                 }, CatalogMessage());
             }
+
+            case MessageTypes.Backup:
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.Backup,
+                    Ok = true,
+                    Body = _backups.Create()
+                });
+
+            case MessageTypes.Album:
+            {
+                var detail = _catalog.AlbumDetail(msg.Text ?? "");
+                return detail is null
+                    ? Fail("album not found")
+                    : Direct(new MonoMessage
+                    {
+                        Type = MessageTypes.Album,
+                        Body = JsonSerializer.Serialize(detail, LineFraming.JsonOptions)
+                    });
+            }
+
+            case MessageTypes.Folders:
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.Folders,
+                    Body = JsonSerializer.Serialize(_libraryRoots.Select(root => new
+                    {
+                        path = root,
+                        exists = Directory.Exists(root),
+                        trackCount = _catalog.Tracks.Values.Count(t =>
+                            t.LocalPath is not null &&
+                            t.LocalPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    }), LineFraming.JsonOptions)
+                });
 
             case MessageTypes.LinkStreaming:
             {

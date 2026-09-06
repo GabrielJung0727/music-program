@@ -27,7 +27,8 @@ public sealed class CatalogStore : IDisposable
               id TEXT PRIMARY KEY, title TEXT, album_id TEXT, artist_id TEXT,
               local_path TEXT, streaming_id TEXT, source INT, quality INT,
               sample_rate INT, bit_depth INT, channels INT, is_dsd INT, dsd_rate INT,
-              duration_ms INT, lyrics TEXT, art TEXT, merged INT, track_no INT DEFAULT 0);
+              duration_ms INT, lyrics TEXT, art TEXT, merged INT, track_no INT DEFAULT 0,
+              genres TEXT, composers TEXT);
             CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
@@ -54,32 +55,34 @@ public sealed class CatalogStore : IDisposable
             UpsertArtist(con, artist);
             UpsertAlbum(con, album);
             con.Execute("""
-                INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no)
-                VALUES($id,$title,$album,$artist,$path,$sid,$src,$q,$sr,$bd,$ch,$dsd,$dr,$dur,$ly,$art,$mg,$no)
+                INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no,genres,composers)
+                VALUES($id,$title,$album,$artist,$path,$sid,$src,$q,$sr,$bd,$ch,$dsd,$dr,$dur,$ly,$art,$mg,$no,$gen,$cmp)
                 ON CONFLICT(id) DO UPDATE SET
                   title=$title, album_id=$album, artist_id=$artist, local_path=$path, streaming_id=$sid,
                   source=$src, quality=$q, sample_rate=$sr, bit_depth=$bd, channels=$ch, is_dsd=$dsd,
-                  dsd_rate=$dr, duration_ms=$dur, lyrics=$ly, art=$art, merged=$mg, track_no=$no
+                  dsd_rate=$dr, duration_ms=$dur, lyrics=$ly, art=$art, merged=$mg, track_no=$no,
+                  genres=$gen, composers=$cmp
                 """,
                 ("$id", track.Id), ("$title", track.Title), ("$album", album.Id), ("$artist", artist.Id),
                 ("$path", track.LocalPath), ("$sid", track.StreamingId), ("$src", (int)track.Source),
                 ("$q", (int)track.StreamingQuality), ("$sr", track.SampleRate), ("$bd", track.BitDepth),
                 ("$ch", track.Channels), ("$dsd", track.IsDsd ? 1 : 0), ("$dr", track.DsdRate),
                 ("$dur", track.DurationMs), ("$ly", track.LyricsLrc), ("$art", track.ArtworkPath),
-                ("$mg", track.MergedLocalAndStreaming ? 1 : 0), ("$no", track.TrackNumber));
+                ("$mg", track.MergedLocalAndStreaming ? 1 : 0), ("$no", track.TrackNumber),
+                ("$gen", PackList(track.Genres)), ("$cmp", PackList(track.Composers)));
             _artists[artist.Id] = artist;
             _albums[album.Id] = album;
             _tracks[track.Id] = track;
         }
     }
 
-    public IReadOnlyList<Track> Search(string query)
+    public IReadOnlyList<object> Search(string query)
     {
         lock (_gate)
         {
             if (string.IsNullOrWhiteSpace(query))
             {
-                return _tracks.Values.ToList();
+                return _tracks.Values.Select(TrackView).ToList();
             }
 
             var q = query.Trim();
@@ -93,8 +96,10 @@ public sealed class CatalogStore : IDisposable
                     || (album?.Label?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (album?.Credits?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
                     || (artist?.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+                    || t.Genres.Any(g => g.Contains(q, StringComparison.OrdinalIgnoreCase))
+                    || t.Composers.Any(c => c.Contains(q, StringComparison.OrdinalIgnoreCase))
                     || MatchesAlias(artist, qNorm);
-            }).ToList();
+            }).Select(TrackView).ToList();
         }
     }
 
@@ -184,6 +189,67 @@ public sealed class CatalogStore : IDisposable
     }
 
     /// <summary>Control이 그리는 카탈로그 뷰. 아트는 캐시 URL로만 넘긴다.</summary>
+    /// <summary>
+    /// catalog 와 search 가 공유하는 트랙 뷰. 한 곳에서만 만든다 —
+    /// 모양이 갈리면 Control 이 같은 파서로 두 응답을 읽다가 필드를 잃는다.
+    /// </summary>
+    private object TrackView(Track t)
+    {
+        var work = CompositionGrouping.Identify(t.Title, t.Composers.FirstOrDefault());
+        return new
+        {
+            t.Id,
+            t.Title,
+            t.AlbumId,
+            t.ArtistId,
+            artist = _artists.GetValueOrDefault(t.ArtistId)?.Name,
+            artistAliases = _artists.GetValueOrDefault(t.ArtistId)?.AlternateNames ?? [],
+            album = _albums.GetValueOrDefault(t.AlbumId)?.Title,
+            year = _albums.GetValueOrDefault(t.AlbumId)?.Year,
+            label = _albums.GetValueOrDefault(t.AlbumId)?.Label,
+            t.SampleRate,
+            t.BitDepth,
+            t.IsDsd,
+            t.DsdRate,
+            t.DurationMs,
+            t.Source,
+            t.StreamingQuality,
+            t.MergedLocalAndStreaming,
+            genres = t.Genres,
+            composers = t.Composers,
+            workKey = work?.Key,
+            workTitle = work?.Title,
+            hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
+            hasLocal = t.LocalPath is not null,
+            artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
+            badge = QualityPolicyEngine.Badge(t, false)
+        };
+    }
+
+    /// <summary>앨범 한 장의 상세. 라이너·크레딧은 여기서만 나간다 — 트랙마다 실으면 낭비다.</summary>
+    public object? AlbumDetail(string albumId)
+    {
+        lock (_gate)
+        {
+            if (!_albums.TryGetValue(albumId, out var album)) return null;
+            return new
+            {
+                album.Id,
+                album.Title,
+                artist = _artists.GetValueOrDefault(album.ArtistId)?.Name,
+                album.Year,
+                album.Label,
+                album.LinerNotes,
+                album.Credits,
+                tracks = _tracks.Values
+                    .Where(t => t.AlbumId == albumId)
+                    .OrderBy(t => t.TrackNumber)
+                    .Select(TrackView)
+                    .ToList()
+            };
+        }
+    }
+
     public IReadOnlyList<object> CatalogView()
     {
         lock (_gate)
@@ -192,30 +258,7 @@ public sealed class CatalogStore : IDisposable
                 .OrderBy(t => _artists.GetValueOrDefault(t.ArtistId)?.Name)
                 .ThenBy(t => _albums.GetValueOrDefault(t.AlbumId)?.Title)
                 .ThenBy(t => t.TrackNumber)
-                .Select(t => (object)new
-                {
-                    t.Id,
-                    t.Title,
-                    t.AlbumId,
-                    t.ArtistId,
-                    artist = _artists.GetValueOrDefault(t.ArtistId)?.Name,
-                    artistAliases = _artists.GetValueOrDefault(t.ArtistId)?.AlternateNames ?? [],
-                    album = _albums.GetValueOrDefault(t.AlbumId)?.Title,
-                    year = _albums.GetValueOrDefault(t.AlbumId)?.Year,
-                    label = _albums.GetValueOrDefault(t.AlbumId)?.Label,
-                    t.SampleRate,
-                    t.BitDepth,
-                    t.IsDsd,
-                    t.DsdRate,
-                    t.DurationMs,
-                    t.Source,
-                    t.StreamingQuality,
-                    t.MergedLocalAndStreaming,
-                    hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
-                    hasLocal = t.LocalPath is not null,
-                    artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
-                    badge = QualityPolicyEngine.Badge(t, false)
-                })
+                .Select(TrackView)
                 .ToList();
         }
     }
@@ -290,6 +333,24 @@ public sealed class CatalogStore : IDisposable
         {
             // 이미 있는 컬럼.
         }
+
+        try
+        {
+            con.Execute("ALTER TABLE tracks ADD COLUMN genres TEXT");
+        }
+        catch (SqliteException)
+        {
+            // 이미 있는 컬럼.
+        }
+
+        try
+        {
+            con.Execute("ALTER TABLE tracks ADD COLUMN composers TEXT");
+        }
+        catch (SqliteException)
+        {
+            // 이미 있는 컬럼.
+        }
     }
 
     private void Load(SqliteConnection con)
@@ -338,7 +399,7 @@ public sealed class CatalogStore : IDisposable
 
         using (var cmd = con.CreateCommand())
         {
-            cmd.CommandText = "SELECT id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,IFNULL(track_no,0) FROM tracks";
+            cmd.CommandText = "SELECT id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,IFNULL(track_no,0),genres,composers FROM tracks";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -361,7 +422,9 @@ public sealed class CatalogStore : IDisposable
                     LyricsLrc = r.IsDBNull(14) ? null : r.GetString(14),
                     ArtworkPath = r.IsDBNull(15) ? null : r.GetString(15),
                     MergedLocalAndStreaming = r.GetInt32(16) == 1,
-                    TrackNumber = r.GetInt32(17)
+                    TrackNumber = r.GetInt32(17),
+                    Genres = UnpackList(r.IsDBNull(18) ? null : r.GetString(18)),
+                    Composers = UnpackList(r.IsDBNull(19) ? null : r.GetString(19))
                 };
             }
         }
@@ -417,13 +480,18 @@ public sealed class CatalogStore : IDisposable
         UpsertAlbum(con, kob);
         UpsertAlbum(con, stray);
         SeedTrack(con, "tr-blue-train", "Blue Train", blue, coltrane, 96000, 24, false, 180000, 1,
-            "[00:00.00]Piano figure\n[00:12.00]Horn entrance — the room leans in\n[00:48.00]Head, full band\n[01:30.00]Tenor solo");
+            "[00:00.00]Piano figure\n[00:12.00]Horn entrance — the room leans in\n[00:48.00]Head, full band\n[01:30.00]Tenor solo",
+            ["Jazz", "Hard Bop"], ["John Coltrane"]);
         SeedTrack(con, "tr-moment-notice", "Moment's Notice", blue, coltrane, 96000, 24, false, 160000, 2,
-            "[00:00.00]Up-tempo turnaround\n[00:08.00]Unison line");
+            "[00:00.00]Up-tempo turnaround\n[00:08.00]Unison line",
+            ["Jazz", "Hard Bop"], ["John Coltrane"]);
         SeedTrack(con, "tr-so-what", "So What", kob, miles, 44100, 16, false, 200000, 1,
-            "[00:00.00]Bass riff\n[00:18.00]Piano answer\n[00:32.00]Horns, So What");
-        SeedTrack(con, "tr-dsd-demo", "DSD Demo (native)", kob, miles, 2822400, 1, true, 120000, 2, null);
-        SeedTrack(con, "tr-kanden", "感電", stray, yonezu, 44100, 16, false, 208000, 1, null);
+            "[00:00.00]Bass riff\n[00:18.00]Piano answer\n[00:32.00]Horns, So What",
+            ["Jazz", "Modal Jazz"], ["Miles Davis"]);
+        SeedTrack(con, "tr-dsd-demo", "DSD Demo (native)", kob, miles, 2822400, 1, true, 120000, 2, null,
+            ["Jazz"], ["Miles Davis"]);
+        SeedTrack(con, "tr-kanden", "感電", stray, yonezu, 44100, 16, false, 208000, 1, null,
+            ["J-Pop"], ["米津玄師"]);
     }
 
     /// <summary>
@@ -548,15 +616,17 @@ public sealed class CatalogStore : IDisposable
         public List<string>? Aliases { get; set; }
     }
 
-    private static void SeedTrack(SqliteConnection con, string id, string title, Album album, Artist artist, int sr, int bd, bool dsd, long dur, int no, string? lrc)
+    private static void SeedTrack(SqliteConnection con, string id, string title, Album album, Artist artist, int sr, int bd, bool dsd, long dur, int no, string? lrc,
+        string[] genres, string[] composers)
         => con.Execute("""
-            INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no)
-            VALUES($id,$title,$album,$artist,NULL,NULL,0,$q,$sr,$bd,2,$dsd,$dr,$dur,$ly,NULL,0,$no)
+            INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no,genres,composers)
+            VALUES($id,$title,$album,$artist,NULL,NULL,0,$q,$sr,$bd,2,$dsd,$dr,$dur,$ly,NULL,0,$no,$gen,$cmp)
             """,
             ("$id", id), ("$title", title), ("$album", album.Id), ("$artist", artist.Id),
             ("$q", (int)StreamingQuality.Unknown), ("$sr", sr),
             ("$bd", bd), ("$dsd", dsd ? 1 : 0), ("$dr", dsd ? 64 : null),
-            ("$dur", dur), ("$ly", lrc), ("$no", no));
+            ("$dur", dur), ("$ly", lrc), ("$no", no),
+            ("$gen", PackList(genres)), ("$cmp", PackList(composers)));
 
     private static void UpsertArtist(SqliteConnection con, Artist artist)
         => con.Execute(
@@ -569,6 +639,17 @@ public sealed class CatalogStore : IDisposable
             "INSERT INTO albums(id,title,artist_id,liner,label,year,credits,art) VALUES($id,$t,$a,$l,$lb,$y,$c,$art) ON CONFLICT(id) DO UPDATE SET title=$t, artist_id=$a, liner=IFNULL($l,liner), label=IFNULL($lb,label), year=IFNULL($y,year), credits=IFNULL($c,credits), art=IFNULL($art,art)",
             ("$id", album.Id), ("$t", album.Title), ("$a", album.ArtistId), ("$l", album.LinerNotes),
             ("$lb", album.Label), ("$y", album.Year), ("$c", album.Credits), ("$art", album.ArtworkPath));
+
+    /// <summary>목록 컬럼 구분자. 장르·작곡가 이름에 나올 수 없는 제어문자를 쓴다.</summary>
+    private const char ListSep = '';
+
+    private static string PackList(IEnumerable<string> items)
+        => string.Join(ListSep, items.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()));
+
+    private static List<string> UnpackList(string? packed)
+        => string.IsNullOrWhiteSpace(packed)
+            ? []
+            : [.. packed.Split(ListSep, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
     private SqliteConnection Open()
     {

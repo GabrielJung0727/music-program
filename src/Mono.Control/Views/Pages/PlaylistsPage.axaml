@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.PlaylistsPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel MaxWidth="720" HorizontalAlignment="Left">
+      <ItemsControl ItemsSource="{Binding Playlists}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:PlaylistEntry">
+            <Border Classes="row" Margin="0,0,0,8" Padding="12">
+              <StackPanel Spacing="6">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6"
+                              VerticalAlignment="Center">
+                    <Button Classes="ghost" Content="큐에 싣기"
+                            Command="{Binding $parent[UserControl].((pvm:LibraryViewModel)DataContext).LoadPlaylistCommand}"
+                            CommandParameter="{Binding}"/>
+                    <Button Classes="ghost" Content="M3U"
+                            Command="{Binding $parent[UserControl].((pvm:LibraryViewModel)DataContext).ExportM3uCommand}"
+                            CommandParameter="{Binding}"/>
+                  </StackPanel>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11"/>
+                  </StackPanel>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding Tracks}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:PlaylistTrack">
+                      <TextBlock Text="{Binding Title}" Classes="muted" FontSize="11" Margin="0,2,0,0"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

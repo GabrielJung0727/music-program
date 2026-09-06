@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.ComposersPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <ItemsControl ItemsSource="{Binding Composers}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="models:ComposerEntry">
+          <StackPanel Width="130" Margin="0,0,12,20">
+            <Border Width="96" Height="96" CornerRadius="48" HorizontalAlignment="Center"
+                    Background="{DynamicResource Mono.Panel}"
+                    BorderBrush="{DynamicResource Mono.Border}" BorderThickness="1">
+              <TextBlock Text="{Binding Initials}" FontSize="30" FontWeight="SemiBold"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,8,0,0"
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11"
+                       HorizontalAlignment="Center"/>
+          </StackPanel>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </ScrollViewer>
+</UserControl>

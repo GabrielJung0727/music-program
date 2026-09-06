@@ -61,6 +61,22 @@ public sealed class StreamingHub
         var state = Guid.NewGuid().ToString("n")[..12];
         lock (_gate) _pendingStates[provider] = state;
 
+        if (!HasLiveCredentials(provider))
+        {
+            var acc = CompleteOAuth(provider, null, state, displayName: null);
+            return new
+            {
+                provider,
+                state,
+                authUrl = "",
+                liveSdk = false,
+                demo = true,
+                connected = acc.Connected,
+                displayName = acc.DisplayName,
+                note = "파트너 키 없음 — 데모 토큰으로 연동했습니다."
+            };
+        }
+
         var redirect = Env("MONO_OAUTH_REDIRECT") ?? "http://127.0.0.1:7702/oauth/callback";
         var authUrl = provider switch
         {

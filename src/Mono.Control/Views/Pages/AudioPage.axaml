@@ -1,0 +1,184 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             xmlns:svg="using:Avalonia.Svg.Skia"
+             x:Class="Mono.Control.Views.Pages.AudioPage"
+             x:DataType="pvm:AudioViewModel">
+            <ScrollViewer>
+              <StackPanel Spacing="14" MaxWidth="640" HorizontalAlignment="Left">
+                <TextBlock Text="시그널 패스" FontWeight="SemiBold"/>
+                <Border Classes="panel" CornerRadius="10" Padding="12">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathSource}"/>
+                    <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathDsp}"/>
+                    <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
+                    <Image Classes="icon" Source="{DynamicResource Mono.Icon.PathDevice}"/>
+                    <TextBlock Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).SignalPathText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                  </StackPanel>
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ConnectOutputCommand}"/>
+                  <Button Classes="ghost" Content="Sync Probe" Command="{Binding SyncProbeCommand}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding SyncProbeSummary}" Classes="muted" TextWrapping="Wrap"
+                           IsVisible="{Binding HasSyncProbe}"/>
+                <TextBox Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).ZoneName}" Watermark="존 이름"/>
+                <Button Classes="ghost" Content="존 만들기" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CreateZoneCommand}" HorizontalAlignment="Left"/>
+
+                <TextBlock Text="존 관리" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <ComboBox ItemsSource="{Binding Zones}" SelectedItem="{Binding SelectedZone}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ZoneItem">
+                      <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <StackPanel IsVisible="{Binding HasSelectedZone}" Spacing="6">
+                  <TextBlock Classes="muted" FontSize="11">
+                    <Run Text="{Binding SelectedZone.ModeLabel}"/><Run Text=" · "/><Run Text="{Binding SelectedZone.MemberSummary}"/>
+                  </TextBlock>
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="ghost" Content="이름 변경" Margin="4,0,0,0"
+                            Command="{Binding RenameZoneCommand}"/>
+                    <TextBox Text="{Binding ZoneRenameText}" Watermark="새 이름"/>
+                  </DockPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Classes="ghost" Content="동시 재생" Command="{Binding SetZoneSyncCommand}"
+                            ToolTip.Tip="존의 모든 기기가 같은 곡을 동시에 냅니다"/>
+                    <Button Classes="ghost" Content="기기별 독립" Command="{Binding SetZoneIndependentCommand}"
+                            ToolTip.Tip="기기마다 다른 곡을 재생합니다"/>
+                    <Button Classes="ghost" Content="존 삭제" Command="{Binding DeleteZoneCommand}"/>
+                  </StackPanel>
+
+                  <TextBlock Text="존의 기기" Classes="muted" FontSize="11" Margin="0,6,0,0"/>
+                  <ItemsControl ItemsSource="{Binding SelectedZone.Members}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ZoneMember">
+                        <DockPanel Margin="0,2">
+                          <Button DockPanel.Dock="Right" Classes="ghost" Content="빼기" Padding="8,2" FontSize="11"
+                                  Command="{Binding $parent[UserControl].((pvm:AudioViewModel)DataContext).RemoveDeviceFromZoneCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <TextBlock Text="기기 추가" Classes="muted" FontSize="11" Margin="0,6,0,0"/>
+                  <ItemsControl ItemsSource="{Binding Outputs}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:OutputDevice">
+                        <Button Classes="ghost" Margin="0,2,0,0" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left" Content="{Binding Name}"
+                                Command="{Binding $parent[UserControl].((pvm:AudioViewModel)DataContext).AddDeviceToZoneCommand}"
+                                CommandParameter="{Binding}"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                <TextBlock Text="원격 Control 페어링" FontWeight="SemiBold" Margin="0,16,0,0"/>
+                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                           Text="다른 PC 의 Mono 로 이 Core 에 붙을 때 씁니다. 코드를 발급해 그쪽에 입력하세요."/>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Classes="ghost" Content="코드 발급" Command="{Binding IssuePairingCommand}"/>
+                  <TextBlock Text="{Binding PairingCode}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Classes="ghost" Content="입력" Margin="4,0,0,0"
+                          Command="{Binding RedeemPairingCommand}"/>
+                  <TextBox Text="{Binding RedeemCode}" Watermark="받은 페어링 코드"/>
+                </DockPanel>
+
+                <TextBlock Text="DSP 프리셋" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="0" ToolTip.Tip="Off">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspOff}"/>
+                      <TextBlock Text="Off" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="1">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspHeadphones}"/>
+                      <TextBlock Text="Headphones" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="2">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspSpeakers}"/>
+                      <TextBlock Text="Speakers" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="3">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspRoomir}"/>
+                      <TextBlock Text="Room IR" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspCrossfeed}"/>
+                      <TextBlock Text="Crossfeed" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="5">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspEq}"/>
+                      <TextBlock Text="Parametric" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+
+                <TextBlock Text="Easy EQ (Parametric / Graphic)" FontWeight="SemiBold"/>
+                <CheckBox Content="Graphic mode" IsChecked="{Binding EqGraphicMode}"/>
+                <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,4">
+                  <TextBlock Text="60 Hz" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand1}"/>
+                  <TextBlock Grid.Row="1" Text="250 Hz" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand2}"/>
+                  <TextBlock Grid.Row="2" Text="1 kHz" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand3}"/>
+                  <TextBlock Grid.Row="3" Text="4 kHz" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand4}"/>
+                  <TextBlock Grid.Row="4" Text="12 kHz" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand5}"/>
+                </Grid>
+                <Button Classes="primary" Content="EQ 적용" Command="{Binding ApplyEasyEqCommand}" HorizontalAlignment="Left"/>
+
+                <TextBlock Text="룸 IR (WAV/ZIP)" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Width="360" Text="{Binding IrPath}" Watermark="IR 파일 경로"/>
+                  <Button Classes="ghost" Click="PickIrClick" ToolTip.Tip="IR 찾기">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.Folder}"/>
+                      <TextBlock Text="찾기…" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Content="지우기" Command="{Binding ClearIrCommand}"/>
+                </StackPanel>
+
+                <TextBlock Text="Device EQ / Speaker Setup" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="harman">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Image Classes="icon" Source="{DynamicResource Mono.Icon.DspDeviceEq}"/>
+                      <TextBlock Text="Harman" VerticalAlignment="Center"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="ghost" Content="Bright" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="bright"/>
+                  <Button Classes="ghost" Content="Warm" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="warm"/>
+                </StackPanel>
+                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Text="Delay L (ms)" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayL}"/>
+                  <TextBlock Grid.Row="1" Text="Delay R (ms)" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayR}"/>
+                  <TextBlock Grid.Row="2" Text="Gain L (dB)" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainL}"/>
+                  <TextBlock Grid.Row="3" Text="Gain R (dB)" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainR}"/>
+                  <TextBlock Grid.Row="4" Text="Headroom" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-24" Maximum="0" Value="{Binding HeadroomDb}"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="ghost" Content="스피커 적용" Command="{Binding ApplySpeakerSetupCommand}"/>
+                  <Button Classes="ghost" Content="헤드룸 적용" Command="{Binding ApplyHeadroomCommand}"/>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+</UserControl>

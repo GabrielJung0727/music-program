@@ -22,6 +22,10 @@ public partial class CatalogTrack : ObservableObject
     [JsonPropertyName("source")] public int Source { get; set; }
     [JsonPropertyName("mergedLocalAndStreaming")] public bool MergedLocalAndStreaming { get; set; }
     [JsonPropertyName("hasLyrics")] public bool HasLyrics { get; set; }
+    [JsonPropertyName("genres")] public List<string> Genres { get; set; } = [];
+    [JsonPropertyName("composers")] public List<string> Composers { get; set; } = [];
+    [JsonPropertyName("workKey")] public string? WorkKey { get; set; }
+    [JsonPropertyName("workTitle")] public string? WorkTitle { get; set; }
 
     [ObservableProperty] private Bitmap? _cover;
 
@@ -66,24 +70,6 @@ public sealed class NavItem
     public string Label { get; }
     public string Section { get; }
     public string Icon { get; }
-}
-
-public sealed class GenreTile
-{
-    public GenreTile(string id, string label, string accent, string subtitle, string motif)
-    {
-        Id = id;
-        Label = label;
-        Accent = accent;
-        Subtitle = subtitle;
-        Motif = motif;
-    }
-
-    public string Id { get; }
-    public string Label { get; }
-    public string Accent { get; }
-    public string Subtitle { get; }
-    public string Motif { get; }
 }
 
 public sealed class HomeRail

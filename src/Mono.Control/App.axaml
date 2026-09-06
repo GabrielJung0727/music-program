@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:svc="using:Mono.Control.Services"
+             xmlns:svg="using:Avalonia.Svg.Skia"
              x:Class="Mono.Control.App"
              RequestedThemeVariant="Light">
   <Application.Resources>
@@ -17,23 +18,89 @@
           <SolidColorBrush x:Key="Mono.Text" Color="#1A1A1E"/>
           <SolidColorBrush x:Key="Mono.Muted" Color="#6B6F7A"/>
           <SolidColorBrush x:Key="Mono.Art" Color="#ECECF8"/>
+          <SolidColorBrush x:Key="Mono.Accent" Color="#6D6DF6"/>
           <SolidColorBrush x:Key="Mono.Onboarding" Color="#CCFFFFFF"/>
           <SolidColorBrush x:Key="Mono.Card" Color="#FFFFFF"/>
           <SolidColorBrush x:Key="Mono.GhostFg" Color="#1A1A1E"/>
+          <SolidColorBrush x:Key="Mono.Warn" Color="#D9762F"/>
+          <SolidColorBrush x:Key="Mono.Bad" Color="#CC4444"/>
+
+          <svg:SvgImage x:Key="Mono.Icon.Guide" Source="avares://Mono.Control/Assets/icons/ui/action-guide.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Theme" Source="avares://Mono.Control/Assets/icons/ui/action-theme.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Resync" Source="avares://Mono.Control/Assets/icons/ui/action-resync.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Folder" Source="avares://Mono.Control/Assets/icons/ui/action-folder.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Scan" Source="avares://Mono.Control/Assets/icons/ui/action-scan.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Output" Source="avares://Mono.Control/Assets/icons/ui/action-output.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Close" Source="avares://Mono.Control/Assets/icons/ui/action-close.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Prev" Source="avares://Mono.Control/Assets/icons/ui/transport-prev.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Play" Source="avares://Mono.Control/Assets/icons/ui/transport-play.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Pause" Source="avares://Mono.Control/Assets/icons/ui/transport-pause.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Next" Source="avares://Mono.Control/Assets/icons/ui/transport-next.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.ArtPlaceholder" Source="avares://Mono.Control/Assets/icons/ui/art-placeholder.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Heart" Source="avares://Mono.Control/Assets/icons/ui/reaction-heart.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Party" Source="avares://Mono.Control/Assets/icons/ui/reaction-party.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Clap" Source="avares://Mono.Control/Assets/icons/ui/reaction-clap.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Fire" Source="avares://Mono.Control/Assets/icons/ui/reaction-fire.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathSource" Source="avares://Mono.Control/Assets/icons/ui/path-source.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathDsp" Source="avares://Mono.Control/Assets/icons/ui/path-dsp.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathDevice" Source="avares://Mono.Control/Assets/icons/ui/path-device.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspOff" Source="avares://Mono.Control/Assets/icons/ui/dsp-off.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspHeadphones" Source="avares://Mono.Control/Assets/icons/ui/dsp-headphones.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspSpeakers" Source="avares://Mono.Control/Assets/icons/ui/dsp-speakers.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspRoomir" Source="avares://Mono.Control/Assets/icons/ui/dsp-roomir.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspCrossfeed" Source="avares://Mono.Control/Assets/icons/ui/dsp-crossfeed.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspEq" Source="avares://Mono.Control/Assets/icons/ui/dsp-eq.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspDeviceEq" Source="avares://Mono.Control/Assets/icons/ui/dsp-device-eq.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpLyrics" Source="avares://Mono.Control/Assets/icons/ui/np-lyrics.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpArtist" Source="avares://Mono.Control/Assets/icons/ui/np-artist.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpCredits" Source="avares://Mono.Control/Assets/icons/ui/np-credits.svg"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="Mono.Bg" Color="#121214"/>
+          <SolidColorBrush x:Key="Mono.Bg" Color="#121317"/>
           <SolidColorBrush x:Key="Mono.Sidebar" Color="#18181C"/>
           <SolidColorBrush x:Key="Mono.Surface" Color="#1C1C22"/>
           <SolidColorBrush x:Key="Mono.Panel" Color="#22222A"/>
           <SolidColorBrush x:Key="Mono.Border" Color="#2E2E38"/>
           <SolidColorBrush x:Key="Mono.Hover" Color="#2A2A38"/>
-          <SolidColorBrush x:Key="Mono.Text" Color="#F2F2F6"/>
+          <SolidColorBrush x:Key="Mono.Text" Color="#F2F2F5"/>
           <SolidColorBrush x:Key="Mono.Muted" Color="#9A9AA8"/>
-          <SolidColorBrush x:Key="Mono.Art" Color="#2A2A38"/>
-          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC121214"/>
+          <SolidColorBrush x:Key="Mono.Art" Color="#22222C"/>
+          <SolidColorBrush x:Key="Mono.Accent" Color="#8F8FF8"/>
+          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC121317"/>
           <SolidColorBrush x:Key="Mono.Card" Color="#1C1C22"/>
-          <SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F6"/>
+          <SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F5"/>
+          <SolidColorBrush x:Key="Mono.Warn" Color="#E39A5C"/>
+          <SolidColorBrush x:Key="Mono.Bad" Color="#EE8888"/>
+
+          <svg:SvgImage x:Key="Mono.Icon.Guide" Source="avares://Mono.Control/Assets/icons/dark/ui/action-guide.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Theme" Source="avares://Mono.Control/Assets/icons/dark/ui/action-theme.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Resync" Source="avares://Mono.Control/Assets/icons/dark/ui/action-resync.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Folder" Source="avares://Mono.Control/Assets/icons/dark/ui/action-folder.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Scan" Source="avares://Mono.Control/Assets/icons/dark/ui/action-scan.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Output" Source="avares://Mono.Control/Assets/icons/dark/ui/action-output.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Close" Source="avares://Mono.Control/Assets/icons/dark/ui/action-close.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Prev" Source="avares://Mono.Control/Assets/icons/dark/ui/transport-prev.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Play" Source="avares://Mono.Control/Assets/icons/dark/ui/transport-play.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Pause" Source="avares://Mono.Control/Assets/icons/dark/ui/transport-pause.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Next" Source="avares://Mono.Control/Assets/icons/dark/ui/transport-next.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.ArtPlaceholder" Source="avares://Mono.Control/Assets/icons/dark/ui/art-placeholder.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Heart" Source="avares://Mono.Control/Assets/icons/dark/ui/reaction-heart.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Party" Source="avares://Mono.Control/Assets/icons/dark/ui/reaction-party.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Clap" Source="avares://Mono.Control/Assets/icons/dark/ui/reaction-clap.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.Fire" Source="avares://Mono.Control/Assets/icons/dark/ui/reaction-fire.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathSource" Source="avares://Mono.Control/Assets/icons/dark/ui/path-source.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathDsp" Source="avares://Mono.Control/Assets/icons/dark/ui/path-dsp.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.PathDevice" Source="avares://Mono.Control/Assets/icons/dark/ui/path-device.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspOff" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-off.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspHeadphones" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-headphones.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspSpeakers" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-speakers.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspRoomir" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-roomir.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspCrossfeed" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-crossfeed.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspEq" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-eq.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.DspDeviceEq" Source="avares://Mono.Control/Assets/icons/dark/ui/dsp-device-eq.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpLyrics" Source="avares://Mono.Control/Assets/icons/dark/ui/np-lyrics.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpArtist" Source="avares://Mono.Control/Assets/icons/dark/ui/np-artist.svg"/>
+          <svg:SvgImage x:Key="Mono.Icon.NpCredits" Source="avares://Mono.Control/Assets/icons/dark/ui/np-credits.svg"/>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>

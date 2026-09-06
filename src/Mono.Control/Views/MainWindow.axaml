@@ -3,6 +3,8 @@
         xmlns:vm="using:Mono.Control.ViewModels"
         xmlns:models="using:Mono.Control.Models"
         xmlns:svg="using:Avalonia.Svg.Skia"
+        xmlns:pages="using:Mono.Control.Views.Pages"
+        xmlns:ctl="using:Mono.Control.Controls"
         x:Class="Mono.Control.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Width="1280" Height="800"
@@ -11,7 +13,8 @@
         Icon="/Assets/icons/app/mono-app.ico"
         Classes="mono"
         WindowStartupLocation="CenterScreen"
-        Closing="OnClosing">
+        Closing="OnClosing"
+        KeyDown="OnKeyDown">
 
   <Grid>
     <Grid RowDefinitions="*,Auto">
@@ -49,19 +52,19 @@
               </Button>
               <Button Classes="ghost" Command="{Binding OpenGuideCommand}" ToolTip.Tip="가이드">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-guide.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Guide}"/>
                   <TextBlock Text="가이드" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="테마">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-theme.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Theme}"/>
                   <TextBlock Text="{Binding ThemeButtonLabel}" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding ResyncCommand}" ToolTip.Tip="리싱크">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-resync.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Resync}"/>
                   <TextBlock Text="리싱크" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
@@ -72,443 +75,105 @@
             </StackPanel>
           </DockPanel>
 
-          <TextBox Grid.Row="1" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
+          <TextBox Grid.Row="1" x:Name="SearchBox" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
                    Text="{Binding SearchText}" Margin="0,12,0,16" MaxWidth="480" HorizontalAlignment="Left"/>
 
           <Grid Grid.Row="2">
-            <!-- Home rails -->
-            <ScrollViewer IsVisible="{Binding IsHomePage}">
-              <StackPanel Spacing="18">
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLibraryToolsVisible}">
-                  <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
-                  <Button Classes="ghost" Content="Tidal OAuth" Command="{Binding LinkTidalCommand}"/>
-                  <Button Classes="ghost" Content="Qobuz OAuth" Command="{Binding LinkQobuzCommand}"/>
-                  <Button Classes="ghost" Content="Tidal 데모" Command="{Binding LinkTidalDemoCommand}"/>
-                  <Button Classes="ghost" Content="Qobuz 데모" Command="{Binding LinkQobuzDemoCommand}"/>
-                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
-                </StackPanel>
-                <ItemsControl ItemsSource="{Binding HomeRails}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:HomeRail">
-                      <StackPanel Margin="0,0,0,8">
-                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="18" Margin="0,0,0,8"/>
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                          <ItemsControl ItemsSource="{Binding Items}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="4"/>
-                              </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="models:CatalogTrack">
-                                <Border Classes="trackcard" Width="148">
-                                  <StackPanel Spacing="6">
-                                    <Border Classes="artslot" Height="130">
-                                      <Panel>
-                                        <Image Classes="artph"
-                                               Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
-                                               IsVisible="{Binding !HasArt}"/>
-                                        <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                                      </Panel>
-                                    </Border>
-                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                                    <Button Classes="primary" Content="재생" Padding="10,4"
-                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
-                                            CommandParameter="{Binding}"/>
-                                  </StackPanel>
-                                </Border>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </ScrollViewer>
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </ScrollViewer>
+            <pages:HomePage IsVisible="{Binding IsHomePage}"/>
 
-            <!-- Genres tiles -->
-            <ScrollViewer IsVisible="{Binding IsGenresPage}">
-              <StackPanel Spacing="16">
-                <ItemsControl ItemsSource="{Binding GenreTiles}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:GenreTile">
-                      <Button Classes="genretile" Background="{Binding Accent}"
-                              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectGenreCommand}"
-                              CommandParameter="{Binding}">
-                        <Grid>
-                          <Image Width="56" Height="56" Opacity="0.35"
-                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
-                                 Source="{Binding Motif, Converter={StaticResource SvgIcon}, ConverterParameter=genres}"/>
-                          <StackPanel VerticalAlignment="Bottom">
-                            <TextBlock Text="{Binding Label}" FontSize="22" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="{Binding Subtitle}" Foreground="#CCFFFFFF" FontSize="12"/>
-                          </StackPanel>
-                        </Grid>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <ItemsControl ItemsSource="{Binding FilteredTracks}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:CatalogTrack">
-                      <Border Classes="trackcard">
-                        <StackPanel Spacing="6">
-                          <Border Classes="artslot" Height="140">
-                            <Panel>
-                              <Image Classes="artph"
-                                     Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
-                                     IsVisible="{Binding !HasArt}"/>
-                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                            </Panel>
-                          </Border>
-                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                          <Button Classes="primary" Content="재생" Padding="10,4"
-                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
-                                  CommandParameter="{Binding}"/>
-                        </StackPanel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </ScrollViewer>
+            <pages:GenresPage DataContext="{Binding Library}"
+                              IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsGenresPage}"/>
 
-            <!-- Library grid -->
-            <ScrollViewer IsVisible="{Binding IsLibraryGrid}">
-              <StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12"
-                            IsVisible="{Binding IsLibraryToolsVisible}">
-                  <Button Classes="ghost" Content="라이브러리 스캔" Command="{Binding ScanLibraryCommand}"/>
-                  <Button Classes="ghost" Content="Tidal 데모" Command="{Binding LinkTidalDemoCommand}"/>
-                  <Button Classes="ghost" Content="Qobuz 데모" Command="{Binding LinkQobuzDemoCommand}"/>
-                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
-                </StackPanel>
+            <pages:ComposersPage DataContext="{Binding Library}"
+                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsComposersPage}"/>
 
-                <ItemsControl ItemsSource="{Binding FilteredTracks}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <WrapPanel />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:CatalogTrack">
-                      <Border Classes="trackcard">
-                        <StackPanel Spacing="6">
-                          <Border Classes="artslot" Height="140">
-                            <Panel>
-                              <Image Classes="artph"
-                                     Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"
-                                     IsVisible="{Binding !HasArt}"/>
-                              <Image Source="{Binding Cover}" Stretch="UniformToFill" IsVisible="{Binding HasArt}"/>
-                            </Panel>
-                          </Border>
-                          <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
-                          <TextBlock Text="{Binding Subtitle}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                          <TextBlock Text="{Binding Badge}" Classes="muted" FontSize="11"/>
-                          <StackPanel Orientation="Horizontal" Spacing="4">
-                            <Button Classes="primary" Content="재생" Padding="10,4"
-                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PlayTrackCommand}"
-                                    CommandParameter="{Binding}"/>
-                            <Button Classes="ghost" Content="큐"
-                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).EnqueueTrackCommand}"
-                                    CommandParameter="{Binding}"/>
-                          </StackPanel>
-                        </StackPanel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </ScrollViewer>
+            <pages:CompositionsPage DataContext="{Binding Library}"
+                                    IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsCompositionsPage}"/>
 
-            <!-- Lounge -->
-            <Grid IsVisible="{Binding IsLoungePage}" ColumnDefinitions="*,320">
-              <StackPanel>
-                <TextBox Text="{Binding RoomName}" Watermark="룸 이름"/>
-                <ComboBox Margin="0,8,0,8" SelectedIndex="{Binding RoomMode}" HorizontalAlignment="Left" MinWidth="280">
-                  <ComboBoxItem Content="Open Lounge"/>
-                  <ComboBoxItem Content="Invite"/>
-                  <ComboBoxItem Content="Host Queue"/>
-                  <ComboBoxItem Content="Audiophile"/>
-                </ComboBox>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="primary" Content="룸 생성" Command="{Binding CreateRoomCommand}"/>
-                  <Button Classes="ghost" Content="새로고침" Command="{Binding RefreshRoomsCommand}"/>
-                  <Button Classes="ghost" Content="나가기" Command="{Binding LeaveRoomCommand}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,8">
-                  <TextBox Width="160" Text="{Binding JoinRoomId}" Watermark="룸 ID"/>
-                  <TextBox Width="100" Text="{Binding InviteCode}" Watermark="초대 코드"/>
-                  <Button Classes="ghost" Content="참여" Command="{Binding JoinRoomCommand}"/>
-                </StackPanel>
-                <TextBlock Text="열린 라운지" FontWeight="SemiBold" Margin="0,12,0,6"/>
-                <ItemsControl ItemsSource="{Binding Rooms}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:RoomListItem">
-                      <Border Classes="roomcard">
-                        <DockPanel>
-                          <Button DockPanel.Dock="Right" Classes="ghost" Content="입장"
-                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).JoinListedRoomCommand}"
-                                  CommandParameter="{Binding}"/>
-                          <StackPanel>
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                            <TextBlock Classes="muted" Text="{Binding Id}"/>
-                          </StackPanel>
-                        </DockPanel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="큐" FontWeight="SemiBold" Margin="0,16,0,6"/>
-                <Button Classes="ghost" Content="큐 비우기" Command="{Binding ClearQueueCommand}" HorizontalAlignment="Left" Margin="0,0,0,8"/>
-                <ItemsControl ItemsSource="{Binding QueueTracks}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:CatalogTrack">
-                      <TextBlock Margin="0,2" Text="{Binding Title}"/>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
+            <pages:FoldersPage DataContext="{Binding Library}"
+                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsFoldersPage}"/>
 
-              <Border Grid.Column="1" Classes="panel" Padding="14" Margin="16,0,0,0">
-                <DockPanel>
-                  <StackPanel DockPanel.Dock="Bottom" Spacing="8">
-                    <TextBox Text="{Binding ChatInput}" Watermark="감상평 / 채팅"/>
-                    <Button Classes="primary" Content="전송" Command="{Binding SendChatCommand}"/>
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="❤️" ToolTip.Tip="하트" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-heart.svg}"/>
-                      </Button>
-                      <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🎉" ToolTip.Tip="파티" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-party.svg}"/>
-                      </Button>
-                      <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="👏" ToolTip.Tip="박수" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-clap.svg}"/>
-                      </Button>
-                      <Button Classes="ghost" Command="{Binding ReactCommand}" CommandParameter="🔥" ToolTip.Tip="파이어" Padding="10,6">
-                        <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/reaction-fire.svg}"/>
-                      </Button>
-                    </StackPanel>
-                  </StackPanel>
-                  <StackPanel>
-                    <TextBlock Text="라운지 채팅" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                    <ListBox ItemsSource="{Binding ChatLines}" Height="360"/>
-                  </StackPanel>
-                </DockPanel>
-              </Border>
-            </Grid>
+            <pages:HistoryPage DataContext="{Binding Library}"
+                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsHistoryPage}"/>
 
-            <!-- Devices / Easy EQ / Signal path -->
-            <ScrollViewer IsVisible="{Binding IsDevicesPage}">
-              <StackPanel Spacing="14" MaxWidth="640" HorizontalAlignment="Left">
-                <TextBlock Text="시그널 패스" FontWeight="SemiBold"/>
-                <Border Classes="panel" CornerRadius="10" Padding="12">
-                  <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-source.svg}"/>
-                    <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-dsp.svg}"/>
-                    <TextBlock Text="→" VerticalAlignment="Center" Classes="muted"/>
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/path-device.svg}"/>
-                    <TextBlock Text="{Binding SignalPathText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                  </StackPanel>
-                </Border>
-                <TextBlock Text="{Binding SyncProbeText}" Classes="muted" TextWrapping="Wrap" FontFamily="Consolas, Cascadia Mono"/>
-                <TextBlock Text="{Binding ArtPerfText}" Classes="muted"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="primary" Content="이 PC에 출력 연결" Command="{Binding ConnectOutputCommand}"/>
-                  <Button Classes="ghost" Content="Sync Probe" Command="{Binding SyncProbeCommand}"/>
-                </StackPanel>
-                <TextBox AcceptsReturn="True" Height="80" Text="{Binding SyncProbeText}" Watermark="sync_probe JSON"/>
-                <TextBox Text="{Binding ZoneName}" Watermark="존 이름"/>
-                <Button Classes="ghost" Content="존 만들기" Command="{Binding CreateZoneCommand}" HorizontalAlignment="Left"/>
+            <pages:PlaylistsPage DataContext="{Binding Library}"
+                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsPlaylistsPage}"/>
 
-                <TextBlock Text="DSP 프리셋" FontWeight="SemiBold"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="0" ToolTip.Tip="Off">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-off.svg}"/>
-                      <TextBlock Text="Off" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="1">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-headphones.svg}"/>
-                      <TextBlock Text="Headphones" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="2">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-speakers.svg}"/>
-                      <TextBlock Text="Speakers" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="3">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-roomir.svg}"/>
-                      <TextBlock Text="Room IR" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="4">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-crossfeed.svg}"/>
-                      <TextBlock Text="Crossfeed" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="5">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-eq.svg}"/>
-                      <TextBlock Text="Parametric" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                </StackPanel>
+            <pages:LibraryPage IsVisible="{Binding IsLibraryGrid}"/>
 
-                <TextBlock Text="Easy EQ (Parametric / Graphic)" FontWeight="SemiBold"/>
-                <CheckBox Content="Graphic mode" IsChecked="{Binding EqGraphicMode}"/>
-                <Grid ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,4">
-                  <TextBlock Text="60 Hz" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand1}"/>
-                  <TextBlock Grid.Row="1" Text="250 Hz" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand2}"/>
-                  <TextBlock Grid.Row="2" Text="1 kHz" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand3}"/>
-                  <TextBlock Grid.Row="3" Text="4 kHz" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand4}"/>
-                  <TextBlock Grid.Row="4" Text="12 kHz" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-12" Maximum="12" Value="{Binding EqBand5}"/>
-                </Grid>
-                <Button Classes="primary" Content="EQ 적용" Command="{Binding ApplyEasyEqCommand}" HorizontalAlignment="Left"/>
+            <pages:LoungePage DataContext="{Binding Lounge}"
+                          IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsLoungePage}"/>
 
-                <TextBlock Text="룸 IR (WAV/ZIP)" FontWeight="SemiBold"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Width="360" Text="{Binding IrPath}" Watermark="IR 파일 경로"/>
-                  <Button Classes="ghost" Click="PickIrClick" ToolTip.Tip="IR 찾기">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
-                      <TextBlock Text="찾기…" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Content="지우기" Command="{Binding ClearIrCommand}"/>
-                </StackPanel>
+            <pages:AudioPage DataContext="{Binding Audio}"
+                          IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsDevicesPage}"/>
 
-                <TextBlock Text="Device EQ / Speaker Setup" FontWeight="SemiBold"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="ghost" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="harman">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/dsp-device-eq.svg}"/>
-                      <TextBlock Text="Harman" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                  <Button Classes="ghost" Content="Bright" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="bright"/>
-                  <Button Classes="ghost" Content="Warm" Command="{Binding ApplyDeviceEqCommand}" CommandParameter="warm"/>
-                </StackPanel>
-                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-                  <TextBlock Text="Delay L (ms)" VerticalAlignment="Center"/><Slider Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayL}"/>
-                  <TextBlock Grid.Row="1" Text="Delay R (ms)" VerticalAlignment="Center"/><Slider Grid.Row="1" Grid.Column="1" Minimum="0" Maximum="30" Value="{Binding SpeakerDelayR}"/>
-                  <TextBlock Grid.Row="2" Text="Gain L (dB)" VerticalAlignment="Center"/><Slider Grid.Row="2" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainL}"/>
-                  <TextBlock Grid.Row="3" Text="Gain R (dB)" VerticalAlignment="Center"/><Slider Grid.Row="3" Grid.Column="1" Minimum="-12" Maximum="6" Value="{Binding SpeakerGainR}"/>
-                  <TextBlock Grid.Row="4" Text="Headroom" VerticalAlignment="Center"/><Slider Grid.Row="4" Grid.Column="1" Minimum="-24" Maximum="0" Value="{Binding HeadroomDb}"/>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="ghost" Content="스피커 적용" Command="{Binding ApplySpeakerSetupCommand}"/>
-                  <Button Classes="ghost" Content="헤드룸 적용" Command="{Binding ApplyHeadroomCommand}"/>
-                </StackPanel>
-              </StackPanel>
-            </ScrollViewer>
-
-            <!-- Settings -->
-            <ScrollViewer IsVisible="{Binding IsSettingsPage}">
-              <StackPanel Spacing="10" MaxWidth="520" HorizontalAlignment="Left">
-                <TextBlock Text="표시 이름"/>
-                <TextBox Text="{Binding DisplayName}"/>
-                <TextBlock Text="라이브러리 경로"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBox Width="360" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
-                  <Button Classes="ghost" Click="PickLibraryClick" ToolTip.Tip="폴더 선택">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
-                      <TextBlock Text="폴더…" VerticalAlignment="Center"/>
-                    </StackPanel>
-                  </Button>
-                </StackPanel>
-                <Button Classes="ghost" Command="{Binding ScanLibraryCommand}" HorizontalAlignment="Left">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-scan.svg}"/>
-                    <TextBlock Text="스캔" VerticalAlignment="Center"/>
-                  </StackPanel>
-                </Button>
-                <CheckBox Content="다크 모드" IsChecked="{Binding DarkTheme}"/>
-                <CheckBox Content="창 닫기 시 트레이로 최소화 (종료는 트레이 메뉴)" IsChecked="{Binding CloseToTray}"/>
-                <TextBlock Text="앱 업데이트" FontWeight="SemiBold" Margin="0,12,0,0"/>
-                <TextBlock Classes="muted" Text="{Binding AppVersion, StringFormat=현재 버전 {0}}"/>
-                <TextBlock Classes="muted" Text="{Binding UpdateStatus}" TextWrapping="Wrap"/>
-                <ProgressBar Maximum="100" Value="{Binding UpdateProgress}" Height="8"
-                             IsVisible="{Binding UpdateBusy}"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="ghost" Content="업데이트 확인" Command="{Binding CheckForUpdatesCommand}"/>
-                  <Button Classes="primary" Content="받고 다시 시작" Command="{Binding ApplyUpdateCommand}"
-                          IsEnabled="{Binding UpdateReady}"/>
-                </StackPanel>
-                <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="Claude처럼 버튼을 누르면 창이 닫히고, Core·Output까지 한 세트로 교체한 뒤 다시 실행됩니다. 자동 업데이트는 Velopack 설치본에서만 동작합니다. GitHub Releases에 새 패키지를 올리면 됩니다."/>
-                <TextBlock Classes="muted" TextWrapping="Wrap"
-                           Text="출시 UX: Mono.Control.exe만 실행합니다. Core·Output은 백그라운드(WinExe)로 기동됩니다. 레거시 웹 UI는 제거되었습니다."/>
-              </StackPanel>
-            </ScrollViewer>
+            <pages:SettingsPage IsVisible="{Binding IsSettingsPage}"/>
           </Grid>
         </Grid>
       </Grid>
 
       <!-- Bottom player -->
       <Border Grid.Row="1" Classes="playerbar" Padding="16,10">
-        <Grid ColumnDefinitions="300,*,280">
-          <Button Classes="ghost" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left"
-                  Command="{Binding OpenNowPlayingCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-              <Border Classes="artslot" Width="56" Height="56" CornerRadius="6">
-                <Panel>
-                  <Image Classes="artph" Width="40" Height="40"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/art-placeholder.svg}"/>
-                  <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
-                </Panel>
-              </Border>
-              <StackPanel VerticalAlignment="Center" MaxWidth="200">
-                <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+        <Grid ColumnDefinitions="300,*,360">
+          <Grid ColumnDefinitions="*,Auto">
+            <Button Classes="ghost" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left"
+                    Command="{Binding OpenNowPlayingCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <Border Classes="artslot" Width="56" Height="56" CornerRadius="6">
+                  <Panel>
+                    <Image Classes="artph" Width="40" Height="40"
+                           Source="{DynamicResource Mono.Icon.ArtPlaceholder}"/>
+                    <Image Source="{Binding NowArt}" Stretch="UniformToFill"/>
+                  </Panel>
+                </Border>
+                <StackPanel VerticalAlignment="Center" MaxWidth="200">
+                  <TextBlock Text="{Binding NowTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding NowArtist}" Classes="muted" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock Text="{Binding NowBadge}" Classes="muted" FontSize="11"/>
+                </StackPanel>
               </StackPanel>
-            </StackPanel>
-          </Button>
+            </Button>
+            <Button Grid.Column="1" Classes="ghost" Padding="8,6" VerticalAlignment="Center"
+                    Command="{Binding HeartCommand}"
+                    IsEnabled="{Binding CanReact}"
+                    ToolTip.Tip="{Binding ReactBlockedReason}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBlock Text="♥" FontSize="14"/>
+                <TextBlock Text="{Binding HeartCount}" FontSize="11" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
+          </Grid>
 
           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
               <Button Classes="ghost" Command="{Binding PrevCommand}" ToolTip.Tip="이전" Padding="12,8">
-                <Image Classes="icon-lg" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-prev.svg}"/>
+                <Image Classes="icon-lg" Source="{DynamicResource Mono.Icon.Prev}"/>
               </Button>
               <Button Classes="primary" Command="{Binding PlayPauseCommand}" Width="72" Height="40" ToolTip.Tip="재생/일시정지">
                 <Panel>
                   <Image Classes="icon-lg" IsVisible="{Binding !IsPlaying}"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-play.svg}"/>
+                         Source="{DynamicResource Mono.Icon.Play}"/>
                   <Image Classes="icon-lg" IsVisible="{Binding IsPlaying}"
-                         Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-pause.svg}"/>
+                         Source="{DynamicResource Mono.Icon.Pause}"/>
                 </Panel>
               </Button>
               <Button Classes="ghost" Command="{Binding NextCommand}" ToolTip.Tip="다음" Padding="12,8">
-                <Image Classes="icon-lg" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/transport-next.svg}"/>
+                <Image Classes="icon-lg" Source="{DynamicResource Mono.Icon.Next}"/>
+              </Button>
+              <Button Classes="ghost" Command="{Binding ToggleQueueCommand}" ToolTip.Tip="큐" Padding="12,8">
+                <TextBlock Text="큐" VerticalAlignment="Center"/>
               </Button>
             </StackPanel>
             <Grid ColumnDefinitions="40,*,40" Margin="40,0">
               <TextBlock Text="{Binding ElapsedText}" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
-              <Slider Grid.Column="1" Minimum="0" Maximum="{Binding SeekMaximum}" Value="{Binding SeekValue}"
-                      PointerCaptureLost="SeekLost"/>
+              <ctl:SeekBar Grid.Column="1"
+                           Maximum="{Binding SeekMaximum}"
+                           Value="{Binding SeekValue, Mode=TwoWay}"
+                           Heatmap="{Binding Heatmap}"
+                           Pins="{Binding Pins}"
+                           SeekEnabled="{Binding SeekingAllowed}"
+                           ToolTip.Tip="{Binding SeekBlockedReason}"
+                           Seeked="OnSeeked"/>
               <TextBlock Grid.Column="2" Text="{Binding RemainText}" Classes="muted" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
             <Border IsVisible="{Binding ShowAutoplay}" Classes="panel" CornerRadius="10" Padding="8" Margin="40,4,40,0">
@@ -528,20 +193,171 @@
             </Border>
           </StackPanel>
 
-          <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2">
-            <TextBlock Text="{Binding RoomChip}" Classes="muted" HorizontalAlignment="Right"/>
-            <TextBlock Text="{Binding SyncText}" Classes="muted" FontSize="11" HorizontalAlignment="Right"/>
-            <TextBlock Text="{Binding SignalPathText}" Classes="muted" FontSize="10" HorizontalAlignment="Right" MaxWidth="260" TextTrimming="CharacterEllipsis"/>
-            <Button Classes="ghost" Command="{Binding ConnectOutputCommand}" HorizontalAlignment="Right">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-output.svg}"/>
-                <TextBlock Text="출력 연결" VerticalAlignment="Center"/>
+          <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <Button Classes="ghost" Padding="8,4" ToolTip.Tip="시그널 패스">
+                <TextBlock Text="{Binding PathBadgeLabel}" FontSize="11"/>
+                <Button.Flyout>
+                  <Flyout>
+                    <StackPanel Spacing="6" MaxWidth="360">
+                      <TextBlock Text="시그널 패스" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding SignalPathText}" TextWrapping="Wrap" Classes="muted"/>
+                      <TextBlock Text="{Binding SyncText}" Classes="muted" FontSize="11"/>
+                      <ItemsControl ItemsSource="{Binding Outputs}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:OutputDevice">
+                            <StackPanel Margin="0,6,0,0">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"/>
+                              <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+
+              <Button Classes="ghost" Padding="8,4" ToolTip.Tip="출력 존/장치"
+                      Command="{Binding RefreshZonesCommand}">
+                <TextBlock Text="{Binding OutputChip}" FontSize="11" MaxWidth="150" TextTrimming="CharacterEllipsis"/>
+                <Button.Flyout>
+                  <Flyout>
+                    <StackPanel Spacing="4" MinWidth="260">
+                      <TextBlock Text="출력 장치" FontWeight="SemiBold"/>
+                      <ItemsControl ItemsSource="{Binding Outputs}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:OutputDevice">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Margin="0,2,0,0"
+                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectOutputCommand}"
+                                    CommandParameter="{Binding}">
+                              <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11"/>
+                              </StackPanel>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Text="존" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                      <ItemsControl ItemsSource="{Binding Zones}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ZoneItem">
+                            <Border Classes="panel" CornerRadius="8" Padding="8" Margin="0,2,0,0">
+                              <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12"/>
+                                <TextBlock Classes="muted" FontSize="11">
+                                  <Run Text="{Binding ModeLabel}"/><Run Text=" · "/><Run Text="{Binding MemberSummary}"/>
+                                </TextBlock>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Button Classes="primary" Content="이 PC에 출력 연결" Margin="0,8,0,0"
+                              HorizontalAlignment="Stretch"
+                              Command="{Binding ConnectOutputCommand}"/>
+                    </StackPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+              <TextBlock Text="{Binding RoomChip}" Classes="muted" FontSize="11"
+                         VerticalAlignment="Center" MaxWidth="130" TextTrimming="CharacterEllipsis"/>
+              <StackPanel Orientation="Horizontal" Spacing="6"
+                          ToolTip.Tip="{Binding VolumeBlockedReason}">
+                <TextBlock Text="{Binding Volume, StringFormat='{}{0}%'}" Classes="muted" FontSize="11"
+                           VerticalAlignment="Center" Width="34" TextAlignment="Right"/>
+                <Slider Width="110" Minimum="0" Maximum="100" VerticalAlignment="Center"
+                        Value="{Binding Volume, Mode=TwoWay}"
+                        IsEnabled="{Binding VolumeEnabled}"
+                        PointerCaptureLost="VolumeReleased"/>
               </StackPanel>
-            </Button>
+            </StackPanel>
           </StackPanel>
         </Grid>
       </Border>
     </Grid>
+
+    <!-- Album detail -->
+    <Border IsVisible="{Binding Library.HasSelectedAlbum}"
+            Background="{DynamicResource Mono.Onboarding}">
+      <Border Classes="obcard" MaxWidth="720" MaxHeight="640"
+              HorizontalAlignment="Center" VerticalAlignment="Center">
+        <DockPanel Margin="24">
+          <DockPanel DockPanel.Dock="Top">
+            <Button DockPanel.Dock="Right" Classes="ghost" Content="닫기"
+                    Command="{Binding Library.CloseAlbumCommand}"/>
+            <StackPanel DataContext="{Binding Library.SelectedAlbum}">
+              <TextBlock Text="{Binding Title}" Classes="h1" FontSize="22"/>
+              <TextBlock Text="{Binding Subtitle}" Classes="muted"/>
+            </StackPanel>
+          </DockPanel>
+          <ScrollViewer Margin="0,16,0,0" DataContext="{Binding Library.SelectedAlbum}">
+            <StackPanel Spacing="12">
+              <ItemsControl ItemsSource="{Binding Tracks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="models:CatalogTrack">
+                    <Grid ColumnDefinitions="*,60" Margin="0,0,0,4">
+                      <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Grid.Column="1" Text="{Binding DurationText}" Classes="muted"
+                                 HorizontalAlignment="Right"/>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="라이너 노트" FontWeight="SemiBold" IsVisible="{Binding HasLinerNotes}"/>
+              <TextBlock Text="{Binding LinerNotes}" Classes="muted" TextWrapping="Wrap"
+                         IsVisible="{Binding HasLinerNotes}"/>
+              <TextBlock Text="크레딧" FontWeight="SemiBold" IsVisible="{Binding HasCredits}"/>
+              <TextBlock Text="{Binding Credits}" Classes="muted" TextWrapping="Wrap"
+                         IsVisible="{Binding HasCredits}"/>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Border>
+
+    <!-- Queue drawer -->
+    <Border IsVisible="{Binding ShowQueue}" Background="{DynamicResource Mono.Panel}"
+            HorizontalAlignment="Right" Width="360" Margin="0,0,0,92"
+            BorderBrush="{DynamicResource Mono.Border}" BorderThickness="1,0,0,1">
+      <DockPanel Margin="16">
+        <DockPanel DockPanel.Dock="Top">
+          <Button DockPanel.Dock="Right" Classes="ghost" Content="닫기" Command="{Binding ToggleQueueCommand}"/>
+          <TextBlock Text="재생 큐" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
+        <ScrollViewer Margin="0,12,0,0">
+          <ItemsControl ItemsSource="{Binding Lounge.QueueTracks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="models:CatalogTrack">
+                <Border Classes="row" Padding="10">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="ghost" Content="✕" Padding="8,4"
+                            ToolTip.Tip="큐에서 제거"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).RemoveFromQueueCommand}"
+                            CommandParameter="{Binding}"/>
+                    <Button Classes="ghost" Background="Transparent" BorderThickness="0"
+                            HorizontalContentAlignment="Left"
+                            ToolTip.Tip="이 곡으로 이동"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).JumpToQueueCommand}"
+                            CommandParameter="{Binding}">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Subtitle}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                      </StackPanel>
+                    </Button>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
 
     <!-- Immersive Now Playing -->
     <Border IsVisible="{Binding ShowNowPlaying}" Background="#E6101014">
@@ -555,26 +371,32 @@
         <DockPanel Margin="40">
           <DockPanel DockPanel.Dock="Top">
             <Button DockPanel.Dock="Right" Classes="ghost" Command="{Binding CloseNowPlayingCommand}" ToolTip.Tip="닫기" Foreground="White">
-              <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-close.svg}"/>
+              <Image Classes="icon" Source="{DynamicResource Mono.Icon.Close}"/>
             </Button>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="0">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-lyrics.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpLyrics}"/>
                   <TextBlock Text="가사" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="1">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-artist.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpArtist}"/>
                   <TextBlock Text="아티스트" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
               </Button>
               <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="2">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/np-credits.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.NpCredits}"/>
                   <TextBlock Text="크레딧" VerticalAlignment="Center" Foreground="White"/>
                 </StackPanel>
+              </Button>
+              <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="3">
+                <TextBlock Text="앨범" VerticalAlignment="Center" Foreground="White"/>
+              </Button>
+              <Button Classes="ghost" Command="{Binding SetNowPlayingTabCommand}" CommandParameter="4">
+                <TextBlock Text="연혁" VerticalAlignment="Center" Foreground="White"/>
               </Button>
             </StackPanel>
           </DockPanel>
@@ -606,6 +428,29 @@
                   <TextBlock Text="{Binding LinerNotes}" TextWrapping="Wrap" Foreground="#CCFFFFFF"/>
                 </StackPanel>
               </ScrollViewer>
+
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpAlbum}">
+                <ItemsControl ItemsSource="{Binding AlbumTracks}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:CatalogTrack">
+                      <Grid ColumnDefinitions="*,70" Margin="0,0,0,4">
+                        <TextBlock Text="{Binding Title}" Foreground="White"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Grid.Column="1" Text="{Binding DurationText}" Foreground="#CCFFFFFF"
+                                   HorizontalAlignment="Right"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+
+              <ScrollViewer MaxHeight="360" IsVisible="{Binding IsNpWiki}">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding WikiText}" Foreground="White" TextWrapping="Wrap"/>
+                  <TextBlock FontSize="11" Foreground="#99FFFFFF" TextWrapping="Wrap"
+                             Text="위키백과 요약 — 한국어가 없으면 영어로 대체합니다."/>
+                </StackPanel>
+              </ScrollViewer>
             </StackPanel>
           </Grid>
         </DockPanel>
@@ -633,7 +478,7 @@
               <TextBox Width="280" Text="{Binding LibraryPath}" Watermark="폴더 선택…"/>
               <Button Classes="ghost" Click="PickLibraryClick">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Image Classes="icon" Source="{svg:SvgImage avares://Mono.Control/Assets/icons/ui/action-folder.svg}"/>
+                  <Image Classes="icon" Source="{DynamicResource Mono.Icon.Folder}"/>
                   <TextBlock Text="폴더…" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>

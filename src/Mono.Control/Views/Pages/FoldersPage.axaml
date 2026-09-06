@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Mono.Control.ViewModels"
+             xmlns:pvm="using:Mono.Control.ViewModels.Pages"
+             xmlns:models="using:Mono.Control.Models"
+             x:Class="Mono.Control.Views.Pages.FoldersPage"
+             x:DataType="pvm:LibraryViewModel">
+  <ScrollViewer>
+    <StackPanel Spacing="8" MaxWidth="720" HorizontalAlignment="Left">
+      <TextBlock Classes="muted" TextWrapping="Wrap"
+                 Text="Mono 는 스캔한 폴더의 원본 파일을 수정하지 않습니다."/>
+      <ItemsControl ItemsSource="{Binding Folders}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="models:FolderEntry">
+            <Border Classes="row" Margin="0,0,0,6" Padding="12">
+              <StackPanel>
+                <TextBlock Text="{Binding Path}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Status}" Classes="muted" FontSize="11"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Classes="ghost" Content="라이브러리 스캔" HorizontalAlignment="Left"
+              Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ScanLibraryCommand}"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
