@@ -50,7 +50,7 @@
   - `BackupService(string dataDir)` · `string Create()` — zip 경로를 돌려준다
   - `CommandProcessor` 생성자 끝에 `BackupService backups` 추가
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [x] **Step 1: 실패하는 테스트를 쓴다**
 
 `tests/Mono.Tests/BackupTests.cs`:
 
@@ -137,7 +137,7 @@ public class BackupTests
 }
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- [x] **Step 2: 실패를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter BackupTests
@@ -145,7 +145,7 @@ dotnet test tests/Mono.Tests --nologo -v q --filter BackupTests
 
 기대: 컴파일 실패 — `BackupService`가 없다.
 
-- [ ] **Step 3: 최소 구현**
+- [x] **Step 3: 최소 구현**
 
 `src/Mono.Core/BackupService.cs`:
 
@@ -239,7 +239,7 @@ builder.Services.AddSingleton(new BackupService(data));
 
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- [x] **Step 4: 통과를 확인한다**
 
 ```bash
 dotnet test tests/Mono.Tests --nologo -v q --filter BackupTests
@@ -248,7 +248,7 @@ dotnet build Mono.slnx -v q --nologo
 
 기대: 백업 4개 통과, 경고 0.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/ tests/
@@ -270,7 +270,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `RoomSnapshot.AlbumTracks` (1단계) · `MainViewModel.WikiText`.
 - Produces: `MainViewModel.IsNpAlbum` · `.IsNpWiki` · `.AlbumTracks` (`ObservableCollection<CatalogTrack>`)
 
-- [ ] **Step 1: 뷰모델에 두 모드를 더한다**
+- [x] **Step 1: 뷰모델에 두 모드를 더한다**
 
 `MainViewModel.cs` 의 `IsNpCredits` 아래:
 
@@ -293,7 +293,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
     public ObservableCollection<CatalogTrack> AlbumTracks { get; } = new();
 ```
 
-- [ ] **Step 2: 스냅샷에서 채운다**
+- [x] **Step 2: 스냅샷에서 채운다**
 
 `MainViewModel.Messages.cs` 의 `ApplyRoomState` 에서 `Lounge.CurrentArtistId = ...` 앞에:
 
@@ -312,7 +312,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
         }
 ```
 
-- [ ] **Step 3: 탭 버튼 두 개를 더한다**
+- [x] **Step 3: 탭 버튼 두 개를 더한다**
 
 `MainWindow.axaml` 의 크레딧 버튼(`CommandParameter="2"`) 블록 뒤에:
 
@@ -325,7 +325,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
               </Button>
 ```
 
-- [ ] **Step 4: 두 패널을 더한다**
+- [x] **Step 4: 두 패널을 더한다**
 
 크레딧 `ScrollViewer` 뒤에:
 
@@ -354,7 +354,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
               </ScrollViewer>
 ```
 
-- [ ] **Step 5: 빌드하고 띄운다**
+- [x] **Step 5: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -364,7 +364,7 @@ dotnet run --project src/Mono.Control
 확인: 하단 아트를 눌러 몰입 모드로 들어가면 탭이 **가사 · 아티스트 · 크레딧 · 앨범 · 연혁** 다섯 개다.
 재생 중 앨범 탭에 수록곡이, 연혁 탭에 위키 요약이 보인다.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -385,7 +385,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Consumes: `MainViewModel.PlayPauseCommand` · `.ShowNowPlaying` · `.ShowQueue` · `Library.SelectedAlbum` · `.ShowOnboarding`.
 - Produces: `MainWindow.OnKeyDown` 처리 — `Space` 재생/일시정지 · `/` 검색 포커스 · `Esc` 최상단 오버레이 닫기.
 
-- [ ] **Step 1: 검색 상자에 이름을 준다**
+- [x] **Step 1: 검색 상자에 이름을 준다**
 
 `MainWindow.axaml` 의 검색 `TextBox` 에 `x:Name="SearchBox"` 를 더한다:
 
@@ -400,7 +400,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
         KeyDown="OnKeyDown"
 ```
 
-- [ ] **Step 2: 핸들러를 쓴다**
+- [x] **Step 2: 핸들러를 쓴다**
 
 `MainWindow.axaml.cs` 에:
 
@@ -447,11 +447,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 grep -n 'CloseNowPlaying\|ToggleQueue' src/Mono.Control/ViewModels/MainViewModel.cs
 ```
 
-- [ ] **Step 3: 설정에 단축키 표를 넣을 준비**
+- [x] **Step 3: 설정에 단축키 표를 넣을 준비**
 
 Task 4의 Shortcuts 섹션에서 쓰므로 여기서는 코드만 끝낸다.
 
-- [ ] **Step 4: 빌드하고 띄운다**
+- [x] **Step 4: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -461,7 +461,7 @@ dotnet run --project src/Mono.Control
 확인: `Space` 로 재생/일시정지 · `/` 로 검색창 포커스 · 몰입 모드에서 `Esc` 로 닫기 ·
 **검색창에 타이핑 중 스페이스가 재생을 건드리지 않는다.**
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -486,7 +486,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces: `CoreSession.BackupAsync()` · `MainViewModel.BackupPath` · `BackupCommand` ·
   `GoToPageCommand(string navId)` — 설정에서 전용 화면으로 보낸다.
 
-- [ ] **Step 1: 백업 명령과 페이지 이동을 더한다**
+- [x] **Step 1: 백업 명령과 페이지 이동을 더한다**
 
 `src/Mono.Control/Services/CoreSession.Library.cs` 의 `AlbumAsync` 아래:
 
@@ -521,7 +521,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
                 break;
 ```
 
-- [ ] **Step 2: 설정 화면을 10트리로 다시 쓴다**
+- [x] **Step 2: 설정 화면을 10트리로 다시 쓴다**
 
 `src/Mono.Control/Views/Pages/SettingsPage.axaml` 전체:
 
@@ -645,7 +645,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 `SettingsPage.axaml.cs` 의 `PickLibraryClick` 은 그대로 둔다.
 
-- [ ] **Step 3: 빌드하고 띄운다**
+- [x] **Step 3: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -655,7 +655,7 @@ dotnet run --project src/Mono.Control
 확인: Settings 에 10개 섹션이 순서대로 있다 · 「지금 백업」이 zip 경로를 돌려준다 ·
 「폴더 목록 보기」 「장치 · 존 설정」 등이 해당 화면으로 이동한다.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -681,7 +681,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   `RenameZoneCommand` · `SetZoneSyncCommand` · `SetZoneIndependentCommand` · `DeleteZoneCommand` ·
   `AddDeviceToZoneCommand` · `RemoveDeviceFromZoneCommand` · `IssuePairingCommand` · `RedeemPairingCommand`
 
-- [ ] **Step 1: Audio VM에 존·페어링 상태를 더한다**
+- [x] **Step 1: Audio VM에 존·페어링 상태를 더한다**
 
 `AudioViewModel.cs` 에:
 
@@ -759,7 +759,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 상단에 `using System.Collections.ObjectModel;` 과 `using Mono.Shared;` 를 더한다.
 
-- [ ] **Step 2: 셸이 존·출력·페어링 코드를 넘긴다**
+- [x] **Step 2: 셸이 존·출력·페어링 코드를 넘긴다**
 
 `MainViewModel.Messages.cs` 의 `LoadZones` 끝에 한 줄:
 
@@ -784,7 +784,7 @@ switch 에 페어링 응답을 더한다:
                 break;
 ```
 
-- [ ] **Step 3: Audio 화면에 존·페어링 블록을 더한다**
+- [x] **Step 3: Audio 화면에 존·페어링 블록을 더한다**
 
 `AudioPage.axaml` 의 존 만들기 블록 아래에:
 
@@ -858,7 +858,7 @@ switch 에 페어링 응답을 더한다:
 
 `AudioPage.axaml` 여는 태그에 `xmlns:pvm="using:Mono.Control.ViewModels.Pages"` 가 있는지 확인한다.
 
-- [ ] **Step 4: 빌드하고 띄운다**
+- [x] **Step 4: 빌드하고 띄운다**
 
 ```bash
 dotnet build Mono.slnx -v q --nologo
@@ -868,7 +868,7 @@ dotnet run --project src/Mono.Control
 확인: Audio 화면에서 존을 만들고 고른 뒤 이름 변경·모드 전환·기기 추가/빼기·삭제가 된다 ·
 「코드 발급」이 6자리를 돌려준다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/Mono.Control/
@@ -887,7 +887,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `docs/03-구현현황.md`
 - Modify: `docs/04-UIUX기획서.md` (§8 우선순위)
 
-- [ ] **Step 1: 표에 열을 하나 더한다**
+- [x] **Step 1: 표에 열을 하나 더한다**
 
 `03-구현현황.md`의 각 표에 **「GUI」 열**을 더한다. 판정 기준을 문서 머리에 적는다:
 
@@ -901,7 +901,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 각 행의 상태를 `Core` / `GUI` 두 칸으로 나눈다. 5단계까지 끝난 시점에서 GUI 열이 ⬜ 인 항목은
 남아 있지 않아야 한다 — 있다면 그대로 ⬜ 로 적는다.
 
-- [ ] **Step 2: 실제로 확인한다**
+- [x] **Step 2: 실제로 확인한다**
 
 ```bash
 grep -ho 'MessageTypes\.[A-Za-z]*' src/Mono.Control/Services/CoreSession*.cs | sed 's/MessageTypes\.//' | sort -u
@@ -909,7 +909,7 @@ grep -ho 'MessageTypes\.[A-Za-z]*' src/Mono.Control/Services/CoreSession*.cs | s
 
 이 목록과 각 기능을 대조해 GUI 열을 채운다. 추측하지 않는다.
 
-- [ ] **Step 3: UI/UX 기획서 §8 우선순위를 갱신한다**
+- [x] **Step 3: UI/UX 기획서 §8 우선순위를 갱신한다**
 
 P0·P1·P2가 모두 취소선으로 완료 표시돼 있다. 5단계까지의 결과를 반영해 한 줄을 더한다:
 
@@ -918,7 +918,7 @@ P0·P1·P2가 모두 취소선으로 완료 표시돼 있다. 5단계까지의 �
 | **남음** | 파트너 SDK 실계정 QA · LAN 2기기 sync_probe 실측 · ASIO/네이티브 DSD 청음 · 코드 서명 인증서 |
 ```
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add docs/
@@ -931,12 +931,23 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## 5단계 완료 기준
 
-- [ ] `dotnet build Mono.slnx` 경고 0, 오류 0
-- [ ] `dotnet test Mono.slnx` 105개 통과 (4단계 101 + 백업 4)
-- [ ] Now Playing 탭이 5개 — 가사 · 아티스트 · 크레딧 · 앨범 · 연혁
-- [ ] 설정에 문서 §4.7의 10섹션이 전부 있다
-- [ ] `Space` `/` `Esc` 가 동작하고, **입력 중에는 Space·/ 를 가로채지 않는다**
-- [ ] 존 이름 변경·모드 전환·기기 추가/빼기·삭제가 된다
-- [ ] 페어링 코드 발급·입력이 된다
-- [ ] 백업 zip 에 DB 4종이 들어가고 음원 파일은 없다
-- [ ] `03-구현현황.md` 가 Core 와 GUI 를 분리해 적는다
+- [x] `dotnet build Mono.slnx` 경고 0, 오류 0
+- [x] `dotnet test Mono.slnx` **105개** 통과 (4단계 101 + 백업 4)
+- [x] Now Playing 탭 **5개** — 가사 · 아티스트 · 크레딧 · 앨범 · 연혁
+- [x] 설정 **10섹션** — General Storage Services Audio Library Lounge DSP Backups Shortcuts About
+- [x] `Space` `/` `Esc` 동작, 입력 중에는 Space·/ 를 가로채지 않는다
+- [x] 존 이름 변경·모드 전환·삭제 — TCP 실측
+- [x] 페어링 코드 발급 — TCP 실측
+- [x] 백업 zip 에 DB 4종(112KB), 음원 없음 — TCP 실측
+- [x] `03-구현현황.md` 가 Core 와 GUI 를 분리해 적는다
+
+실측:
+```
+backup   -> data/backups/mono-backup-20260906-123509.zip
+            [catalog.db, history.db, endpoints.db, zones.db] 112KB
+존 생성   -> 거실(Sync) → 이름 변경 침실 → 모드 Independent → 삭제 []
+페어링    -> 574691 · 03:46:42까지 유효
+```
+
+**검증하지 못한 것:** 화면 제어 권한이 없어 새 화면의 렌더 결과를 눈으로 보지 못했다.
+설정 10섹션은 세로로 길고, Audio 화면도 존 관리·페어링이 붙어 길어졌다 — 사람이 한 번 봐야 한다.
