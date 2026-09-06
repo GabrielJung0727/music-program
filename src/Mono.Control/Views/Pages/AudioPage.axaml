@@ -29,6 +29,72 @@
                 <TextBox Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).ZoneName}" Watermark="존 이름"/>
                 <Button Classes="ghost" Content="존 만들기" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CreateZoneCommand}" HorizontalAlignment="Left"/>
 
+                <TextBlock Text="존 관리" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                <ComboBox ItemsSource="{Binding Zones}" SelectedItem="{Binding SelectedZone}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ZoneItem">
+                      <TextBlock Text="{Binding Name}"/>
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <StackPanel IsVisible="{Binding HasSelectedZone}" Spacing="6">
+                  <TextBlock Classes="muted" FontSize="11">
+                    <Run Text="{Binding SelectedZone.ModeLabel}"/><Run Text=" · "/><Run Text="{Binding SelectedZone.MemberSummary}"/>
+                  </TextBlock>
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="ghost" Content="이름 변경" Margin="4,0,0,0"
+                            Command="{Binding RenameZoneCommand}"/>
+                    <TextBox Text="{Binding ZoneRenameText}" Watermark="새 이름"/>
+                  </DockPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button Classes="ghost" Content="동시 재생" Command="{Binding SetZoneSyncCommand}"
+                            ToolTip.Tip="존의 모든 기기가 같은 곡을 동시에 냅니다"/>
+                    <Button Classes="ghost" Content="기기별 독립" Command="{Binding SetZoneIndependentCommand}"
+                            ToolTip.Tip="기기마다 다른 곡을 재생합니다"/>
+                    <Button Classes="ghost" Content="존 삭제" Command="{Binding DeleteZoneCommand}"/>
+                  </StackPanel>
+
+                  <TextBlock Text="존의 기기" Classes="muted" FontSize="11" Margin="0,6,0,0"/>
+                  <ItemsControl ItemsSource="{Binding SelectedZone.Members}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ZoneMember">
+                        <DockPanel Margin="0,2">
+                          <Button DockPanel.Dock="Right" Classes="ghost" Content="빼기" Padding="8,2" FontSize="11"
+                                  Command="{Binding $parent[UserControl].((pvm:AudioViewModel)DataContext).RemoveDeviceFromZoneCommand}"
+                                  CommandParameter="{Binding}"/>
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <TextBlock Text="기기 추가" Classes="muted" FontSize="11" Margin="0,6,0,0"/>
+                  <ItemsControl ItemsSource="{Binding Outputs}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:OutputDevice">
+                        <Button Classes="ghost" Margin="0,2,0,0" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left" Content="{Binding Name}"
+                                Command="{Binding $parent[UserControl].((pvm:AudioViewModel)DataContext).AddDeviceToZoneCommand}"
+                                CommandParameter="{Binding}"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+                <TextBlock Text="원격 Control 페어링" FontWeight="SemiBold" Margin="0,16,0,0"/>
+                <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                           Text="다른 PC 의 Mono 로 이 Core 에 붙을 때 씁니다. 코드를 발급해 그쪽에 입력하세요."/>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Classes="ghost" Content="코드 발급" Command="{Binding IssuePairingCommand}"/>
+                  <TextBlock Text="{Binding PairingCode}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Classes="ghost" Content="입력" Margin="4,0,0,0"
+                          Command="{Binding RedeemPairingCommand}"/>
+                  <TextBox Text="{Binding RedeemCode}" Watermark="받은 페어링 코드"/>
+                </DockPanel>
+
                 <TextBlock Text="DSP 프리셋" FontWeight="SemiBold"/>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="ghost" Command="{Binding SetDspCommand}" CommandParameter="0" ToolTip.Tip="Off">

@@ -1,9 +1,11 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Mono.Control.Services;
 using Mono.Protocol;
+using Mono.Shared;
 
 namespace Mono.Control.ViewModels.Pages;
 
@@ -30,6 +32,35 @@ public sealed partial class AudioViewModel : PageViewModel
     [ObservableProperty] private string _deviceEqProfile = "harman";
     [ObservableProperty] private string _syncProbeText = "";
     [ObservableProperty] private string _artPerfText = "";
+
+    public ObservableCollection<ZoneItem> Zones { get; } = new();
+    public ObservableCollection<OutputDevice> Outputs { get; } = new();
+
+    [ObservableProperty] private ZoneItem? _selectedZone;
+    [ObservableProperty] private string _zoneRenameText = "";
+    [ObservableProperty] private string _pairingCode = "";
+    [ObservableProperty] private string _redeemCode = "";
+
+    /// <summary>존 편집 블록 표시 여부. XAML 에서 컨버터를 쓰지 않도록 bool 로 낸다.</summary>
+    public bool HasSelectedZone => SelectedZone is not null;
+
+    partial void OnSelectedZoneChanged(ZoneItem? value) => OnPropertyChanged(nameof(HasSelectedZone));
+
+    public void ApplyZones(IEnumerable<ZoneItem> zones)
+    {
+        var keep = SelectedZone?.Id;
+        Zones.Clear();
+        foreach (var z in zones) Zones.Add(z);
+        SelectedZone = Zones.FirstOrDefault(z => z.Id == keep) ?? Zones.FirstOrDefault();
+    }
+
+    public void ApplyOutputs(IEnumerable<OutputDevice> outputs)
+    {
+        Outputs.Clear();
+        foreach (var o in outputs) Outputs.Add(o);
+    }
+
+    public void ApplyPairingCode(string code) => PairingCode = code;
 
     public override void ApplySnapshot(RoomSnapshot snapshot)
     {
@@ -94,4 +125,47 @@ public sealed partial class AudioViewModel : PageViewModel
         IrPath = "";
         return Safe(() => Session.SetConvolutionIrAsync(null));
     }
+
+    // ── 존 관리 ─────────────────────────────────────────
+    [RelayCommand]
+    private Task RenameZoneAsync()
+        => SelectedZone is null || string.IsNullOrWhiteSpace(ZoneRenameText)
+            ? Task.CompletedTask
+            : Safe(() => Session.RenameZoneAsync(SelectedZone.Id, ZoneRenameText.Trim()));
+
+    [RelayCommand]
+    private Task SetZoneSyncAsync()
+        => SelectedZone is null ? Task.CompletedTask
+            : Safe(() => Session.SetZoneModeAsync(SelectedZone.Id, ZoneMode.Sync));
+
+    [RelayCommand]
+    private Task SetZoneIndependentAsync()
+        => SelectedZone is null ? Task.CompletedTask
+            : Safe(() => Session.SetZoneModeAsync(SelectedZone.Id, ZoneMode.Independent));
+
+    [RelayCommand]
+    private Task DeleteZoneAsync()
+        => SelectedZone is null ? Task.CompletedTask : Safe(() => Session.DeleteZoneAsync(SelectedZone.Id));
+
+    [RelayCommand]
+    private Task AddDeviceToZoneAsync(OutputDevice? device)
+        => SelectedZone is null || device is null
+            ? Task.CompletedTask
+            : Safe(() => Session.ZoneAddMemberAsync(SelectedZone.Id, device.PeerId));
+
+    [RelayCommand]
+    private Task RemoveDeviceFromZoneAsync(ZoneMember? member)
+        => SelectedZone is null || member is null
+            ? Task.CompletedTask
+            : Safe(() => Session.ZoneRemoveMemberAsync(SelectedZone.Id, member.PeerId));
+
+    // ── 원격 페어링 ─────────────────────────────────────
+    [RelayCommand]
+    private Task IssuePairingAsync() => Safe(() => Session.PairAsync());
+
+    [RelayCommand]
+    private Task RedeemPairingAsync()
+        => string.IsNullOrWhiteSpace(RedeemCode)
+            ? Task.CompletedTask
+            : Safe(() => Session.RedeemAsync(RedeemCode.Trim()));
 }

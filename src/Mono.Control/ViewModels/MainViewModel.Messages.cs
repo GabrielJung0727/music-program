@@ -64,6 +64,12 @@ public partial class MainViewModel
                     ? (msg.Body ?? "세션을 종료했습니다")
                     : "세션을 저장하고 하이라이트 플레이리스트를 만들었습니다");
                 break;
+            case MessageTypes.PairingIssued:
+                Audio.ApplyPairingCode(msg.PairingCode ?? msg.Body ?? "");
+                break;
+            case MessageTypes.Redeem:
+                StatusText = (msg.Ok ?? false) ? "페어링 완료" : (msg.Error ?? "페어링 실패");
+                break;
             case MessageTypes.Backup:
                 BackupPath = msg.Body ?? "";
                 StatusText = string.IsNullOrEmpty(BackupPath) ? "백업 실패" : "백업 완료";
@@ -160,6 +166,7 @@ public partial class MainViewModel
             var list = JsonSerializer.Deserialize<List<ZoneItem>>(body, Json) ?? [];
             Zones.Clear();
             foreach (var z in list) Zones.Add(z);
+            Audio.ApplyZones(Zones);
         }
         catch { /* 형식이 어긋나면 이전 목록을 유지한다 */ }
     }
@@ -309,6 +316,7 @@ public partial class MainViewModel
 
         Lounge.CurrentArtistId = snap.CurrentTrack?.ArtistId ?? "";
         Lounge.ApplySnapshot(snap);
+        Audio.ApplyOutputs(Outputs);
         Audio.ApplySnapshot(snap);
     }
 
