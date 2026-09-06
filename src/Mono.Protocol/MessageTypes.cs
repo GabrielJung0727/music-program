@@ -70,6 +70,7 @@ public static class MessageTypes
     public const string ScanLibrary = "scan_library";
     public const string Folders = "folders";
     public const string Album = "album";
+    public const string Backup = "backup";
     public const string LinkStreaming = "link_streaming";
     public const string ReactionHeatmap = "reaction_heatmap";
     public const string WikiBio = "wiki_bio";

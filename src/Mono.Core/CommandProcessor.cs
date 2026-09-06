@@ -20,6 +20,7 @@ public sealed class CommandProcessor
     private readonly EndpointRegistry _endpoints;
     private readonly ZoneRegistry _zones;
     private readonly WikipediaService _wiki;
+    private readonly BackupService _backups;
     private readonly IReadOnlyList<string> _libraryRoots;
     private readonly ConcurrentDictionary<string, string> _peerRoom = new();
 
@@ -33,6 +34,7 @@ public sealed class CommandProcessor
         EndpointRegistry endpoints,
         ZoneRegistry zones,
         WikipediaService wiki,
+        BackupService backups,
         IReadOnlyList<string> libraryRoots)
     {
         _rooms = rooms;
@@ -44,6 +46,7 @@ public sealed class CommandProcessor
         _endpoints = endpoints;
         _zones = zones;
         _wiki = wiki;
+        _backups = backups;
         _libraryRoots = libraryRoots;
     }
 
@@ -469,6 +472,14 @@ public sealed class CommandProcessor
                     Body = $"scanned {scanned} files · catalog {_catalog.Tracks.Count} tracks"
                 }, CatalogMessage());
             }
+
+            case MessageTypes.Backup:
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.Backup,
+                    Ok = true,
+                    Body = _backups.Create()
+                });
 
             case MessageTypes.Album:
             {

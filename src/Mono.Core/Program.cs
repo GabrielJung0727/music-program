@@ -19,6 +19,7 @@ builder.Services.AddSingleton(new CatalogStore(Path.Combine(data, "catalog.db"))
 builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db")));
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
 builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
+builder.Services.AddSingleton(new BackupService(data));
 var wikiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 // 위키미디어 API 정책상 User-Agent 없는 요청은 403으로 거부된다.
 wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi lounge app; https://github.com/mono-audio)");
@@ -43,6 +44,7 @@ builder.Services.AddSingleton(sp => new CommandProcessor(
     sp.GetRequiredService<EndpointRegistry>(),
     sp.GetRequiredService<ZoneRegistry>(),
     sp.GetRequiredService<WikipediaService>(),
+    sp.GetRequiredService<BackupService>(),
     libraryRoots));
 builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSignalR().AddJsonProtocol(o =>
