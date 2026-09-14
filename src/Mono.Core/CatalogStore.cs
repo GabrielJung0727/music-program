@@ -28,7 +28,7 @@ public sealed class CatalogStore : IDisposable
               local_path TEXT, streaming_id TEXT, source INT, quality INT,
               sample_rate INT, bit_depth INT, channels INT, is_dsd INT, dsd_rate INT,
               duration_ms INT, lyrics TEXT, art TEXT, merged INT, track_no INT DEFAULT 0,
-              genres TEXT, composers TEXT);
+              genres TEXT, composers TEXT, added_at TEXT);
             CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id);
@@ -51,12 +51,19 @@ public sealed class CatalogStore : IDisposable
     {
         lock (_gate)
         {
+            // 재스캔은 "추가된 시각"을 건드리면 안 된다. DB 쪽은 ON CONFLICT 가 added_at 을
+            // 빼 두어 지켜 주지만, 메모리 사본도 같이 지켜야 재시작 전까지 순서가 어긋나지 않는다.
+            if (_tracks.TryGetValue(track.Id, out var existing))
+            {
+                track.AddedAt = existing.AddedAt;
+            }
+
             using var con = Open();
             UpsertArtist(con, artist);
             UpsertAlbum(con, album);
             con.Execute("""
-                INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no,genres,composers)
-                VALUES($id,$title,$album,$artist,$path,$sid,$src,$q,$sr,$bd,$ch,$dsd,$dr,$dur,$ly,$art,$mg,$no,$gen,$cmp)
+                INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no,genres,composers,added_at)
+                VALUES($id,$title,$album,$artist,$path,$sid,$src,$q,$sr,$bd,$ch,$dsd,$dr,$dur,$ly,$art,$mg,$no,$gen,$cmp,$added)
                 ON CONFLICT(id) DO UPDATE SET
                   title=$title, album_id=$album, artist_id=$artist, local_path=$path, streaming_id=$sid,
                   source=$src, quality=$q, sample_rate=$sr, bit_depth=$bd, channels=$ch, is_dsd=$dsd,
@@ -69,7 +76,8 @@ public sealed class CatalogStore : IDisposable
                 ("$ch", track.Channels), ("$dsd", track.IsDsd ? 1 : 0), ("$dr", track.DsdRate),
                 ("$dur", track.DurationMs), ("$ly", track.LyricsLrc), ("$art", track.ArtworkPath),
                 ("$mg", track.MergedLocalAndStreaming ? 1 : 0), ("$no", track.TrackNumber),
-                ("$gen", PackList(track.Genres)), ("$cmp", PackList(track.Composers)));
+                ("$gen", PackList(track.Genres)), ("$cmp", PackList(track.Composers)),
+                ("$added", track.AddedAt.ToString("o")));
             _artists[artist.Id] = artist;
             _albums[album.Id] = album;
             _tracks[track.Id] = track;
@@ -222,6 +230,7 @@ public sealed class CatalogStore : IDisposable
             hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
             hasLocal = t.LocalPath is not null,
             artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
+            addedAt = t.AddedAt,
             badge = QualityPolicyEngine.Badge(t, false)
         };
     }
@@ -327,6 +336,15 @@ public sealed class CatalogStore : IDisposable
 
         try
         {
+            con.Execute("ALTER TABLE tracks ADD COLUMN added_at TEXT");
+        }
+        catch (SqliteException)
+        {
+            // 이미 있는 컬럼.
+        }
+
+        try
+        {
             con.Execute("ALTER TABLE artists ADD COLUMN aliases TEXT");
         }
         catch (SqliteException)
@@ -399,7 +417,7 @@ public sealed class CatalogStore : IDisposable
 
         using (var cmd = con.CreateCommand())
         {
-            cmd.CommandText = "SELECT id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,IFNULL(track_no,0),genres,composers FROM tracks";
+            cmd.CommandText = "SELECT id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,IFNULL(track_no,0),genres,composers,added_at FROM tracks";
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -424,7 +442,11 @@ public sealed class CatalogStore : IDisposable
                     MergedLocalAndStreaming = r.GetInt32(16) == 1,
                     TrackNumber = r.GetInt32(17),
                     Genres = UnpackList(r.IsDBNull(18) ? null : r.GetString(18)),
-                    Composers = UnpackList(r.IsDBNull(19) ? null : r.GetString(19))
+                    Composers = UnpackList(r.IsDBNull(19) ? null : r.GetString(19)),
+                    // 마이그레이션 전 행은 added_at 이 비어 있다. 에폭으로 두면 "가장 오래된"으로 정렬된다.
+                    AddedAt = r.IsDBNull(20) || !DateTimeOffset.TryParse(r.GetString(20), out var added)
+                        ? DateTimeOffset.UnixEpoch
+                        : added
                 };
             }
         }

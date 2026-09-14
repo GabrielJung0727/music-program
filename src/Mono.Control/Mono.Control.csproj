@@ -1,30 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Mono.Control</RootNamespace>
     <AssemblyName>Mono.Control</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationIcon>Assets\icons\app\mono-app.ico</ApplicationIcon>
     <!-- publish.ps1 이 -p:Version 으로 덮어쓴다. AssemblyVersion 을 따로 박으면
          그쪽이 이겨서 About 에 옛 버전이 찍힌다. -->
     <Version>0.1.5</Version>
+    <!-- WebView2 패키지는 WinForms·WPF 래퍼를 함께 싣는다. WPF 쪽이 WindowsBase 5.0 을
+         끌고 와 4.0 과 충돌 경고(MSB3277)를 낸다. 우리는 WinForms 래퍼만 쓰고,
+         런타임에 WPF 어셈블리는 로드되지 않으므로 이 경고는 잡음이다. -->
+    <MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>
   </PropertyGroup>
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**\*" />
+    <!-- 창·트레이 아이콘과 publish.ps1 이 참조하는 exe 아이콘만 둔다.
+         화면에 쓰는 그래픽은 전부 React 번들(src/Mono.Web) 안에 있다. -->
+    <None Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.2.3" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
-    <PackageReference Include="Avalonia.Svg" Version="11.2.0.2" />
-    <PackageReference Include="Avalonia.Svg.Skia" Version="11.2.0.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
     <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
   <ItemGroup>

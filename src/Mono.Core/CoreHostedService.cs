@@ -75,112 +75,18 @@ public sealed class CoreHostedService : BackgroundService
         {
             var stream = client.GetStream();
             using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
-            var local = IsLoopback(client);
-            string? peerId = null;
-            string? peerName = null;
+            var session = new ControlSession(_commands, _rooms, _broadcaster, _connections, _pairing);
             try
             {
-                while (!ct.IsCancellationRequested)
-                {
-                    var line = await reader.ReadLineAsync(ct);
-                    if (line is null) break;
-                    MonoMessage? msg;
-                    try
-                    {
-                        msg = JsonSerializer.Deserialize<MonoMessage>(line, LineFraming.JsonOptions);
-                    }
-                    catch (JsonException)
-                    {
-                        await stream.WriteAsync(LineFraming.Encode(new MonoMessage { Type = MessageTypes.Error, Error = "bad json" }), ct);
-                        continue;
-                    }
-
-                    if (msg is null) continue;
-
-                    if (msg.Type == MessageTypes.Hello)
-                    {
-                        // 원격 Control은 페어링 코드를 교환해 받은 세션 토큰이 있어야 한다.
-                        if (!local && !_pairing.IsAuthorized(msg.Token))
-                        {
-                            await stream.WriteAsync(LineFraming.Encode(new MonoMessage
-                            {
-                                Type = MessageTypes.Error,
-                                Ok = false,
-                                Error = "pairing required — Core에서 발급한 코드를 redeem 하세요"
-                            }), ct);
-                            break;
-                        }
-
-                        peerId = string.IsNullOrWhiteSpace(msg.PeerId) ? Guid.NewGuid().ToString("n")[..10] : msg.PeerId;
-                        peerName = string.IsNullOrWhiteSpace(msg.DisplayName) ? peerId : msg.DisplayName;
-                        var id = peerId;
-                        _connections.Controls[id] = m => stream.WriteAsync(LineFraming.Encode(m), ct).AsTask();
-                        await stream.WriteAsync(LineFraming.Encode(new MonoMessage
-                        {
-                            Type = MessageTypes.Welcome,
-                            PeerId = id,
-                            Ok = true,
-                            Body = $"Mono Core · catalog ready"
-                        }), ct);
-                        await stream.WriteAsync(LineFraming.Encode(_commands.CatalogMessage()), ct);
-                        continue;
-                    }
-
-                    if (msg.Type == MessageTypes.Redeem)
-                    {
-                        var result = _commands.Execute("anon", msg, null);
-                        if (result.Direct is not null)
-                        {
-                            await stream.WriteAsync(LineFraming.Encode(result.Direct), ct);
-                        }
-
-                        continue;
-                    }
-
-                    if (peerId is null)
-                    {
-                        await stream.WriteAsync(LineFraming.Encode(new MonoMessage { Type = MessageTypes.Error, Error = "hello first" }), ct);
-                        continue;
-                    }
-
-                    // hello에서 받은 이름을 이후 명령에도 붙인다(멤버 목록·아카이브 참가자).
-                    var executed = _commands.Execute(peerId, msg, msg.DisplayName ?? peerName);
-                    if (executed.Direct is not null)
-                    {
-                        await stream.WriteAsync(LineFraming.Encode(executed.Direct), ct);
-                    }
-
-                    if (executed.BroadcastAll is not null)
-                    {
-                        await _broadcaster.PushCatalogAsync(executed.BroadcastAll);
-                    }
-
-                    if (executed.BroadcastRoom is not null)
-                    {
-                        await _broadcaster.PublishAsync(executed.BroadcastRoom, ct);
-                    }
-                }
+                await session.RunAsync(
+                    token => reader.ReadLineAsync(token).AsTask(),
+                    (msg, token) => stream.WriteAsync(LineFraming.Encode(msg), token).AsTask(),
+                    IsLoopback(client),
+                    ct);
             }
             catch (Exception ex) when (ex is IOException or OperationCanceledException)
             {
                 _log.LogDebug(ex, "Control closed");
-            }
-            finally
-            {
-                if (peerId is not null)
-                {
-                    _connections.Controls.TryRemove(peerId, out _);
-                    foreach (var room in _rooms.RoomsOf(peerId))
-                    {
-                        var left = _rooms.Leave(room.Id, peerId);
-                        if (left.Room is not null)
-                        {
-                            await _broadcaster.PublishAsync(left.Room, CancellationToken.None);
-                        }
-                    }
-
-                    _commands.Forget(peerId);
-                }
             }
         }
     }

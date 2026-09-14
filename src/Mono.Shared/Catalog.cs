@@ -26,6 +26,12 @@ public sealed class Track
 
     /// <summary>파일 태그의 작곡가. Composers·Compositions 화면의 근거다.</summary>
     public List<string> Composers { get; init; } = [];
+
+    /// <summary>
+    /// 라이브러리에 처음 들어온 시각. 홈의 "최근 추가" 정렬 근거다.
+    /// 재스캔으로 갱신하지 않는다 — 재스캔마다 순서가 뒤집히면 쓸모가 없다.
+    /// </summary>
+    public DateTimeOffset AddedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class Album

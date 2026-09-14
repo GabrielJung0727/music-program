@@ -1,0 +1,220 @@
+import TrackActionMenu from "../TrackActionMenu"
+import type { TrackActionTarget } from "../TrackActionMenu"
+import type { PlayerMode } from "../PlayerBar"
+import type { QueueTrack } from "../../data/types"
+import { useLiveSession } from "../../state/useLiveSession"
+
+interface Props {
+  selectedAlbum: any
+  currentTrack: QueueTrack | null
+  activeLoungeRoom: boolean
+  playerMode: PlayerMode
+  onReturnToLounge: () => void
+  onBack: () => void
+  onPlayNow: (t: TrackActionTarget) => void
+  onPlayNext: (t: TrackActionTarget) => void
+  onAddToQueue: (t: TrackActionTarget) => void
+}
+
+export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLoungeRoom, playerMode, onReturnToLounge, onBack, onPlayNow, onPlayNext, onAddToQueue }: Props) {
+  const { findAlbum } = useLiveSession()
+  const artSrc: string = selectedAlbum?.art || selectedAlbum?.coverUrl || ""
+
+  // 트랙 목록: 넘어온 게 있으면 그대로, 없으면 카탈로그에서 제목으로 찾는다.
+  const resolvedTracks: any[] = (() => {
+    if (selectedAlbum?.tracks?.length) return selectedAlbum.tracks
+    return findAlbum(selectedAlbum?.title ?? "")?.tracks ?? []
+  })()
+
+  // Liner notes: prefer wikiSummary, fall back to generic
+  const linerNotes: string =
+    selectedAlbum?.wikiSummary ||
+    selectedAlbum?.description ||
+    selectedAlbum?.notes ||
+    "이 앨범에는 라이너 노트가 없습니다."
+
+  const isTrackActive = (track: any): boolean =>
+    currentTrack !== null && (
+      (currentTrack.title === track.title && currentTrack.album === selectedAlbum?.title) ||
+      (track.id != null && currentTrack.id === track.id)
+    )
+
+  const playTrack = (track: any) => {
+    onPlayNow({
+      title: track.title,
+      artist: track.artist ?? selectedAlbum?.artist,
+      album: selectedAlbum?.title,
+      duration: track.duration,
+      format: selectedAlbum?.format,
+      dr: track.dr,
+      art: artSrc,
+    })
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-8 py-10 space-y-8">
+
+      {/* Breadcrumb */}
+      <div>
+        {activeLoungeRoom && playerMode === "host" ? (
+          <button
+            onClick={onReturnToLounge}
+            className="text-xs font-mono font-medium px-3.5 py-1.5 rounded-full inline-flex items-center gap-2 cursor-pointer transition"
+            style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-solo)", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite", flexShrink: 0 }} />
+            ← Return to Live Lounge (ON AIR)
+          </button>
+        ) : (
+          <button
+            onClick={onBack}
+            className="album-back-btn"
+            style={{ background: "none", border: "none", padding: 0 }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Repertoire
+          </button>
+        )}
+      </div>
+
+      {/* Hero */}
+      <div className="flex items-start gap-10">
+        <div className="relative shrink-0">
+          {artSrc && (
+            <img src={artSrc} aria-hidden="true" className="absolute -inset-4 w-[calc(100%+32px)] h-[calc(100%+32px)] object-cover rounded-3xl pointer-events-none" style={{ opacity: 0.12, filter: "blur(40px)", zIndex: 0 }} />
+          )}
+          <img
+            src={artSrc}
+            alt={selectedAlbum?.title}
+            className="relative w-56 h-56 rounded-2xl object-cover shadow-xl"
+            style={{ border: "1px solid var(--album-detail-border)", zIndex: 1, background: artSrc ? undefined : "#E4E4E7" }}
+          />
+        </div>
+        <div className="flex flex-col min-w-0 justify-center pt-1">
+          <p className="text-[10px] font-mono uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>
+            {selectedAlbum?.year || "1958"} · {selectedAlbum?.label || "Master Recording"}
+          </p>
+          <h1 className="album-title-primary">
+            {selectedAlbum?.title || "Album Title"}
+          </h1>
+          <p className="text-sm mb-1" style={{ color: "var(--text-secondary)" }}>{selectedAlbum?.artist || "Artist"}</p>
+          {selectedAlbum?.studio && (
+            <p className="text-xs font-mono mb-5" style={{ color: "var(--text-muted)" }}>{selectedAlbum.studio}</p>
+          )}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {selectedAlbum?.format && (
+              <span className="album-detail-pill">{selectedAlbum.format}</span>
+            )}
+            {selectedAlbum?.dr && (
+              <span className="album-detail-pill">{selectedAlbum.dr} Uncompressed</span>
+            )}
+            <span className="album-detail-pill">¼″ Analog Master Transfer</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => resolvedTracks[0] && playTrack(resolvedTracks[0])}
+              disabled={resolvedTracks.length === 0}
+              className="album-detail-play-btn"
+            >
+              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 fill-current" aria-hidden="true"><path d="M3 2.5l10 5.5-10 5.5V2.5z" /></svg>
+              Play Album
+            </button>
+            {selectedAlbum?.wikiUrl && (
+              <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="album-detail-wiki-btn">
+                Wikipedia ↗
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Liner Notes Card */}
+      <div className="album-liner-notes-surface">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Studio Liner Notes</span>
+          {selectedAlbum?.wikiUrl && (
+            <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono transition-colors no-underline hover:opacity-80" style={{ color: "var(--text-muted)" }}>Open article ↗</a>
+          )}
+        </div>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{linerNotes}</p>
+      </div>
+
+      {/* Master Tape Tracklist */}
+      {resolvedTracks.length === 0 && (
+        <div className="album-liner-notes-surface px-5 py-6 text-center">
+          <p className="text-[10px] font-mono uppercase tracking-widest mb-1.5" style={{ color: "var(--text-muted)" }}>Master Tracklist</p>
+          <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>Master tracklist pending verification.</p>
+        </div>
+      )}
+      {resolvedTracks.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)" }}>Master Tape Tracklist</p>
+          <div className="album-detail-table-wrap">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="album-detail-table-header">
+                  <th className="text-left text-[10px] font-mono uppercase tracking-wider px-5 py-3 w-12" style={{ color: "var(--text-muted)" }}>#</th>
+                  <th className="text-left text-[10px] font-mono uppercase tracking-wider px-3 py-3" style={{ color: "var(--text-muted)" }}>Title</th>
+                  <th className="text-left text-[10px] font-mono uppercase tracking-wider px-3 py-3" style={{ color: "var(--text-muted)" }}>Artist</th>
+                  <th className="text-center text-[10px] font-mono uppercase tracking-wider px-3 py-3" style={{ color: "var(--text-muted)" }}>DR</th>
+                  <th className="text-right text-[10px] font-mono uppercase tracking-wider px-5 py-3" style={{ color: "var(--text-muted)" }}>Time</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {resolvedTracks.map((track: any, tIdx: number) => (
+                  <tr
+                    key={track.num ?? track.title ?? tIdx}
+                    className={`group album-track-row ${isTrackActive(track) ? "album-track-row-active" : ""}`}
+                  >
+                    <td className="px-5 py-3.5 w-12">
+                      {isTrackActive(track) ? (
+                        <span className="flex items-center gap-1">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--album-detail-active-accent)" }} />
+                          <span className="text-xs font-mono font-medium" style={{ color: "var(--album-detail-active-accent)" }}>▶</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{tIdx + 1}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <button
+                        onClick={() => playTrack(track)}
+                        className="album-track-title-btn"
+                      >
+                        {track.title}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3.5"><span className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>{track.artist ?? selectedAlbum?.artist}</span></td>
+                    <td className="px-3 py-3.5 text-center"><span className="badge-dr-meter">{track.dr}</span></td>
+                    <td className="px-5 py-3.5 text-right"><span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{track.duration}</span></td>
+                    <td className="pr-2 py-2 w-8">
+                      <TrackActionMenu
+                        track={{
+                          title: track.title,
+                          artist: track.artist ?? selectedAlbum?.artist,
+                          album: selectedAlbum?.title,
+                          duration: track.duration,
+                          format: selectedAlbum?.format,
+                          dr: track.dr,
+                          art: artSrc,
+                        }}
+                        onPlayNow={onPlayNow}
+                        onPlayNext={onPlayNext}
+                        onAddToQueue={onAddToQueue}
+                        isGuest={playerMode === "guest"}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}

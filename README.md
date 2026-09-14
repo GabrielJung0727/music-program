@@ -7,28 +7,57 @@
 - 아키텍처: [`docs/02-아키텍처.md`](docs/02-아키텍처.md)
 - 구현 현황: [`docs/03-구현현황.md`](docs/03-구현현황.md)
 - UI/UX·**exe-only** 배포: [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md)
+- 로드맵(v1.0 까지): [`docs/06-로드맵.md`](docs/06-로드맵.md)
 
-## 최근 추가된 기능
+## Control UI
 
-- **Avalonia 네이티브 Control**: Roon형 사이드바 + 본문 + 하단 플레이어 바. 브라우저·콘솔 없이 `Mono.Control.exe`
-- **프로세스 수명 관리**: Control이 Core·Output을 `WinExe` 백그라운드로 기동
-- **온보딩**: Avalonia 6단계 (이름 → 라이브러리 → 출력/존 → 스트리밍 → 완료)
-- 반응 히트맵 · 스마트 오토플레이 · 멀티 디바이스 존 · 다국어 검색 · 위키백과 이력
+Control 화면은 **React 19 + Vite + Tailwind v4** (`src/Mono.Web`)이고,
+`Mono.Control.exe` 는 그 화면을 띄우는 **WebView2 셸**입니다.
+
+```
+src/Mono.Web      React 앱 (화면 전부)
+  └ vite build →  src/Mono.Core/wwwroot   Core 가 7702 에서 정적 서빙
+src/Mono.Control  WebView2 창 + Core·Output 프로세스 관리 + 트레이·업데이트
+```
+
+셸은 `window.mono` 브리지로 브라우저가 못 하는 일만 열어 줍니다 —
+폴더 선택, Output 워커 기동/재시작, 외부 링크, 업데이트, 트레이.
+브라우저로 `http://127.0.0.1:7702` 를 열어도 같은 화면이 뜨며,
+그때는 브리지가 없어 출력 연결만 막힙니다.
+
+이전 Avalonia UI 는 `legacy/Mono.Control.Avalonia` 에 보관돼 있습니다(빌드 대상 아님).
 
 ## 빠른 시작
 
 ```powershell
+cd src/Mono.Web; npm install; npm run build; cd ../..
 dotnet build Mono.slnx
 dotnet run --project src/Mono.Control
 ```
 
-Control이 Core를 찾아 기동하고 GUI를 엽니다. 소리는 하단 **「출력 연결」** 또는 온보딩에서 Output을 붙입니다.
+Control이 Core를 찾아 기동하고 창을 엽니다. 소리는 설정 → **오디오 엔진 → 「출력 연결」**
+또는 하단 출력 팝오버에서 Output을 붙입니다.
+
+UI만 고칠 때는 Core를 따로 띄우고 Vite 개발 서버를 씁니다(HMR·프록시 설정 포함):
+
+```powershell
+dotnet run --project src/Mono.Core
+cd src/Mono.Web; npm run dev     # http://localhost:5273
+```
 
 | 포트 | 용도 |
 | --- | --- |
 | 7700 | Control ↔ Core (TCP JSON) |
 | 7701 | MATP (오디오 + 클럭) |
-| 7702 | REST·앨범 아트 API (레거시 웹 SPA는 참고용) |
+| 7702 | Control UI(정적) · REST · `/ws/control` · SignalR `/hub` |
+| 5273 | Vite 개발 서버 (개발 중에만) |
+
+### 컨트롤 플레인
+
+웹 UI는 `/ws/control` WebSocket 으로 **TCP 7700 과 똑같은 `MonoMessage` 규약**을 씁니다.
+두 전송 계층은 `ControlSession`(`src/Mono.Core/ControlPlane.cs`) 한 곳을 공유하므로
+네이티브 Control 과 웹 UI 가 기능 차이 없이 같은 명령을 냅니다.
+TypeScript 쪽 거울은 `src/Mono.Web/src/lib/protocol.ts` 입니다.
 
 ```powershell
 dotnet run --project src/Mono.Cli                              # 개발용 CLI
@@ -37,7 +66,10 @@ dotnet run --project src/Mono.Output -- --room=<룸ID>          # Output 수동 
 
 Output 옵션: `--host=` `--room=` `--invite=` `--name=` `--device=` `--volume=0-100` `--shared` `--dsd`
 
-출시 zip: `Mono.Control.exe` + `Mono.Core.exe` + `Mono.Output.exe` 동일 폴더. 규약은 [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md) §5.
+출시 zip: `Mono.Control.exe` + `Mono.Core.exe` + `Mono.Output.exe` + `wwwroot/` 동일 폴더.
+`publish.ps1` 이 React 번들을 먼저 빌드한 뒤 publish 합니다. 규약은 [`docs/04-UIUX기획서.md`](docs/04-UIUX기획서.md) §5.
+
+> WebView2 런타임이 필요합니다. Windows 11 에는 기본 포함돼 있습니다.
 
 ## 라이브러리
 
@@ -74,9 +106,12 @@ play
 | `GET /api/art/{trackId}` | 앨범 아트 |
 | `GET /api/reactions/{trackId}` | 반응 히트맵 |
 | `GET /api/wiki/{artistId}` | 위키 요약 |
+| `GET /api/endpoints` | 등록된 출력 엔드포인트 |
+| `WS /ws/control` | Control 컨트롤 플레인 (MonoMessage) |
 
 ## 테스트
 
 ```powershell
 dotnet test Mono.slnx
+cd src/Mono.Web; npm run typecheck
 ```
