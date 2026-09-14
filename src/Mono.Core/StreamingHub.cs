@@ -37,6 +37,15 @@ public sealed class StreamingHub
         _ => throw Unexpected(provider)
     };
 
+    public string? LastImportNote { get; private set; }
+
+    public int LiveTrackCount()
+    {
+        return _catalog.Tracks.Values.Count(t =>
+            t.Source == StreamingProvider.Tidal &&
+            !string.Equals(t.StreamingId, "take-five-demo", StringComparison.Ordinal));
+    }
+
     public IReadOnlyList<object> AccountViews
     {
         get
@@ -50,6 +59,8 @@ public sealed class StreamingHub
                         connected = a.Connected,
                         displayName = a.DisplayName,
                         liveSdk = HasLiveCredentials(a.Provider),
+                        imported = a.Provider == StreamingProvider.Tidal ? LiveTrackCount() : 0,
+                        note = a.Provider == StreamingProvider.Tidal ? LastImportNote : null,
                         authMode = a.Provider == StreamingProvider.Tidal ? "oauth_browser" : "password_or_token"
                     })
                     .ToList();
@@ -172,24 +183,22 @@ public sealed class StreamingHub
         }
 
         var name = displayName;
-        if (provider == StreamingProvider.Tidal && HasLiveCredentials(provider) && !LooksDemo(token))
+        TidalProfile? profile = null;
+        if (provider == StreamingProvider.Tidal && HasLiveCredentials(provider) && LooksLikeLiveAccessToken(token))
         {
-            var profile = Tidal.FetchProfile(token!);
-            if (profile is not null)
-            {
-                name ??= profile.DisplayName;
-                _tidalCountry = profile.Country;
-            }
+            profile = Tidal.FetchProfile(token!);
+            name ??= profile.DisplayName;
+            _tidalCountry = profile.Country;
         }
 
-        return Link(provider, token!, name ?? provider.ToString(), refresh, expires);
+        return Link(provider, token!, name ?? provider.ToString(), refresh, expires, profile);
     }
 
     public StreamingAccount Link(StreamingProvider provider, string token, string? displayName)
-        => Link(provider, token, displayName, refreshToken: null, expiresAt: null);
+        => Link(provider, token, displayName, refreshToken: null, expiresAt: null, profile: null);
 
     private StreamingAccount Link(
-        StreamingProvider provider, string token, string? displayName, string? refreshToken, DateTimeOffset? expiresAt)
+        StreamingProvider provider, string token, string? displayName, string? refreshToken, DateTimeOffset? expiresAt, TidalProfile? profile)
     {
         var acc = new StreamingAccount
         {
@@ -204,9 +213,11 @@ public sealed class StreamingHub
         lock (_gate) _accounts[provider] = acc;
         if (acc.Connected)
         {
-            if (HasLiveCredentials(provider) && !LooksDemo(token))
-                _ = TryImportLiveCatalogAsync(provider, token);
-            SeedProvider(provider);
+            var live = HasLiveCredentials(provider) && LooksLikeLiveAccessToken(token);
+            if (live)
+                ImportLiveNow(provider, token, profile);
+            else
+                SeedProvider(provider);
             Save();
         }
         return acc;
@@ -325,6 +336,51 @@ public sealed class StreamingHub
     private static bool LooksDemo(string? value)
         => !string.IsNullOrWhiteSpace(value) && value.StartsWith("demo-", StringComparison.OrdinalIgnoreCase);
 
+    private static bool LooksLikeLiveAccessToken(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !LooksDemo(value)
+           && value.Count(c => c == '.') == 2
+           && value.Length > 40;
+
+    private void ImportLiveNow(StreamingProvider provider, string token, TidalProfile? profile)
+    {
+        try
+        {
+            if (provider == StreamingProvider.Tidal)
+            {
+                if (!EnsureFreshTidalToken()) return;
+                var access = GetToken(StreamingProvider.Tidal) ?? token;
+                ImportTidal(access, profile);
+            }
+            else if (provider == StreamingProvider.Qobuz)
+                ImportQobuzFavoritesAsync(token).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            LastImportNote = ex.Message;
+        }
+    }
+
+    private void ImportTidal(string token, TidalProfile? profile)
+    {
+        profile ??= Tidal.FetchProfile(token);
+        _tidalCountry = profile.Country;
+        LastImportNote = null;
+        var before = LiveTrackCount();
+        foreach (var hit in Tidal.FetchFavorites(token, profile, 40))
+            UpsertTidalHit(hit);
+        foreach (var seed in new[] { "Miles Davis", "Hiromi", "Kind of Blue", "Daft Punk" })
+        {
+            foreach (var hit in Tidal.Search(token, seed, _tidalCountry, 12))
+                UpsertTidalHit(hit);
+        }
+
+        var added = LiveTrackCount() - before;
+        LastImportNote = added > 0
+            ? $"{added}곡을 Tidal에서 가져왔습니다."
+            : (Tidal.LastError ?? "Tidal API가 곡을 돌려주지 않았습니다.");
+    }
+
     private static string BuildQobuzAuthUrl(string state)
     {
         var appId = Env("MONO_QOBUZ_APP_ID") ?? "MONO_QOBUZ_CLIENT";
@@ -349,33 +405,6 @@ public sealed class StreamingHub
         if (doc.RootElement.TryGetProperty("user_auth_token", out var t))
             return t.GetString();
         return doc.RootElement.TryGetProperty("token", out var t2) ? t2.GetString() : null;
-    }
-
-    private async Task TryImportLiveCatalogAsync(StreamingProvider provider, string token)
-    {
-        try
-        {
-            if (provider == StreamingProvider.Tidal)
-            {
-                if (!EnsureFreshTidalToken()) return;
-                var access = GetToken(StreamingProvider.Tidal) ?? token;
-                await Task.Run(() => ImportTidal(access)).ConfigureAwait(false);
-            }
-            else if (provider == StreamingProvider.Qobuz)
-                await ImportQobuzFavoritesAsync(token).ConfigureAwait(false);
-        }
-        catch { /* keep demo seed */ }
-    }
-
-    private void ImportTidal(string token)
-    {
-        foreach (var hit in Tidal.FetchFavorites(token, _tidalCountry, 40))
-            UpsertTidalHit(hit);
-        foreach (var seed in new[] { "Miles Davis", "Hiromi", "Kind of Blue" })
-        {
-            foreach (var hit in Tidal.Search(token, seed, _tidalCountry, 8))
-                UpsertTidalHit(hit);
-        }
     }
 
     private void UpsertTidalHit(TidalTrackHit hit)
@@ -533,7 +562,7 @@ public sealed class StreamingHub
                     exp = parsed;
                 if (el.TryGetProperty("country", out var c) && provider == StreamingProvider.Tidal)
                     _tidalCountry = c.GetString() ?? _tidalCountry;
-                Link(provider, token, name, refresh, exp);
+                Link(provider, token, name, refresh, exp, profile: null);
             }
         }
         catch { /* corrupt store */ }

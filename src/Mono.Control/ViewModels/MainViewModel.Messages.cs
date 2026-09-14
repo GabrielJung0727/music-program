@@ -52,7 +52,21 @@ public partial class MainViewModel
                          && msg.Body.Contains("\"connected\":false", StringComparison.OrdinalIgnoreCase))
                     StatusText = "브라우저에서 Tidal에 로그인하세요";
                 else if ((msg.Ok ?? false) && msg.Provider == StreamingProvider.Tidal)
+                {
                     StatusText = "Tidal 연동 완료";
+                    if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"note\":", StringComparison.Ordinal))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(msg.Body.StartsWith('[') ? msg.Body : "{}");
+                            if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0
+                                && doc.RootElement[0].TryGetProperty("note", out var n))
+                                StatusText = n.GetString() ?? StatusText;
+                        }
+                        catch { /* keep default */ }
+                    }
+                    _ = _session.CatalogAsync();
+                }
                 break;
             case MessageTypes.History:
                 LoadHistory(msg.Body);

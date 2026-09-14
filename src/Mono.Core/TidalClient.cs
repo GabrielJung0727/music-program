@@ -68,46 +68,65 @@ internal sealed class TidalClient
         return PostToken(form);
     }
 
-    public TidalProfile? FetchProfile(string accessToken)
+    public string? LastError { get; private set; }
+
+    public TidalProfile FetchProfile(string accessToken)
     {
-        using var doc = GetJson("https://openapi.tidal.com/v2/users/me", accessToken)
-                        ?? GetJson("https://api.tidal.com/v1/users/me", accessToken);
-        if (doc is null) return null;
-        var root = doc.RootElement;
-        var data = root.TryGetProperty("data", out var d) ? d : root;
-        var attrs = data.TryGetProperty("attributes", out var a) ? a : data;
-        var id = ReadId(data) ?? ReadId(root);
-        var name = Str(attrs, "username") ?? Str(attrs, "displayName") ?? Str(root, "username") ?? "TIDAL";
-        var country = Str(attrs, "country") ?? Str(root, "countryCode") ?? Str(root, "country") ?? "US";
-        return new TidalProfile(id ?? "me", name, country);
+        var jwt = ProfileFromJwt(accessToken);
+        using var doc = GetJson("https://openapi.tidal.com/v2/users/me?include=entitlements", accessToken);
+        if (doc is not null)
+        {
+            var root = doc.RootElement;
+            var data = root.TryGetProperty("data", out var d) ? d : root;
+            var attrs = data.TryGetProperty("attributes", out var a) ? a : data;
+            var id = ReadId(data) ?? jwt?.UserId ?? "me";
+            var name = Str(attrs, "username") ?? Str(attrs, "displayName") ?? jwt?.DisplayName ?? "TIDAL";
+            var country = Str(attrs, "country") ?? Str(attrs, "countryCode") ?? jwt?.Country ?? "US";
+            return new TidalProfile(id, name, country);
+        }
+
+        return jwt ?? new TidalProfile("me", "TIDAL", "US");
     }
 
-    public IReadOnlyList<TidalTrackHit> FetchFavorites(string accessToken, string country, int limit)
+    public IReadOnlyList<TidalTrackHit> FetchFavorites(string accessToken, TidalProfile profile, int limit)
     {
-        var hits = ParseTrackList(GetJson(
-            $"https://api.tidal.com/v1/users/me/favorites/tracks?limit={limit}&countryCode={Uri.EscapeDataString(country)}",
-            accessToken));
-        if (hits.Count > 0) return hits;
-        return ParseIncludedTracks(GetJson(
-            $"https://openapi.tidal.com/v2/userCollections/me?countryCode={Uri.EscapeDataString(country)}&include=tracks",
-            accessToken));
+        foreach (var cc in Countries(profile.Country))
+        {
+            foreach (var path in new[]
+            {
+                $"https://openapi.tidal.com/v2/userCollections/{Uri.EscapeDataString(profile.UserId)}/relationships/tracks?countryCode={cc}&include=tracks,artists,albums",
+                $"https://openapi.tidal.com/v2/userCollections/{Uri.EscapeDataString(profile.UserId)}?countryCode={cc}&include=tracks,artists,albums"
+            })
+            {
+                var hits = ParseIncludedTracks(GetJson(path, accessToken));
+                if (hits.Count > 0) return hits.Take(limit).ToList();
+            }
+        }
+
+        return [];
     }
 
     public IReadOnlyList<TidalTrackHit> Search(string accessToken, string query, string country, int limit)
     {
         var q = query.Trim();
         if (q.Length == 0) return [];
+        var encoded = Uri.EscapeDataString(q);
 
-        var v2 = GetJson(
-            $"https://openapi.tidal.com/v2/searchResults/{Uri.EscapeDataString(q)}?countryCode={Uri.EscapeDataString(country)}&include=tracks,artists,albums",
-            accessToken);
-        var hits = ParseIncludedTracks(v2);
-        if (hits.Count > 0) return hits.Take(limit).ToList();
+        foreach (var cc in Countries(country))
+        {
+            foreach (var url in new[]
+            {
+                $"https://openapi.tidal.com/v2/searchResults/{encoded}/relationships/tracks?countryCode={cc}&include=tracks,artists,albums",
+                $"https://openapi.tidal.com/v2/searchResults/{encoded}?countryCode={cc}&include=tracks,artists,albums,topHits",
+                $"https://openapi.tidal.com/v2/searchResults?filter[query]={encoded}&countryCode={cc}&include=tracks,artists,albums"
+            })
+            {
+                var hits = ParseIncludedTracks(GetJson(url, accessToken));
+                if (hits.Count > 0) return hits.Take(limit).ToList();
+            }
+        }
 
-        var v1 = GetJson(
-            $"https://api.tidal.com/v1/search/tracks?query={Uri.EscapeDataString(q)}&limit={limit}&offset=0&countryCode={Uri.EscapeDataString(country)}",
-            accessToken);
-        return ParseTrackList(v1).Take(limit).ToList();
+        return [];
     }
 
     public string? FetchPlaybackUrl(string accessToken, string trackId, string country)
@@ -156,18 +175,28 @@ internal sealed class TidalClient
 
     private JsonDocument? GetJson(string url, string accessToken)
     {
+        LastError = null;
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            req.Headers.Accept.ParseAdd("application/vnd.api+json");
-            req.Headers.Accept.ParseAdd("application/json");
-            using var res = _http.Send(req);
-            if (!res.IsSuccessStatusCode) return null;
-            return JsonDocument.Parse(res.Content.ReadAsStream());
+            req.Headers.TryAddWithoutValidation("Accept", "application/vnd.api+json");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            using var res = _http.Send(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+            using var reader = new StreamReader(res.Content.ReadAsStream());
+            var body = reader.ReadToEnd();
+            if (!res.IsSuccessStatusCode)
+            {
+                var snippet = body.Length <= 200 ? body : body[..200];
+                LastError = $"{(int)res.StatusCode} {url} {snippet}";
+                return null;
+            }
+
+            return JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
         }
-        catch
+        catch (Exception ex)
         {
+            LastError = $"{url} {ex.GetType().Name}: {ex.Message}";
             return null;
         }
     }
@@ -221,16 +250,30 @@ internal sealed class TidalClient
             }
         }
 
-        if (list.Count == 0 && doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+        if (list.Count == 0 && doc.RootElement.TryGetProperty("data", out var data))
         {
-            foreach (var node in data.EnumerateArray())
+            if (data.ValueKind == JsonValueKind.Array)
             {
-                var hit = FromJsonApiTrack(node, artists, albums);
-                if (hit is not null) list.Add(hit);
+                foreach (var node in data.EnumerateArray())
+                    AddIfTrack(node);
+            }
+            else if (data.ValueKind == JsonValueKind.Object)
+            {
+                AddIfTrack(data);
             }
         }
 
         return list;
+
+        void AddIfTrack(JsonElement node)
+        {
+            var type = Str(node, "type") ?? "tracks";
+            if (!type.Contains("track", StringComparison.OrdinalIgnoreCase)
+                || type.Contains("manifest", StringComparison.OrdinalIgnoreCase))
+                return;
+            var hit = FromJsonApiTrack(node, artists, albums);
+            if (hit is not null) list.Add(hit);
+        }
     }
 
     private static TidalTrackHit? FromJsonApiTrack(JsonElement node, Dictionary<string, string> artists, Dictionary<string, string> albums)
@@ -342,6 +385,50 @@ internal sealed class TidalClient
         }
 
         return 180_000;
+    }
+
+    private static IEnumerable<string> Countries(string? preferred)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cc in new[] { preferred, "WW", "US" })
+        {
+            if (string.IsNullOrWhiteSpace(cc) || !seen.Add(cc)) continue;
+            yield return cc;
+        }
+    }
+
+    private static TidalProfile? ProfileFromJwt(string accessToken)
+    {
+        var parts = accessToken.Split('.');
+        if (parts.Length < 2) return null;
+        try
+        {
+            var json = Encoding.UTF8.GetString(Base64UrlDecode(parts[1]));
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var id = root.TryGetProperty("userId", out var uid)
+                ? uid.ToString()
+                : Str(root, "uid") ?? Str(root, "sub") ?? "me";
+            var country = Str(root, "countryCode") ?? Str(root, "country") ?? "US";
+            var name = Str(root, "username") ?? Str(root, "name") ?? "TIDAL";
+            return new TidalProfile(id, name, country);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        var padded = value.Replace('-', '+').Replace('_', '/');
+        switch (padded.Length % 4)
+        {
+            case 2: padded += "=="; break;
+            case 3: padded += "="; break;
+        }
+
+        return Convert.FromBase64String(padded);
     }
 
     private static string? ReadId(JsonElement el)

@@ -74,6 +74,8 @@ app.MapGet("/oauth/callback", (string? code, string? state, string? error, Strea
     try
     {
         var acc = streaming.CompleteOAuth(StreamingProvider.Tidal, code, state, null);
+        var imported = streaming.LiveTrackCount();
+        var note = streaming.LastImportNote;
         var accounts = new MonoMessage
         {
             Type = MessageTypes.LinkStreaming,
@@ -88,7 +90,10 @@ app.MapGet("/oauth/callback", (string? code, string? state, string? error, Strea
         };
         _ = bus.PushCatalogAsync(accounts);
         _ = bus.PushCatalogAsync(catalogMsg);
-        return Results.Content(OAuthPage("Tidal 연동이 완료됐습니다. 이 창을 닫고 Mono로 돌아가세요.", null), "text/html; charset=utf-8");
+        var title = imported > 0
+            ? $"Tidal 연동 완료 · {imported}곡을 가져왔습니다."
+            : "Tidal 로그인은 됐지만 곡 목록을 못 가져왔습니다.";
+        return Results.Content(OAuthPage(title, note), "text/html; charset=utf-8");
     }
     catch (Exception ex)
     {
