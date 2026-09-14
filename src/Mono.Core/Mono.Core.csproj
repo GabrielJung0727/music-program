@@ -6,10 +6,16 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Mono.Core</RootNamespace>
     <AssemblyName>Mono.Core</AssemblyName>
-    <!-- 레거시 웹 UI(wwwroot)는 커밋 3277af2 에서 삭제됐다. 정적 웹 자산을 끄지 않으면
-         dotnet run 이 없는 wwwroot 를 찾다 기동 전에 죽는다. -->
+    <!-- wwwroot 는 src/Mono.Web (React) 의 vite build 산출물이다.
+         빌드 전에 한 번은 `npm run build` 가 돌아야 한다. -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- React 번들(src/Mono.Web 의 vite build 산출물)을 exe 옆으로 복사한다.
+         StaticWebAssetsEnabled 가 꺼져 있어 ASP.NET 기본 규칙이 안 태워 주므로
+         명시적으로 넣는다. 번들이 없으면 항목이 비고, Core 는 REST 만 서빙한다. -->
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
@@ -18,5 +24,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Mono.Protocol\Mono.Protocol.csproj" />
     <ProjectReference Include="..\Mono.Shared\Mono.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mono.Tests" />
   </ItemGroup>
 </Project>

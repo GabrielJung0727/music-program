@@ -1,34 +1,55 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Mono.Shared;
 
 namespace Mono.Core;
 
 /// <summary>
 /// 스트리밍 서비스 어댑터. 토큰은 Core에만 보관.
-/// env에 파트너 Client ID/Secret이 있으면 실 OAuth·카탈로그/스트림 URL 경로를 쓰고,
-/// 없으면 데모 토큰·시드 카탈로그로 폴백한다.
+/// Tidal은 임베디드 QA Client ID + PKCE로 실 OAuth를 타고,
+/// Qobuz는 env 키가 있을 때만 실경로, 없으면 데모로 폴백한다.
 /// </summary>
 public sealed class StreamingHub
 {
     private static readonly HttpClient Http = CreateHttp();
+    private static readonly TidalClient Tidal = new(Http);
 
     private readonly Dictionary<StreamingProvider, StreamingAccount> _accounts = new();
-    private readonly Dictionary<StreamingProvider, string> _pendingStates = new();
+    private readonly Dictionary<StreamingProvider, PendingAuth> _pending = new();
     private readonly Dictionary<string, string> _streamUrlCache = new(StringComparer.Ordinal);
     private readonly CatalogStore _catalog;
+    private readonly string? _storePath;
+    private readonly string _streamBaseUrl;
     private readonly object _gate = new();
+    private string _tidalCountry = "US";
 
-    public StreamingHub(CatalogStore catalog) => _catalog = catalog;
+    public StreamingHub(CatalogStore catalog, string? storePath = null, string? streamBaseUrl = null)
+    {
+        _catalog = catalog;
+        _storePath = storePath;
+        _streamBaseUrl = (streamBaseUrl ?? "http://127.0.0.1:7702").TrimEnd('/');
+        Load();
+    }
 
     public bool HasLiveCredentials(StreamingProvider provider) => provider switch
     {
-        StreamingProvider.Tidal => !string.IsNullOrWhiteSpace(Env("MONO_TIDAL_CLIENT_ID")),
+        // Tidal QA Client ID는 바이너리에 포함. 데모는 MONO_TIDAL_DEMO=1 일 때만.
+        StreamingProvider.Tidal => !TidalClient.DemoForced,
         StreamingProvider.Qobuz => !string.IsNullOrWhiteSpace(Env("MONO_QOBUZ_APP_ID")),
-        _ => false
+        StreamingProvider.Local => false,
+        _ => throw Unexpected(provider)
     };
+
+    public string? LastImportNote { get; private set; }
+
+    public int LiveTrackCount()
+    {
+        return _catalog.Tracks.Values.Count(t =>
+            t.Source == StreamingProvider.Tidal &&
+            !string.Equals(t.StreamingId, "take-five-demo", StringComparison.Ordinal));
+    }
 
     public IReadOnlyList<object> AccountViews
     {
@@ -43,6 +64,8 @@ public sealed class StreamingHub
                         connected = a.Connected,
                         displayName = a.DisplayName,
                         liveSdk = HasLiveCredentials(a.Provider),
+                        imported = a.Provider == StreamingProvider.Tidal ? LiveTrackCount() : 0,
+                        note = a.Provider == StreamingProvider.Tidal ? LastImportNote : null,
                         authMode = a.Provider == StreamingProvider.Tidal ? "oauth_browser" : "password_or_token"
                     })
                     .ToList();
@@ -58,11 +81,53 @@ public sealed class StreamingHub
 
     public object BeginOAuth(StreamingProvider provider)
     {
+        if (provider == StreamingProvider.Tidal && IsConnected(provider) && EnsureFreshTidalToken())
+        {
+            return new
+            {
+                provider,
+                state = "",
+                authUrl = "",
+                liveSdk = true,
+                demo = false,
+                already = true,
+                connected = true,
+                displayName = DisplayName(provider),
+                note = "이미 Tidal에 연동되어 있습니다."
+            };
+        }
+
         var state = Guid.NewGuid().ToString("n")[..12];
-        lock (_gate) _pendingStates[provider] = state;
+        string verifier = "";
+        string challenge = "";
+        if (provider == StreamingProvider.Tidal)
+        {
+            var pkce = TidalClient.CreatePkce();
+            verifier = pkce.Verifier;
+            challenge = pkce.Challenge;
+        }
+        lock (_gate) _pending[provider] = new PendingAuth(state, verifier);
 
         if (!HasLiveCredentials(provider))
         {
+            // Tidal은 임베디드 QA Client ID가 있으므로 여기 오면 DEMO 강제뿐.
+            // 조용히 데모로 떨어지지 않고 이유를 돌려준다.
+            if (provider == StreamingProvider.Tidal)
+            {
+                return new
+                {
+                    provider,
+                    state,
+                    authUrl = "",
+                    liveSdk = false,
+                    demo = false,
+                    connected = false,
+                    note = "Tidal 실연동이 꺼져 있습니다 (MONO_TIDAL_DEMO=1). 끄고 다시 시도하세요.",
+                    clientIdPrefix = TidalClient.ClientId.Length >= 4 ? TidalClient.ClientId[..4] : "",
+                    hasSecret = !string.IsNullOrWhiteSpace(TidalClient.ClientSecret)
+                };
+            }
+
             var acc = CompleteOAuth(provider, null, state, displayName: null);
             return new
             {
@@ -77,58 +142,93 @@ public sealed class StreamingHub
             };
         }
 
-        var redirect = Env("MONO_OAUTH_REDIRECT") ?? "http://127.0.0.1:7702/oauth/callback";
         var authUrl = provider switch
         {
-            StreamingProvider.Tidal => BuildTidalAuthUrl(state, redirect),
-            StreamingProvider.Qobuz => BuildQobuzAuthUrl(state, redirect),
-            _ => ""
+            StreamingProvider.Tidal => Tidal.BuildAuthorizeUrl(state, challenge),
+            StreamingProvider.Qobuz => BuildQobuzAuthUrl(state),
+            StreamingProvider.Local => "",
+            _ => throw Unexpected(provider)
         };
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(authUrl))
+            if (!string.IsNullOrWhiteSpace(authUrl) && !InTestHost())
                 Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
         }
         catch { /* headless / CI */ }
 
-        var live = HasLiveCredentials(provider);
         return new
         {
             provider,
             state,
             authUrl,
-            liveSdk = live,
-            note = live
-                ? "실 파트너 자격증명이 설정됨. 콜백 code로 CompleteOAuth하세요."
-                : "파트너 SDK 승인 후 MONO_TIDAL_CLIENT_ID / MONO_QOBUZ_APP_ID 등을 설정하세요. 지금은 데모 토큰으로 CompleteOAuth 가능."
+            liveSdk = true,
+            demo = false,
+            connected = false,
+            note = "브라우저에서 로그인하면 Core가 콜백을 받아 연동을 마칩니다."
         };
     }
 
     public StreamingAccount CompleteOAuth(StreamingProvider provider, string? codeOrToken, string? state, string? displayName)
     {
+        PendingAuth? pending = null;
         lock (_gate)
         {
-            if (state is not null && _pendingStates.TryGetValue(provider, out var expected) && expected != state)
+            if (state is not null && _pending.TryGetValue(provider, out var expected) && expected.State != state)
                 throw new InvalidOperationException("OAuth state mismatch");
-            _pendingStates.Remove(provider);
+            if (_pending.TryGetValue(provider, out var p))
+                pending = p;
+            _pending.Remove(provider);
         }
 
         var token = codeOrToken;
+        string? refresh = null;
+        DateTimeOffset? expires = null;
         if (HasLiveCredentials(provider) && LooksLikeAuthCode(codeOrToken))
-            token = ExchangeCodeForToken(provider, codeOrToken!) ?? codeOrToken;
+        {
+            if (provider == StreamingProvider.Tidal)
+            {
+                var tokens = Tidal.ExchangeCode(codeOrToken!, pending?.Verifier ?? "");
+                if (tokens is null)
+                    throw new InvalidOperationException("Tidal 토큰 교환에 실패했습니다. Client ID/Secret과 Redirect URI를 확인하세요.");
+                token = tokens.AccessToken;
+                refresh = tokens.RefreshToken;
+                expires = tokens.ExpiresAt;
+            }
+            else
+            {
+                token = ExchangeQobuz(codeOrToken!) ?? codeOrToken;
+            }
+        }
         else if (string.IsNullOrWhiteSpace(token))
+        {
             token = $"demo-{provider}-{DateTimeOffset.UtcNow:yyyyMMdd}";
+        }
 
-        return Link(provider, token!, displayName ?? provider.ToString());
+        var name = displayName;
+        TidalProfile? profile = null;
+        if (provider == StreamingProvider.Tidal && HasLiveCredentials(provider) && LooksLikeLiveAccessToken(token))
+        {
+            profile = Tidal.FetchProfile(token!);
+            name ??= profile.DisplayName;
+            _tidalCountry = profile.Country;
+        }
+
+        return Link(provider, token!, name ?? provider.ToString(), refresh, expires, profile);
     }
 
     public StreamingAccount Link(StreamingProvider provider, string token, string? displayName)
+        => Link(provider, token, displayName, refreshToken: null, expiresAt: null, profile: null);
+
+    private StreamingAccount Link(
+        StreamingProvider provider, string token, string? displayName, string? refreshToken, DateTimeOffset? expiresAt, TidalProfile? profile)
     {
         var acc = new StreamingAccount
         {
             Provider = provider,
             Token = token,
+            RefreshToken = refreshToken,
+            ExpiresAt = expiresAt,
             Connected = !string.IsNullOrWhiteSpace(token),
             DisplayName = displayName ?? provider.ToString()
         };
@@ -136,9 +236,12 @@ public sealed class StreamingHub
         lock (_gate) _accounts[provider] = acc;
         if (acc.Connected)
         {
-            if (HasLiveCredentials(provider))
-                _ = TryImportLiveCatalogAsync(provider, token);
-            SeedProvider(provider);
+            var live = HasLiveCredentials(provider) && LooksLikeLiveAccessToken(token);
+            if (live)
+                ImportLiveNow(provider, token, profile);
+            else
+                SeedProvider(provider);
+            Save();
         }
         return acc;
     }
@@ -151,9 +254,25 @@ public sealed class StreamingHub
             foreach (var key in _streamUrlCache.Keys.Where(k => k.StartsWith(provider + ":", StringComparison.Ordinal)).ToList())
                 _streamUrlCache.Remove(key);
         }
+        Save();
     }
 
-    /// <summary>Clock-sync Output이 열 수 있는 HTTP(S) 스트림 URL. 없으면 null.</summary>
+    public void EnrichSearch(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || !IsConnected(StreamingProvider.Tidal) || !HasLiveCredentials(StreamingProvider.Tidal))
+            return;
+        if (!EnsureFreshTidalToken()) return;
+        var token = GetToken(StreamingProvider.Tidal);
+        if (string.IsNullOrWhiteSpace(token) || LooksDemo(token)) return;
+        try
+        {
+            foreach (var hit in Tidal.Search(token, query, _tidalCountry, 20))
+                UpsertTidalHit(hit);
+        }
+        catch { /* local search still works */ }
+    }
+
+    /// <summary>Clock-sync Output이 열 수 있는 HTTP(S) 스트림 URL 또는 로컬 경로. 없으면 null.</summary>
     public string? ResolveStreamUrl(Track track)
     {
         if (track.Source is not (StreamingProvider.Tidal or StreamingProvider.Qobuz))
@@ -175,9 +294,10 @@ public sealed class StreamingHub
         {
             var url = track.Source switch
             {
-                StreamingProvider.Tidal => FetchTidalManifestUrl(track, GetToken(track.Source)),
+                StreamingProvider.Tidal => FetchTidalUrl(track),
                 StreamingProvider.Qobuz => FetchQobuzFileUrl(track, GetToken(track.Source)),
-                _ => null
+                StreamingProvider.Local => null,
+                _ => throw Unexpected(track.Source)
             };
             if (!string.IsNullOrWhiteSpace(url))
             {
@@ -191,65 +311,163 @@ public sealed class StreamingHub
         }
     }
 
+    public string? ResolvePlayablePath(Track track)
+    {
+        if (!string.IsNullOrWhiteSpace(track.LocalPath))
+            return track.LocalPath;
+
+        if (track.Source == StreamingProvider.Tidal
+            && HasLiveCredentials(StreamingProvider.Tidal)
+            && IsConnected(StreamingProvider.Tidal))
+        {
+            var sid = track.StreamingId
+                      ?? track.Id.Replace("tr-tidal-", "", StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(sid)
+                && !string.Equals(sid, "take-five-demo", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{_streamBaseUrl}/api/stream/tidal/{Uri.EscapeDataString(sid)}";
+            }
+        }
+
+        return ResolveStreamUrl(track);
+    }
+
+    /// <summary>Tidal CDN URL에 Bearer를 붙여 Output이 Range로 읽을 수 있게 중계한다.</summary>
+    public async Task ProxyTidalStreamAsync(HttpContext http, string trackId, CancellationToken ct = default)
+    {
+        if (!IsConnected(StreamingProvider.Tidal) || !EnsureFreshTidalToken())
+        {
+            http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var token = GetToken(StreamingProvider.Tidal);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var upstream = Tidal.FetchPlaybackUrl(token, trackId, _tidalCountry);
+        if (string.IsNullOrWhiteSpace(upstream))
+        {
+            http.Response.StatusCode = StatusCodes.Status404NotFound;
+            await http.Response.WriteAsync(Tidal.LastError ?? "playback url unavailable", ct).ConfigureAwait(false);
+            return;
+        }
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, upstream);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (http.Request.Headers.TryGetValue("Range", out var range))
+            req.Headers.TryAddWithoutValidation("Range", range.ToString());
+
+        using var res = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        http.Response.StatusCode = (int)res.StatusCode;
+        if (res.Content.Headers.ContentType is not null)
+            http.Response.ContentType = res.Content.Headers.ContentType.ToString();
+        if (res.Content.Headers.ContentLength is not null)
+            http.Response.ContentLength = res.Content.Headers.ContentLength;
+        if (res.Content.Headers.ContentRange is not null)
+            http.Response.Headers.ContentRange = res.Content.Headers.ContentRange.ToString();
+        await res.Content.CopyToAsync(http.Response.Body, ct).ConfigureAwait(false);
+    }
+
+    private string? FetchTidalUrl(Track track)
+    {
+        if (!EnsureFreshTidalToken()) return null;
+        var token = GetToken(StreamingProvider.Tidal);
+        if (string.IsNullOrWhiteSpace(token)) return null;
+        var id = track.StreamingId ?? track.Id.Replace("tr-tidal-", "", StringComparison.OrdinalIgnoreCase);
+        return Tidal.FetchPlaybackUrl(token, id, _tidalCountry);
+    }
+
+    private bool EnsureFreshTidalToken()
+    {
+        lock (_gate)
+        {
+            if (!_accounts.TryGetValue(StreamingProvider.Tidal, out var acc) || !acc.Connected)
+                return false;
+            if (LooksDemo(acc.Token)) return false;
+            if (acc.ExpiresAt is null || acc.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(2))
+                return true;
+            if (string.IsNullOrWhiteSpace(acc.RefreshToken)) return false;
+            var next = Tidal.Refresh(acc.RefreshToken);
+            if (next is null) return false;
+            acc.Token = next.AccessToken;
+            acc.RefreshToken = next.RefreshToken ?? acc.RefreshToken;
+            acc.ExpiresAt = next.ExpiresAt;
+        }
+        Save();
+        return true;
+    }
+
     private string? GetToken(StreamingProvider provider)
     {
         lock (_gate) return _accounts.TryGetValue(provider, out var a) ? a.Token : null;
     }
 
+    private string? DisplayName(StreamingProvider provider)
+    {
+        lock (_gate) return _accounts.TryGetValue(provider, out var a) ? a.DisplayName : provider.ToString();
+    }
+
     private static bool LooksLikeAuthCode(string? value)
+        => !string.IsNullOrWhiteSpace(value) && !LooksDemo(value);
+
+    private static bool LooksDemo(string? value)
+        => !string.IsNullOrWhiteSpace(value) && value.StartsWith("demo-", StringComparison.OrdinalIgnoreCase);
+
+    private static bool LooksLikeLiveAccessToken(string? value)
         => !string.IsNullOrWhiteSpace(value)
-           && !value.StartsWith("demo-", StringComparison.OrdinalIgnoreCase)
-           && value.Length < 200;
+           && !LooksDemo(value)
+           && value.Count(c => c == '.') == 2
+           && value.Length > 40;
 
-    private string BuildTidalAuthUrl(string state, string redirect)
-    {
-        var clientId = Env("MONO_TIDAL_CLIENT_ID") ?? "MONO_TIDAL_CLIENT";
-        return $"https://login.tidal.com/authorize?response_type=code&client_id={Uri.EscapeDataString(clientId)}"
-               + $"&redirect_uri={Uri.EscapeDataString(redirect)}&state={state}&scope=r_usr+w_usr";
-    }
-
-    private string BuildQobuzAuthUrl(string state, string redirect)
-    {
-        var appId = Env("MONO_QOBUZ_APP_ID") ?? "MONO_QOBUZ_CLIENT";
-        return $"https://www.qobuz.com/login?state={state}&client_id={Uri.EscapeDataString(appId)}"
-               + $"&redirect_uri={Uri.EscapeDataString(redirect)}";
-    }
-
-    private string? ExchangeCodeForToken(StreamingProvider provider, string code)
+    private void ImportLiveNow(StreamingProvider provider, string token, TidalProfile? profile)
     {
         try
         {
-            return provider switch
+            if (provider == StreamingProvider.Tidal)
             {
-                StreamingProvider.Tidal => ExchangeTidal(code),
-                StreamingProvider.Qobuz => ExchangeQobuz(code),
-                _ => null
-            };
+                if (!EnsureFreshTidalToken()) return;
+                var access = GetToken(StreamingProvider.Tidal) ?? token;
+                ImportTidal(access, profile);
+            }
+            else if (provider == StreamingProvider.Qobuz)
+                ImportQobuzFavoritesAsync(token).GetAwaiter().GetResult();
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            LastImportNote = ex.Message;
+        }
     }
 
-    private static string? ExchangeTidal(string code)
+    private void ImportTidal(string token, TidalProfile? profile)
     {
-        var clientId = Env("MONO_TIDAL_CLIENT_ID");
-        var secret = Env("MONO_TIDAL_CLIENT_SECRET");
-        var redirect = Env("MONO_OAUTH_REDIRECT") ?? "http://127.0.0.1:7702/oauth/callback";
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(secret))
-            return null;
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, "https://auth.tidal.com/v1/oauth2/token");
-        var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{secret}"));
-        req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
-        req.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        profile ??= Tidal.FetchProfile(token);
+        _tidalCountry = profile.Country;
+        LastImportNote = null;
+        var before = LiveTrackCount();
+        foreach (var hit in Tidal.FetchFavorites(token, profile, 40))
+            UpsertTidalHit(hit);
+        foreach (var seed in new[] { "Miles Davis", "Hiromi", "Kind of Blue", "Daft Punk" })
         {
-            ["grant_type"] = "authorization_code",
-            ["code"] = code,
-            ["redirect_uri"] = redirect
-        });
-        using var res = Http.Send(req);
-        if (!res.IsSuccessStatusCode) return null;
-        using var doc = JsonDocument.Parse(res.Content.ReadAsStream());
-        return doc.RootElement.TryGetProperty("access_token", out var t) ? t.GetString() : null;
+            foreach (var hit in Tidal.Search(token, seed, _tidalCountry, 12))
+                UpsertTidalHit(hit);
+        }
+
+        var added = LiveTrackCount() - before;
+        LastImportNote = added > 0
+            ? $"{added}곡을 Tidal에서 가져왔습니다."
+            : (Tidal.LastError ?? "Tidal API가 곡을 돌려주지 않았습니다.");
+    }
+
+    private static string BuildQobuzAuthUrl(string state)
+    {
+        var appId = Env("MONO_QOBUZ_APP_ID") ?? "MONO_QOBUZ_CLIENT";
+        var redirect = Env("MONO_OAUTH_REDIRECT") ?? TidalClient.DefaultRedirect;
+        return $"https://www.qobuz.com/login?state={state}&client_id={Uri.EscapeDataString(appId)}"
+               + $"&redirect_uri={Uri.EscapeDataString(redirect)}";
     }
 
     private static string? ExchangeQobuz(string code)
@@ -270,40 +488,18 @@ public sealed class StreamingHub
         return doc.RootElement.TryGetProperty("token", out var t2) ? t2.GetString() : null;
     }
 
-    private async Task TryImportLiveCatalogAsync(StreamingProvider provider, string token)
-    {
-        try
-        {
-            if (provider == StreamingProvider.Tidal)
-                await ImportTidalFavoritesAsync(token).ConfigureAwait(false);
-            else if (provider == StreamingProvider.Qobuz)
-                await ImportQobuzFavoritesAsync(token).ConfigureAwait(false);
-        }
-        catch { /* keep demo seed */ }
-    }
-
-    private async Task ImportTidalFavoritesAsync(string token)
-    {
-        using var req = new HttpRequestMessage(HttpMethod.Get, "https://api.tidal.com/v1/users/me/favorites/tracks?limit=20&countryCode=US");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var res = await Http.SendAsync(req).ConfigureAwait(false);
-        if (!res.IsSuccessStatusCode) return;
-        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync().ConfigureAwait(false));
-        if (!doc.RootElement.TryGetProperty("items", out var items)) return;
-        var n = 0;
-        foreach (var item in items.EnumerateArray())
-        {
-            var track = item.TryGetProperty("item", out var inner) ? inner : item;
-            if (!track.TryGetProperty("id", out var idEl)) continue;
-            var sid = idEl.ToString();
-            var title = track.TryGetProperty("title", out var t) ? t.GetString() ?? "Track" : "Track";
-            var artistName = "TIDAL";
-            if (track.TryGetProperty("artists", out var artists) && artists.GetArrayLength() > 0)
-                artistName = artists[0].TryGetProperty("name", out var an) ? an.GetString() ?? artistName : artistName;
-            UpsertStreamingTrack(StreamingProvider.Tidal, "tr-tidal-" + sid, sid, title, artistName, "TIDAL", 96000, 24, StreamingQuality.Max);
-            if (++n >= 12) break;
-        }
-    }
+    private void UpsertTidalHit(TidalTrackHit hit)
+        => UpsertStreamingTrack(
+            StreamingProvider.Tidal,
+            "tr-tidal-" + hit.Id,
+            hit.Id,
+            hit.Title,
+            hit.Artist,
+            hit.Album,
+            96000,
+            24,
+            StreamingQuality.Max,
+            hit.DurationMs);
 
     private async Task ImportQobuzFavoritesAsync(string token)
     {
@@ -325,14 +521,14 @@ public sealed class StreamingHub
             var artistName = track.TryGetProperty("performer", out var p) && p.TryGetProperty("name", out var pn)
                 ? pn.GetString() ?? "Qobuz"
                 : "Qobuz";
-            UpsertStreamingTrack(StreamingProvider.Qobuz, "tr-qobuz-" + sid, sid, title, artistName, "Qobuz", 192000, 24, StreamingQuality.Studio);
+            UpsertStreamingTrack(StreamingProvider.Qobuz, "tr-qobuz-" + sid, sid, title, artistName, "Qobuz", 192000, 24, StreamingQuality.Studio, 180000);
             if (++n >= 12) break;
         }
     }
 
     private void UpsertStreamingTrack(
         StreamingProvider provider, string trackId, string streamingId, string title, string artistName,
-        string albumTitle, int rate, int depth, StreamingQuality quality)
+        string albumTitle, int rate, int depth, StreamingQuality quality, long durationMs)
     {
         var artistId = "ar-stream-" + Sanitize(artistName);
         var albumId = "al-stream-" + Sanitize(albumTitle) + "-" + provider;
@@ -359,39 +555,11 @@ public sealed class StreamingHub
             SampleRate = rate,
             BitDepth = depth,
             Channels = 2,
-            DurationMs = 180000,
+            DurationMs = durationMs > 0 ? durationMs : 180000,
             Source = provider,
             StreamingId = streamingId,
             StreamingQuality = quality
         }, album, artist);
-    }
-
-    private string? FetchTidalManifestUrl(Track track, string? token)
-    {
-        if (string.IsNullOrWhiteSpace(token)) return null;
-        var id = track.StreamingId ?? track.Id.Replace("tr-tidal-", "", StringComparison.OrdinalIgnoreCase);
-        using var req = new HttpRequestMessage(HttpMethod.Get,
-            $"https://api.tidal.com/v1/tracks/{Uri.EscapeDataString(id)}/playbackinfopostpaywall?playbackmode=STREAM&assetpresentation=FULL&audioquality=HI_RES");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var res = Http.Send(req);
-        if (!res.IsSuccessStatusCode) return null;
-        using var doc = JsonDocument.Parse(res.Content.ReadAsStream());
-        if (!doc.RootElement.TryGetProperty("manifest", out var man)) return null;
-        var raw = man.GetString();
-        if (string.IsNullOrWhiteSpace(raw)) return null;
-        try
-        {
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(raw));
-            using var mdoc = JsonDocument.Parse(json);
-            if (mdoc.RootElement.TryGetProperty("urls", out var urls) && urls.GetArrayLength() > 0)
-                return urls[0].GetString();
-        }
-        catch
-        {
-            if (raw.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                return raw;
-        }
-        return null;
     }
 
     private string? FetchQobuzFileUrl(Track track, string? token)
@@ -412,7 +580,9 @@ public sealed class StreamingHub
         var (trackId, artistId, artistName, albumId, albumTitle, trackTitle, rate, depth, quality, streamingId) = provider switch
         {
             StreamingProvider.Qobuz => ("tr-qobuz-spectrum", "ar-hiromi", "Hiromi", "al-spectrum", "Spectrum", "Spectrum", 192000, 24, StreamingQuality.Studio, "spectrum-demo"),
-            _ => ("tr-tidal-time-out", "ar-brubeck", "Dave Brubeck", "al-time-out", "Time Out", "Take Five", 96000, 24, StreamingQuality.Max, "take-five-demo")
+            StreamingProvider.Tidal => ("tr-tidal-time-out", "ar-brubeck", "Dave Brubeck", "al-time-out", "Time Out", "Take Five", 96000, 24, StreamingQuality.Max, "take-five-demo"),
+            StreamingProvider.Local => throw new InvalidOperationException("local is not a streaming seed"),
+            _ => throw Unexpected(provider)
         };
 
         var artist = _catalog.Artists.GetValueOrDefault(artistId) ?? new Artist
@@ -452,13 +622,75 @@ public sealed class StreamingHub
         }, album, artist);
     }
 
+    private void Load()
+    {
+        if (string.IsNullOrWhiteSpace(_storePath) || !File.Exists(_storePath)) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(_storePath));
+            if (!doc.RootElement.TryGetProperty("accounts", out var accounts)) return;
+            foreach (var el in accounts.EnumerateArray())
+            {
+                if (!el.TryGetProperty("provider", out var pEl)) continue;
+                if (!Enum.TryParse<StreamingProvider>(pEl.GetString(), out var provider) || provider == StreamingProvider.Local)
+                    continue;
+                var token = el.TryGetProperty("token", out var t) ? t.GetString() : null;
+                if (string.IsNullOrWhiteSpace(token)) continue;
+                var name = el.TryGetProperty("displayName", out var n) ? n.GetString() : provider.ToString();
+                var refresh = el.TryGetProperty("refreshToken", out var r) ? r.GetString() : null;
+                DateTimeOffset? exp = null;
+                if (el.TryGetProperty("expiresAt", out var e) && DateTimeOffset.TryParse(e.GetString(), out var parsed))
+                    exp = parsed;
+                if (el.TryGetProperty("country", out var c) && provider == StreamingProvider.Tidal)
+                    _tidalCountry = c.GetString() ?? _tidalCountry;
+                Link(provider, token, name, refresh, exp, profile: null);
+            }
+        }
+        catch { /* corrupt store */ }
+    }
+
+    private void Save()
+    {
+        if (string.IsNullOrWhiteSpace(_storePath)) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_storePath)!);
+            object payload;
+            lock (_gate)
+            {
+                payload = new
+                {
+                    country = _tidalCountry,
+                    accounts = _accounts.Values.Select(a => new
+                    {
+                        provider = a.Provider.ToString(),
+                        token = a.Token,
+                        refreshToken = a.RefreshToken,
+                        expiresAt = a.ExpiresAt,
+                        displayName = a.DisplayName,
+                        country = a.Provider == StreamingProvider.Tidal ? _tidalCountry : null
+                    }).ToList()
+                };
+            }
+            File.WriteAllText(_storePath, JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false }));
+        }
+        catch { /* disk full / locked */ }
+    }
+
     private static string Sanitize(string s)
         => new(s.Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-').ToArray());
 
-    private static string? Env(string key)
+    private static string? Env(string key) => CredentialStore.Get(key);
+
+    private static ArgumentOutOfRangeException Unexpected(StreamingProvider provider)
+        => new(nameof(provider), provider, null);
+
+    private static bool InTestHost()
     {
-        var v = Environment.GetEnvironmentVariable(key);
-        return string.IsNullOrWhiteSpace(v) ? null : v.Trim();
+        var entry = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "";
+        var domain = AppDomain.CurrentDomain.FriendlyName;
+        return entry.Contains("testhost", StringComparison.OrdinalIgnoreCase)
+               || domain.Contains("testhost", StringComparison.OrdinalIgnoreCase);
     }
 
     private static HttpClient CreateHttp()
@@ -467,4 +699,6 @@ public sealed class StreamingHub
         c.DefaultRequestHeaders.UserAgent.ParseAdd("Mono/0.1 (+https://github.com/GabrielJung0727/music-program)");
         return c;
     }
+
+    private sealed record PendingAuth(string State, string Verifier);
 }

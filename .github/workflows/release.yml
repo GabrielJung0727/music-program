@@ -34,6 +34,14 @@ jobs:
             8.0.x
             10.0.x
 
+      # Control UI 는 React 다. publish.ps1 이 npm ci · npm run build 를 돌리므로
+      # Node 가 없으면 패키지 단계에서 멈춘다.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/Mono.Web/package-lock.json
+
       - name: dotnet 전역 도구 PATH 등록
         shell: pwsh
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File $env:GITHUB_PATH -Append -Encoding utf8

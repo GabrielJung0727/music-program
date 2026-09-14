@@ -26,6 +26,12 @@ public sealed class Track
 
     /// <summary>파일 태그의 작곡가. Composers·Compositions 화면의 근거다.</summary>
     public List<string> Composers { get; init; } = [];
+
+    /// <summary>
+    /// 라이브러리에 처음 들어온 시각. 홈의 "최근 추가" 정렬 근거다.
+    /// 재스캔으로 갱신하지 않는다 — 재스캔마다 순서가 뒤집히면 쓸모가 없다.
+    /// </summary>
+    public DateTimeOffset AddedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class Album
@@ -134,6 +140,13 @@ public sealed class PeerStats
     public int BufferMs { get; set; }
     public int Resyncs { get; set; }
     public bool Locked { get; set; }
+
+    /// <summary>출력 장치 상태 머신의 현재 값. 0=Idle 2=ExclusiveStreaming 4=DeviceBusyLocked 6=DeviceLostSuspend.</summary>
+    public int DeviceState { get; set; }
+
+    /// <summary>재생을 보류한 사유. 점유 충돌·장치 분리처럼 사용자가 조치해야 하는 것만 담는다.</summary>
+    public string? DeviceError { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -177,6 +190,8 @@ public sealed class StreamingAccount
 {
     public required StreamingProvider Provider { get; init; }
     public required string Token { get; set; }
+    public string? RefreshToken { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
     public bool Connected { get; set; }
     public string? DisplayName { get; set; }
 }

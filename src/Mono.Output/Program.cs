@@ -16,15 +16,40 @@ var invite = Arg("--invite=");
 var deviceHint = Arg("--device=");
 var peerId = Arg("--peer=") ?? "out-" + Guid.NewGuid().ToString("n")[..6];
 var displayName = Arg("--name=") ?? Environment.MachineName;
-var forceShared = args.Contains("--shared");
+// 장치는 등록 시 한 모드로 고정된다. 묵시적 강등은 없다.
+var deviceMode = args.Contains("--shared") ? DeviceMode.SystemShared : DeviceMode.BitPerfectExclusive;
 var claimDsd = args.Contains("--dsd");
 var preferAsio = args.Contains("--asio");
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
 const int matpPort = 7701;
 
-var renderer = preferAsio
-    ? (IAudioRenderer)(AsioAudioRenderer.TryCreate(deviceHint) ?? (IAudioRenderer)new Renderer(deviceHint, forceShared))
-    : new Renderer(deviceHint, forceShared);
+// ASIO 드라이버 목록은 진단에 중요하다 — 전문 인터페이스에서 배타가 거절될 때
+// 대안이 실제로 있는지 없는지를 이 줄로 판별한다.
+var asioDrivers = AsioAudioRenderer.DriverNames();
+Console.WriteLine(asioDrivers.Length > 0
+    ? "ASIO 드라이버: " + string.Join(" · ", asioDrivers)
+    : "ASIO 드라이버 없음");
+
+IAudioOutputDevice renderer;
+if (preferAsio)
+{
+    var asio = AsioAudioRenderer.TryCreate(deviceHint, out var asioError);
+    if (asio is null)
+    {
+        // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 사유까지 남긴다.
+        Console.WriteLine($"ASIO 를 열지 못했습니다 ({asioError}) — WASAPI 로 진행합니다.");
+        renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+    }
+    else
+    {
+        renderer = asio;
+    }
+}
+else
+{
+    renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+}
+var caps = renderer.GetSupportedFormats();
 var timeline = new Timeline();
 var clock = new ClockState();
 var frames = new ConcurrentQueue<MatpAudio>();
@@ -36,6 +61,8 @@ var lastLog = DateTimeOffset.MinValue;
 
 Console.WriteLine($"Mono Output {peerId} → {host}:{matpPort}  device={renderer.DeviceName}");
 Console.WriteLine(renderer.HardwareVolume ? "하드웨어 볼륨 사용 가능 (bit-perfect 유지)" : "하드웨어 볼륨 없음 — 룸이 허용할 때만 디지털 감쇠");
+Console.WriteLine($"mode={deviceMode} exclusiveCapable={caps.SupportsExclusive} " +
+                  $"rates=[{string.Join(",", caps.SampleRates)}] depths=[{string.Join(",", caps.BitDepths)}]");
 
 using var client = new TcpClient { NoDelay = true };
 await client.ConnectAsync(host, matpPort);
@@ -53,17 +80,44 @@ await Send(new MonoMessage
     Role = "output",
     DisplayName = displayName,
     Device = renderer.DeviceName,
-    MaxSampleRate = renderer.MaxSampleRate,
-    MaxBitDepth = renderer.MaxBitDepth,
+    MaxSampleRate = caps.SampleRates.Count > 0 ? caps.SampleRates.Max() : 48000,
+    MaxBitDepth = caps.BitDepths.Count > 0 ? caps.BitDepths.Max() : 16,
     SupportsDsd = claimDsd,
-    ExclusiveMode = !forceShared,
+    ExclusiveMode = deviceMode == DeviceMode.BitPerfectExclusive,
     LatencyMs = renderer.LatencyMs,
     HardwareVolume = renderer.HardwareVolume,
     Volume = volumePercent
 });
 
 var clockLoop = Task.Run(() => ClockLoopAsync(cts.Token));
-var renderLoop = Task.Run(() => RenderLoopAsync(cts.Token));
+
+// 렌더 루프는 전용 스레드에서 돈다. 스레드풀에서 await 로 돌면 스레드가 계속 바뀌어
+// MMCSS 등록(스레드 단위)이 아무 효과가 없다.
+var renderThread = new Thread(() =>
+{
+    var mmcss = Mmcss.Register(out var mmcssStatus);
+    var fineTimer = Mmcss.RaiseTimerResolution();
+    Console.WriteLine($"render thread · {mmcssStatus} · timer={(fineTimer ? "1ms" : "기본")}");
+    try
+    {
+        RenderLoop(cts.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        // 정상 종료
+    }
+    finally
+    {
+        Mmcss.Revert(mmcss);
+        if (fineTimer) Mmcss.RestoreTimerResolution();
+    }
+})
+{
+    IsBackground = true,
+    Priority = ThreadPriority.Highest,
+    Name = "mono-render"
+};
+renderThread.Start();
 
 try
 {
@@ -157,7 +211,8 @@ finally
     renderer.Dispose();
 }
 
-await Task.WhenAny(Task.WhenAll(clockLoop, renderLoop), Task.Delay(500));
+await Task.WhenAny(clockLoop, Task.Delay(500));
+renderThread.Join(500);
 return;
 
 async Task ClockLoopAsync(CancellationToken ct)
@@ -179,7 +234,9 @@ async Task ClockLoopAsync(CancellationToken ct)
                     RttMs = clock.RttMs,
                     BufferMs = (int)renderer.BufferedMs,
                     Resyncs = resyncs + drops,
-                    Locked = renderer.Playing && Math.Abs(renderer.BufferedMs - clock.TargetBufferMs) < 40
+                    Locked = renderer.Playing && Math.Abs(renderer.BufferedMs - clock.TargetBufferMs) < 40,
+                    DeviceState = (int)renderer.GetCurrentState(),
+                    DeviceError = renderer.LastError
                 });
             }
         }
@@ -192,8 +249,15 @@ async Task ClockLoopAsync(CancellationToken ct)
     }
 }
 
+double DepthCeilingMs(MatpAudio frame)
+    => RenderGate.DepthCeilingMs(
+        clock.TargetBufferMs,
+        renderer.LatencyMs,
+        RenderGate.FrameDurationMs(frame.Payload.Length, frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd),
+        renderer.CapacityMs);
+
 // 렌더 루프: PTS가 도래한 프레임만 DAC 버퍼로 넘긴다. 소셜/네트워크 처리와 스레드를 나눈다.
-async Task RenderLoopAsync(CancellationToken ct)
+void RenderLoop(CancellationToken ct)
 {
     ILocalChunkSource? local = null;
     var lastEpoch = long.MinValue;
@@ -205,7 +269,15 @@ async Task RenderLoopAsync(CancellationToken ct)
             {
                 var firstLock = lastEpoch == long.MinValue;
                 lastEpoch = timeline.Epoch;
-                frames.Clear();
+
+                // 지난 epoch 의 프레임만 걷어낸다. 통째로 비우면 곡을 넘긴 직후 Core 가 한꺼번에
+                // 보내 둔 새 곡의 룩어헤드(약 320ms)까지 함께 지워져, 새 곡이 앞부분을 잃고
+                // 한참 뒤에서 튀어나온다. 수신 루프는 이미 새 epoch 기준으로 받아들이고 있다.
+                foreach (var keep in RenderGate.DropStaleEpochs(frames, timeline.Epoch))
+                {
+                    frames.Enqueue(keep);
+                }
+
                 renderer.Flush();
                 local?.Dispose();
                 local = null;
@@ -218,31 +290,43 @@ async Task RenderLoopAsync(CancellationToken ct)
             if (timeline.ClockSyncMode)
             {
                 // Clock-sync: Core는 파일을 보내지 않는다. 같은 트랙을 내 소스로 열어 같은 시각에 재생한다.
+                renderer.PrimeMs = clock.TargetBufferMs;
                 if (timeline.Playing && timeline.LocalPath is not null)
                 {
                     local ??= LocalFileRenderer.TryOpen(timeline.LocalPath);
                     if (local is not null)
                     {
-                        var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
-                        var chunk = local.Read(mediaNow, 40, out var fmt);
-                        if (chunk.Length > 0)
+                        // 40ms를 20ms마다 밀어 넣으면 버퍼가 계속 불어 DiscardOnOverflow 로 지직거린다.
+                        var ceiling = Math.Max(clock.TargetBufferMs + 60, 100);
+                        if (!renderer.Playing || renderer.BufferedMs < ceiling)
                         {
-                            renderer.Push(chunk, fmt.rate, fmt.depth, fmt.channels, volumePercent);
+                            var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
+                            var wantMs = Math.Clamp((int)Math.Ceiling(ceiling - renderer.BufferedMs), 10, 30);
+                            var chunk = local.Read(mediaNow, wantMs, out var fmt);
+                            if (chunk.Length > 0)
+                            {
+                                renderer.PushSamples(
+                                    new AudioBuffer(chunk, 0, chunk.Length, fmt.rate, fmt.depth, fmt.channels, false),
+                                    volumePercent);
+                            }
                         }
                     }
                     else if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(10))
                     {
                         lastLog = DateTimeOffset.UtcNow;
-                        Console.WriteLine("clock-sync: 로컬 파일이 없습니다 — 각자의 스트리밍 앱에서 같은 트랙을 여세요 (타임라인만 동기화).");
+                        Console.WriteLine("clock-sync: 재생 소스를 열 수 없습니다 — Tidal이면 Core 프록시(7702)와 출력 연결을 확인하세요.");
                     }
                 }
 
-                await Task.Delay(20, ct);
+                Thread.Sleep(15);
                 continue;
             }
 
             local?.Dispose();
             local = null;
+
+            // 프라임 깊이는 스케줄러가 앞당겨 잡아 둔 지터 버퍼와 같아야 동기가 맞는다.
+            renderer.PrimeMs = clock.TargetBufferMs;
 
             while (frames.TryPeek(out var head))
             {
@@ -253,11 +337,20 @@ async Task RenderLoopAsync(CancellationToken ct)
                     break;
                 }
 
-                frames.TryDequeue(out var frame);
-                if (wait < -clock.TargetBufferMs * 4)
+                // 버퍼가 깊다고 프레임을 버리면 그 자리에 파형 불연속이 남아 딸깍/지직 소리가 난다.
+                // 큐에 그대로 두고 다음 루프에서 다시 시도한다(백프레셔). PTS 게이트가 이미 속도를 맞추므로
+                // 버퍼는 곧 빠지고 프레임은 온전히 들어간다.
+                if (renderer.Playing && RenderGate.ShouldHold(renderer.BufferedMs, DepthCeilingMs(head)))
                 {
-                    // 너무 늦게 도착 — 버리고 락을 유지한다.
-                    resyncs++;
+                    break;
+                }
+
+                frames.TryDequeue(out var frame);
+                if (wait < -RenderGate.LateToleranceMs)
+                {
+                    // 너무 늦게 도착 — 버리고 락을 유지한다. 깊이 제어로 버리는 일은 이제 없으므로
+                    // drop 카운터는 오직 이 경우(지각 도착)만 센다.
+                    drops++;
                     continue;
                 }
 
@@ -270,27 +363,22 @@ async Task RenderLoopAsync(CancellationToken ct)
 
                     var (dop, rate, depth, ch) = DopEncoder.Encode(frame.Payload, frame.SampleRate, frame.Channels);
                     if (dop.Length == 0) continue;
-                    renderer.Push(dop, rate, depth, ch, volumePercent);
+                    renderer.PushSamples(new AudioBuffer(dop, 0, dop.Length, rate, depth, ch, false), volumePercent);
                     continue;
                 }
 
-                // 목표 지연 = 지터 버퍼 + DAC 자체 지연. 그보다 깊어지면 락을 유지한 채 지연만 걷어낸다.
-                var targetDepth = clock.TargetBufferMs + renderer.LatencyMs;
-                if (renderer.Playing && renderer.BufferedMs > targetDepth + 60)
+                // 스톨 등으로 백프레셔가 감당 못 할 만큼 벌어졌을 때만 비운다. 정상 재생에서는 닿지 않는다.
+                if (renderer.Playing && RenderGate.ShouldFlush(renderer.BufferedMs, DepthCeilingMs(frame)))
                 {
-                    // 큰 이탈(스톨 이후)은 한 번에 비우고 다시 락한다.
                     renderer.Flush();
                     resyncs++;
                     continue;
                 }
 
-                if (renderer.Playing && renderer.BufferedMs > targetDepth + 10)
-                {
-                    drops++;
-                    continue;
-                }
-
-                renderer.Push(frame.Payload, frame.SampleRate, frame.BitDepth, frame.Channels, volumePercent);
+                renderer.PushSamples(
+                    new AudioBuffer(frame.Payload, 0, frame.Payload.Length,
+                        frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd),
+                    volumePercent);
             }
 
             if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(5) && clock.Samples > 0)
@@ -298,8 +386,10 @@ async Task RenderLoopAsync(CancellationToken ct)
                 lastLog = DateTimeOffset.UtcNow;
                 Console.WriteLine(
                     $"clock offset={clock.OffsetMs:F2}ms jitter={clock.JitterMs:F2}ms rtt={clock.RttMs:F2}ms " +
-                    $"target={clock.TargetBufferMs}ms depth={renderer.BufferedMs:F0}ms resync={resyncs} drop={drops} " +
-                    $"{(renderer.Exclusive ? "Exclusive" : "Shared")}");
+                    $"target={clock.TargetBufferMs}ms depth={renderer.BufferedMs:F0}ms " +
+                    $"latency={renderer.LatencyMs}ms cap={renderer.CapacityMs}ms resync={resyncs} drop={drops} " +
+                    $"state={renderer.GetCurrentState()}" +
+                    (renderer.LastError is { } err ? $" · {err}" : ""));
             }
         }
         catch (OperationCanceledException)
@@ -311,7 +401,8 @@ async Task RenderLoopAsync(CancellationToken ct)
             Console.WriteLine("render: " + ex.Message);
         }
 
-        await Task.Delay(3, ct);
+        // 1ms 타이머 해상도를 올려 뒀으므로 이 대기는 실제로 ~1ms 다.
+        Thread.Sleep(1);
     }
 
     local?.Dispose();

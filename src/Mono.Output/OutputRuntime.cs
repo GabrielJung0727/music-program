@@ -79,220 +79,6 @@ public sealed class ClockState
 }
 
 /// <summary>WASAPI / ASIO 공통 출력 백엔드.</summary>
-public interface IAudioRenderer : IDisposable
-{
-    string DeviceName { get; }
-    int MaxSampleRate { get; }
-    int MaxBitDepth { get; }
-    bool HardwareVolume { get; }
-    long LatencyMs { get; }
-    bool Exclusive { get; }
-    bool Playing { get; }
-    double BufferedMs { get; }
-    void Push(byte[] pcm, int rate, int depth, int channels, int volumePercent);
-    void Flush();
-    void SetHardwareVolume(int percent);
-}
-
-/// <summary>
-/// WASAPI 렌더러. Exclusive를 먼저 시도하고 실패하면 Shared로 내려간다.
-/// 볼륨은 가능하면 하드웨어 엔드포인트 볼륨을 쓴다(디지털 감쇠 회피).
-/// </summary>
-public sealed class Renderer : IAudioRenderer, IDisposable
-{
-    private readonly bool _forceShared;
-    private readonly MMDevice? _device;
-    private readonly object _gate = new();
-    private WasapiOut? _out;
-    private BufferedWaveProvider? _buffer;
-
-    public Renderer(string? deviceHint, bool forceShared)
-    {
-        _forceShared = forceShared;
-        try
-        {
-            var enumerator = new MMDeviceEnumerator();
-            var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active).ToList();
-            _device = deviceHint is null
-                ? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
-                : devices.FirstOrDefault(d => d.FriendlyName.Contains(deviceHint, StringComparison.OrdinalIgnoreCase))
-                  ?? enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            DeviceName = _device.FriendlyName;
-            var mix = _device.AudioClient.MixFormat;
-            MaxSampleRate = Math.Max(mix.SampleRate, 192000);
-            MaxBitDepth = Math.Max(mix.BitsPerSample, 24);
-            HardwareVolume = true;
-        }
-        catch (Exception)
-        {
-            DeviceName = "default";
-            MaxSampleRate = 192000;
-            MaxBitDepth = 24;
-            HardwareVolume = false;
-        }
-    }
-
-    public string DeviceName { get; }
-    public int MaxSampleRate { get; }
-    public int MaxBitDepth { get; }
-    public bool HardwareVolume { get; }
-    public long LatencyMs { get; private set; } = 10;
-    public bool Exclusive { get; private set; }
-    public bool Playing => _out?.PlaybackState == PlaybackState.Playing;
-
-    public double BufferedMs
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _buffer?.BufferedDuration.TotalMilliseconds ?? 0;
-            }
-        }
-    }
-
-    /// <summary>목표 버퍼 대비 실제 버퍼의 어긋남. 락 판정에 쓴다.</summary>
-    public double DriftMs { get; private set; }
-
-    public void Push(byte[] pcm, int rate, int depth, int channels, int volumePercent)
-    {
-        if (pcm.Length == 0)
-        {
-            return;
-        }
-
-        lock (_gate)
-        {
-            var bits = depth >= 24 ? 24 : 16;
-            if (_buffer is null
-                || _buffer.WaveFormat.SampleRate != rate
-                || _buffer.WaveFormat.BitsPerSample != bits
-                || _buffer.WaveFormat.Channels != Math.Max(channels, 1))
-            {
-                Open(rate, bits, Math.Max(channels, 1));
-            }
-
-            var payload = pcm;
-            if (!HardwareVolume && volumePercent < 100)
-            {
-                payload = Attenuate(pcm, bits, volumePercent);
-            }
-
-            _buffer!.AddSamples(payload, 0, payload.Length);
-            DriftMs = _buffer.BufferedDuration.TotalMilliseconds - LatencyMs;
-        }
-    }
-
-    public void Flush()
-    {
-        lock (_gate)
-        {
-            _buffer?.ClearBuffer();
-        }
-    }
-
-    public void SetHardwareVolume(int percent)
-    {
-        if (_device is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _device.AudioEndpointVolume.MasterVolumeLevelScalar = Math.Clamp(percent, 0, 100) / 100f;
-        }
-        catch (Exception)
-        {
-            // 하드웨어 볼륨을 못 쓰면 Push에서 디지털 감쇠로 처리한다.
-        }
-    }
-
-    private void Open(int rate, int bits, int channels)
-    {
-        _out?.Stop();
-        _out?.Dispose();
-        var format = bits >= 24
-            ? WaveFormat.CreateCustomFormat(WaveFormatEncoding.Pcm, rate, channels, rate * channels * 3, channels * 3, 24)
-            : new WaveFormat(rate, 16, channels);
-        _buffer = new BufferedWaveProvider(format)
-        {
-            DiscardOnBufferOverflow = true,
-            BufferDuration = TimeSpan.FromMilliseconds(400)
-        };
-
-        if (!_forceShared && _device is not null)
-        {
-            try
-            {
-                var exclusive = new WasapiOut(_device, AudioClientShareMode.Exclusive, true, 10);
-                exclusive.Init(_buffer);
-                exclusive.Play();
-                _out = exclusive;
-                Exclusive = true;
-                LatencyMs = 10;
-                return;
-            }
-            catch (Exception)
-            {
-                // 배타 모드가 이 포맷을 못 받으면 공유 모드로 내려간다.
-            }
-        }
-
-        var shared = _device is null
-            ? new WasapiOut(AudioClientShareMode.Shared, 20)
-            : new WasapiOut(_device, AudioClientShareMode.Shared, true, 20);
-        shared.Init(_buffer);
-        shared.Play();
-        _out = shared;
-        Exclusive = false;
-        LatencyMs = 20;
-    }
-
-    private static byte[] Attenuate(byte[] pcm, int bits, int percent)
-    {
-        var gain = Math.Clamp(percent, 0, 100) / 100f;
-        var copy = new byte[pcm.Length];
-        Buffer.BlockCopy(pcm, 0, copy, 0, pcm.Length);
-        if (bits == 16)
-        {
-            for (var i = 0; i + 1 < copy.Length; i += 2)
-            {
-                var s = (short)(BitConverter.ToInt16(copy, i) * gain);
-                BitConverter.TryWriteBytes(copy.AsSpan(i), s);
-            }
-
-            return copy;
-        }
-
-        for (var i = 0; i + 2 < copy.Length; i += 3)
-        {
-            var v = copy[i] | (copy[i + 1] << 8) | (copy[i + 2] << 16);
-            if ((v & 0x800000) != 0)
-            {
-                v |= unchecked((int)0xFF000000);
-            }
-
-            v = (int)(v * gain);
-            copy[i] = (byte)v;
-            copy[i + 1] = (byte)(v >> 8);
-            copy[i + 2] = (byte)(v >> 16);
-        }
-
-        return copy;
-    }
-
-    public void Dispose()
-    {
-        lock (_gate)
-        {
-            _out?.Stop();
-            _out?.Dispose();
-            _out = null;
-            _device?.Dispose();
-        }
-    }
-}
 
 /// <summary>
 /// Clock-sync 모드에서 이 엔드포인트가 자기 로컬 파일을 직접 여는 경로.
@@ -320,6 +106,10 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 
     public static ILocalChunkSource? TryOpen(string path)
     {
+        if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return MfStreamingLocalRenderer.TryOpen(path);
+
         if (!File.Exists(path))
             return null;
 
@@ -398,15 +188,17 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 /// <summary>FLAC/MP3 등 Media Foundation 구간 디코드 (Clock-sync 로컬). 전량 RAM 적재 없음.</summary>
 file sealed class MfStreamingLocalRenderer : ILocalChunkSource
 {
-    private readonly AudioFileReader _reader;
+    private readonly WaveStream _reader;
+    private readonly ISampleProvider _samples;
     private readonly object _gate = new();
     private readonly int _rate;
     private readonly int _channels;
     private long _cursorMs = -1;
 
-    private MfStreamingLocalRenderer(AudioFileReader reader)
+    private MfStreamingLocalRenderer(WaveStream reader)
     {
         _reader = reader;
+        _samples = reader is AudioFileReader afr ? afr : reader.ToSampleProvider();
         _rate = reader.WaveFormat.SampleRate;
         _channels = Math.Max(reader.WaveFormat.Channels, 1);
     }
@@ -414,7 +206,11 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
     public static MfStreamingLocalRenderer? TryOpen(string path)
     {
         try { return new MfStreamingLocalRenderer(new AudioFileReader(path)); }
-        catch { return null; }
+        catch
+        {
+            try { return new MfStreamingLocalRenderer(new MediaFoundationReader(path)); }
+            catch { return null; }
+        }
     }
 
     public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
@@ -432,7 +228,7 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
             var frames = Math.Max(1, durationMs * _rate / 1000);
             var samplesNeeded = frames * _channels;
             var floatBuf = new float[samplesNeeded];
-            var n = _reader.Read(floatBuf, 0, samplesNeeded);
+            var n = _samples.Read(floatBuf, 0, samplesNeeded);
             _cursorMs = target + durationMs;
             if (n <= 0) return [];
             if (n < samplesNeeded) Array.Resize(ref floatBuf, n);

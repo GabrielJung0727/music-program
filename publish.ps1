@@ -1,11 +1,11 @@
 ## mono – Self-Contained + Velopack 릴리스
 ## 대상: Windows 11 x64
 ##
-##   .\publish.ps1 -Version 0.1.3
-##   .\publish.ps1 -Version 0.1.3 -SkipZip -GitHubRelease
+##   .\publish.ps1 -Version 0.2.0
+##   .\publish.ps1 -Version 0.2.0 -SkipZip -GitHubRelease
 
 param(
-    [string]$Version = "0.1.3",
+    [string]$Version = "0.2.0",
     [switch]$GitHubRelease,
     [switch]$SkipZip,
     ## CI용. 자체 서명 인증서를 만들지 않는다 — 릴리스마다 다른, 신뢰받지 못하는 인증서가
@@ -158,6 +158,25 @@ $commonArgs = @(
 )
 
 Write-Host ">>> 버전 $Version" -ForegroundColor Cyan
+
+# Control UI(React)를 먼저 빌드한다. 산출물은 src/Mono.Core/wwwroot 로 떨어지고,
+# Mono.Core publish 가 그걸 exe 옆으로 실어 간다. 순서가 바뀌면 빈 화면이 나간다.
+Write-Host '>>> Mono.Web (Control UI)' -ForegroundColor Cyan
+$webDir = Join-Path $PSScriptRoot 'src\Mono.Web'
+Push-Location $webDir
+try {
+    if (-not (Test-Path (Join-Path $webDir 'node_modules'))) {
+        npm ci --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { throw "Mono.Web npm ci failed" }
+    }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { throw "Mono.Web build failed" }
+}
+finally { Pop-Location }
+
+$bundle = Join-Path $PSScriptRoot 'src\Mono.Core\wwwroot\index.html'
+if (-not (Test-Path $bundle)) { throw "Control UI 번들이 없습니다: $bundle" }
+
 Write-Host '>>> Mono.Core' -ForegroundColor Cyan
 dotnet publish src/Mono.Core/Mono.Core.csproj @commonArgs
 if ($LASTEXITCODE -ne 0) { throw "Core publish failed" }

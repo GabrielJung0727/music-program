@@ -1158,7 +1158,7 @@ public sealed class RoomManager
     }
 
     /// <summary>Output이 보고한 클럭 품질. 측정 UI가 이 값을 그린다.</summary>
-    public ListeningRoom? ReportClock(string roomId, string peerId, double offsetMs, double jitterMs, double rttMs, int bufferMs, int resyncs, bool locked)
+    public ListeningRoom? ReportClock(string roomId, string peerId, double offsetMs, double jitterMs, double rttMs, int bufferMs, int resyncs, bool locked, int deviceState = 0, string? deviceError = null)
     {
         lock (_gate)
         {
@@ -1175,6 +1175,8 @@ public sealed class RoomManager
                 BufferMs = bufferMs,
                 Resyncs = resyncs,
                 Locked = locked,
+                DeviceState = deviceState,
+                DeviceError = deviceError,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
             return room;

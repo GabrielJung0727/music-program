@@ -1,11 +1,19 @@
+using System.Net;
+using Microsoft.Extensions.FileProviders;
 using System.Text.Json;
-using Mono.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Mono.Core;
+using Mono.Protocol;
+using Mono.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702");
 
-var data = Path.Combine(AppContext.BaseDirectory, "data");
+// Velopack 이 current/ 를 갈아엎어도 토큰·카탈로그가 남도록 AppData 에 둔다.
+var data = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "Mono", "data");
+MigrateLegacyData(Path.Combine(AppContext.BaseDirectory, "data"), data);
 var library = builder.Configuration["Mono:LibraryRoot"] ?? Path.Combine(data, "library");
 // Mono:LibraryRoots 배열이 우선. 없으면 기존 단수 Mono:LibraryRoot 를 그대로 쓴다.
 var configuredRoots = builder.Configuration.GetSection("Mono:LibraryRoots").Get<string[]>() ?? [];
@@ -26,7 +34,11 @@ wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi
 builder.Services.AddSingleton(new WikipediaService(wikiHttp, Path.Combine(data, "wiki")));
 builder.Services.AddSingleton(new ArtworkService(art));
 builder.Services.AddSingleton<LibraryScanner>();
-builder.Services.AddSingleton<StreamingHub>();
+var controlUrl = builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702";
+builder.Services.AddSingleton(sp => new StreamingHub(
+    sp.GetRequiredService<CatalogStore>(),
+    Path.Combine(data, "streaming.json"),
+    controlUrl));
 builder.Services.AddSingleton<PairingService>();
 builder.Services.AddSingleton(sp => new RoomManager(
     sp.GetRequiredService<CatalogStore>(),
@@ -56,9 +68,78 @@ builder.Services.AddHostedService<TransportService>();
 builder.Services.AddHostedService<RetentionService>();
 builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanScheduler>(sp, library));
 
+builder.Services.AddSingleton<ControlSession>();
+
 var app = builder.Build();
-// 레거시 wwwroot SPA 제거 — Control은 Avalonia exe. HTTP는 art/REST API만.
+
+// Control UI(React, src/Mono.Web)는 wwwroot 에서 정적 서빙한다.
+// WebView2 셸과 브라우저가 같은 번들을 본다.
+var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+if (Directory.Exists(wwwroot))
+{
+    var files = new PhysicalFileProvider(wwwroot);
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = files,
+        // 해시 파일명이 붙는 assets/ 는 오래 캐시해도 안전하고, index.html 은 절대 캐시하면 안 된다.
+        OnPrepareResponse = ctx =>
+        {
+            var path = ctx.File.Name;
+            ctx.Context.Response.Headers.CacheControl =
+                path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+                    ? "no-cache, no-store, must-revalidate"
+                    : "public, max-age=31536000, immutable";
+        }
+    });
+}
+
+app.UseWebSockets();
+
+// 웹 UI의 컨트롤 플레인. TCP 7700 과 동일한 MonoMessage 규약.
+app.Map("/ws/control", async (HttpContext http, ControlSession session, CancellationToken ct) =>
+    await ControlWebSocket.HandleAsync(http, session, ct));
+
 app.MapHub<LoungeHub>("/hub");
+
+app.MapGet("/api/stream/tidal/{trackId}", async (HttpContext http, string trackId, StreamingHub hub, CancellationToken ct) =>
+    await hub.ProxyTidalStreamAsync(http, trackId, ct));
+
+app.MapGet("/oauth/callback", (string? code, string? state, string? error, StreamingHub streaming, CatalogStore catalog, RoomBroadcaster bus) =>
+{
+    if (!string.IsNullOrWhiteSpace(error))
+        return Results.Content(OAuthPage("Tidal 연동을 취소했거나 거부했습니다.", error), "text/html; charset=utf-8");
+    if (string.IsNullOrWhiteSpace(code))
+        return Results.Content(OAuthPage("로그인 코드가 없습니다.", "code missing"), "text/html; charset=utf-8");
+    try
+    {
+        var acc = streaming.CompleteOAuth(StreamingProvider.Tidal, code, state, null);
+        var imported = streaming.LiveTrackCount();
+        var note = streaming.LastImportNote;
+        var accounts = new MonoMessage
+        {
+            Type = MessageTypes.LinkStreaming,
+            Ok = acc.Connected,
+            Provider = StreamingProvider.Tidal,
+            Body = JsonSerializer.Serialize(streaming.AccountViews, LineFraming.JsonOptions)
+        };
+        var catalogMsg = new MonoMessage
+        {
+            Type = MessageTypes.Catalog,
+            Body = JsonSerializer.Serialize(catalog.CatalogView(), LineFraming.JsonOptions)
+        };
+        _ = bus.PushCatalogAsync(accounts);
+        _ = bus.PushCatalogAsync(catalogMsg);
+        var title = imported > 0
+            ? $"Tidal 연동 완료 · {imported}곡을 가져왔습니다."
+            : "Tidal 로그인은 됐지만 곡 목록을 못 가져왔습니다.";
+        return Results.Content(OAuthPage(title, note), "text/html; charset=utf-8");
+    }
+    catch (Exception ex)
+    {
+        return Results.Content(OAuthPage("Tidal 토큰 교환에 실패했습니다.", ex.Message), "text/html; charset=utf-8");
+    }
+});
 
 app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegistry endpoints) => Results.Ok(new
 {
@@ -157,4 +238,53 @@ app.MapGet("/api/session/{archiveId}", (string archiveId, HistoryStore history, 
         : Results.Text(history.ShareSummary(archive, catalog), "text/plain; charset=utf-8");
 });
 
+// SPA 딥링크. /api, /hub, /ws, /oauth 는 위에서 이미 잡혔으므로 여기 오지 않는다.
+if (Directory.Exists(wwwroot))
+{
+    app.MapFallback(async ctx =>
+    {
+        ctx.Response.ContentType = "text/html; charset=utf-8";
+        ctx.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+        await ctx.Response.SendFileAsync(Path.Combine(wwwroot, "index.html"));
+    });
+}
+
 app.Run();
+
+static void MigrateLegacyData(string legacy, string dest)
+{
+    try
+    {
+        if (!Directory.Exists(legacy) || string.Equals(
+                Path.GetFullPath(legacy), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
+            return;
+        Directory.CreateDirectory(dest);
+        foreach (var file in Directory.EnumerateFiles(legacy, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(legacy, file);
+            var target = Path.Combine(dest, rel);
+            if (File.Exists(target)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+    }
+    catch
+    {
+        // 마이그레이션 실패해도 새 경로로 계속한다.
+    }
+}
+
+static string OAuthPage(string title, string? detail)
+{
+    var extra = string.IsNullOrWhiteSpace(detail)
+        ? ""
+        : $"<p style=\"color:#888;font-size:13px\">{WebUtility.HtmlEncode(detail)}</p>";
+    return $"""
+        <!doctype html><html lang="ko"><head><meta charset="utf-8"><title>Mono · Tidal</title></head>
+        <body style="font-family:Segoe UI,sans-serif;background:#121317;color:#f2f2f6;display:flex;min-height:100vh;align-items:center;justify-content:center">
+        <div style="max-width:28rem;text-align:center">
+        <h1 style="font-weight:600;font-size:1.25rem">{WebUtility.HtmlEncode(title)}</h1>
+        {extra}
+        </div></body></html>
+        """;
+}

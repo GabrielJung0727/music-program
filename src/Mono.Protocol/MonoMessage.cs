@@ -77,6 +77,12 @@ public sealed class MonoMessage
     [JsonPropertyName("locked")]
     public bool? Locked { get; set; }
 
+    /// <summary>출력 장치 상태 머신의 현재 값.</summary>
+    public int? DeviceState { get; set; }
+
+    /// <summary>재생을 보류한 사유(점유 충돌·장치 분리 등).</summary>
+    public string? DeviceError { get; set; }
+
     [JsonPropertyName("epoch")]
     public long? Epoch { get; set; }
 
