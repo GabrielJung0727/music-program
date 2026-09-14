@@ -9,9 +9,6 @@
     <AssemblyName>Mono.Control</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\icons\app\mono-app.ico</ApplicationIcon>
-    <!-- publish.ps1 이 -p:Version 으로 덮어쓴다. AssemblyVersion 을 따로 박으면
-         그쪽이 이겨서 About 에 옛 버전이 찍힌다. -->
-    <Version>0.1.5</Version>
     <!-- WebView2 패키지는 WinForms·WPF 래퍼를 함께 싣는다. WPF 쪽이 WindowsBase 5.0 을
          끌고 와 4.0 과 충돌 경고(MSB3277)를 낸다. 우리는 WinForms 래퍼만 쓰고,
          런타임에 WPF 어셈블리는 로드되지 않으므로 이 경고는 잡음이다. -->
