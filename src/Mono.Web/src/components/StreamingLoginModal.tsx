@@ -41,7 +41,7 @@ function QobuzFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
     try {
       // Core 의 Qobuz 어댑터는 토큰(또는 비밀번호)을 그대로 받는다.
       const res = await cmd.linkStreaming(StreamingProvider.Qobuz, password)
-      if (res.ok) onSuccess()
+      if (res.ok) { cmd.refreshStreamingAccounts(); onSuccess() }
       else setError(res.error ?? res.body ?? "연동에 실패했습니다.")
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -216,7 +216,12 @@ function TidalFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
   const handleLaunch = async () => {
     const begin = await cmd.beginOAuth(StreamingProvider.Tidal)
     if (!begin) { setNote("Core 에 연결하지 못했습니다."); return }
-    if (begin.already || begin.connected) { onSuccess(); return }
+    // 이미 연동돼 있으면 인증 페이지가 뜨지 않는 게 맞다. 화면 상태만 바로잡는다.
+    if (begin.already || begin.connected) {
+      cmd.refreshStreamingAccounts()
+      onSuccess()
+      return
+    }
     if (!begin.authUrl) { setNote(begin.note ?? "인증 URL 을 받지 못했습니다."); return }
     openExternal(begin.authUrl)
     setState("authorize")

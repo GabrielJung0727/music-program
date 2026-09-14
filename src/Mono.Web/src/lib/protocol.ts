@@ -59,6 +59,7 @@ export const MSG = {
   album: "album",
   backup: "backup",
   linkStreaming: "link_streaming",
+  streamingAccounts: "streaming_accounts",
   reactionHeatmap: "reaction_heatmap",
   wikiBio: "wiki_bio",
 

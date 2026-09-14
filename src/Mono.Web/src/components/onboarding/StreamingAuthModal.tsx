@@ -31,7 +31,7 @@ function QobuzLoginPanel({ onClose, onSuccess }: QobuzLoginProps) {
     setError(null);
     try {
       const res = await cmd.linkStreaming(StreamingProvider.Qobuz, password);
-      if (res.ok) onSuccess();
+      if (res.ok) { cmd.refreshStreamingAccounts(); onSuccess(); }
       else setError(res.error ?? res.body ?? "연동에 실패했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -169,7 +169,14 @@ function TidalOAuthPanel({ onClose, onSuccess }: TidalOAuthProps) {
     setError(null);
     const begin = await cmd.beginOAuth(StreamingProvider.Tidal);
     if (!begin) { setError("Core 에 연결하지 못했습니다."); return; }
-    if (begin.already || begin.connected) { setPhase("done"); timerRef.current = setTimeout(onSuccess, 400); return; }
+    // Core 에 이미 토큰이 남아 있으면 로그인 페이지를 다시 띄울 이유가 없다.
+    // 다만 화면이 그걸 모르고 있었던 것이므로, 상태를 새로 받아 와 바로잡는다.
+    if (begin.already || begin.connected) {
+      cmd.refreshStreamingAccounts();
+      setPhase("done");
+      timerRef.current = setTimeout(onSuccess, 400);
+      return;
+    }
     if (!begin.authUrl) { setError(begin.note ?? "인증 URL 을 받지 못했습니다."); return; }
     setAuthUrl(begin.authUrl);
     openExternal(begin.authUrl);

@@ -72,6 +72,12 @@ public static class MessageTypes
     public const string Album = "album";
     public const string Backup = "backup";
     public const string LinkStreaming = "link_streaming";
+
+    /// <summary>
+    /// 연동된 스트리밍 계정 조회. 부작용이 없다 —
+    /// link_streaming 은 토큰 없이 보내면 연결을 끊으므로 조회용으로 쓸 수 없다.
+    /// </summary>
+    public const string StreamingAccounts = "streaming_accounts";
     public const string ReactionHeatmap = "reaction_heatmap";
     public const string WikiBio = "wiki_bio";
 

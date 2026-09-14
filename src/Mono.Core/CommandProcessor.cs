@@ -508,6 +508,16 @@ public sealed class CommandProcessor
                     }), LineFraming.JsonOptions)
                 });
 
+            // 조회 전용. Control 이 켜질 때 "지금 뭐가 붙어 있나"를 묻는 유일한 안전한 길이다 —
+            // link_streaming 은 토큰이 없으면 연결을 끊어 버린다.
+            case MessageTypes.StreamingAccounts:
+                return Direct(new MonoMessage
+                {
+                    Type = MessageTypes.StreamingAccounts,
+                    Ok = true,
+                    Body = JsonSerializer.Serialize(_streaming.AccountViews, LineFraming.JsonOptions)
+                });
+
             case MessageTypes.LinkStreaming:
             {
                 var provider = msg.Provider ?? StreamingProvider.Tidal;

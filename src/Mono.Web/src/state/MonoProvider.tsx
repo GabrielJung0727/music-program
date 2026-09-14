@@ -142,6 +142,8 @@ export interface MonoCommands {
   /** OAuth 를 시작하고 인증 URL 을 받는다. 브라우저로 여는 건 호출부 책임. */
   beginOAuth(provider: StreamingProvider): Promise<OAuthStart | null>
   unlinkStreaming(provider: StreamingProvider): Promise<void>
+  /** Core 에 현재 연동 상태를 다시 묻는다. 부작용 없는 조회다. */
+  refreshStreamingAccounts(): void
 
   clearError(): void
 }
@@ -240,6 +242,12 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           break
         }
 
+        case MSG.streamingAccounts: {
+          const accounts = parseBody<StreamingAccount[]>(msg)
+          if (Array.isArray(accounts)) setStreamingAccounts(accounts)
+          break
+        }
+
         case MSG.linkStreaming: {
           // body 는 계정 목록이거나(성공) 사람이 읽는 한 줄이다(해제·오류).
           const accounts = parseBody<StreamingAccount[]>(msg)
@@ -269,6 +277,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
     client.send({ type: MSG.playlists })
     client.send({ type: MSG.history })
     client.send({ type: MSG.archives })
+    client.send({ type: MSG.streamingAccounts })
   }, [connection, client])
 
   const albums = useMemo(
@@ -505,6 +514,11 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       async unlinkStreaming(provider) {
         // 토큰 없이 보내면 Core 가 연결을 끊는다.
         client.send({ type: MSG.linkStreaming, provider })
+        client.send({ type: MSG.streamingAccounts })
+      },
+
+      refreshStreamingAccounts() {
+        client.send({ type: MSG.streamingAccounts })
       },
 
       clearError: () => setLastError(null),
