@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -70,6 +71,18 @@ internal sealed class TidalClient
 
     public string? LastError { get; private set; }
 
+    /// <summary>
+    /// 직전 호출이 Tidal 한도(429)에 걸렸는지. "곡이 없음"과 구분해야 한다 —
+    /// 전자는 잠시 뒤 다시 하면 되고, 후자는 다시 해도 같다.
+    /// </summary>
+    public bool RateLimited { get; private set; }
+
+    /// <summary>Retry-After 가 이보다 길면 기다리지 않는다. 사용자를 세워 둘 수는 없다.</summary>
+    private static readonly TimeSpan MaxRetryWait = TimeSpan.FromSeconds(2);
+
+    /// <summary>한도에 걸렸을 때 같은 URL 을 다시 시도하는 횟수.</summary>
+    private const int RateLimitRetries = 1;
+
     public TidalProfile FetchProfile(string accessToken)
     {
         var jwt = ProfileFromJwt(accessToken);
@@ -100,6 +113,7 @@ internal sealed class TidalClient
             {
                 var hits = ParseIncludedTracks(GetJson(path, accessToken));
                 if (hits.Count > 0) return hits.Take(limit).ToList();
+                if (RateLimited) return [];
             }
         }
 
@@ -123,6 +137,8 @@ internal sealed class TidalClient
             {
                 var hits = ParseIncludedTracks(GetJson(url, accessToken));
                 if (hits.Count > 0) return hits.Take(limit).ToList();
+                // 한도에 걸렸다면 남은 조합도 똑같이 거절당한다. 더 두드릴수록 한도만 깊어진다.
+                if (RateLimited) return [];
             }
         }
 
@@ -182,29 +198,68 @@ internal sealed class TidalClient
     private JsonDocument? GetJson(string url, string accessToken)
     {
         LastError = null;
-        try
+        RateLimited = false;
+
+        for (var attempt = 0; ; attempt++)
         {
-            using var req = new HttpRequestMessage(HttpMethod.Get, url);
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            req.Headers.TryAddWithoutValidation("Accept", "application/vnd.api+json");
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            using var res = _http.Send(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
-            using var reader = new StreamReader(res.Content.ReadAsStream());
-            var body = reader.ReadToEnd();
-            if (!res.IsSuccessStatusCode)
+            try
             {
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                req.Headers.TryAddWithoutValidation("Accept", "application/vnd.api+json");
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                using var res = _http.Send(req, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                using var reader = new StreamReader(res.Content.ReadAsStream());
+                var body = reader.ReadToEnd();
+
+                if (res.IsSuccessStatusCode)
+                {
+                    // 재시도가 통했으면 결국 막히지 않은 것이다. RateLimited 는
+                    // "이번 호출이 한도 때문에 포기했다"는 뜻이어야 한다.
+                    RateLimited = false;
+                    LastError = null;
+                    return JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
+                }
+
                 var snippet = body.Length <= 200 ? body : body[..200];
                 LastError = $"{(int)res.StatusCode} {url} {snippet}";
+
+                if (res.StatusCode != HttpStatusCode.TooManyRequests)
+                {
+                    return null;
+                }
+
+                // 429. 서버가 곧 풀린다고 하면 한 번만 기다렸다 다시 해 본다.
+                RateLimited = true;
+                var wait = RetryAfter(res);
+                if (attempt >= RateLimitRetries || wait is null || wait > MaxRetryWait)
+                {
+                    return null;
+                }
+
+                Thread.Sleep(wait.Value);
+            }
+            catch (Exception ex)
+            {
+                LastError = $"{url} {ex.GetType().Name}: {ex.Message}";
                 return null;
             }
+        }
+    }
 
-            return JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
-        }
-        catch (Exception ex)
+    /// <summary>Retry-After 를 초 또는 날짜 형식 모두에서 읽는다. 없으면 null.</summary>
+    private static TimeSpan? RetryAfter(HttpResponseMessage res)
+    {
+        var header = res.Headers.RetryAfter;
+        if (header is null) return null;
+        if (header.Delta is { } delta) return delta < TimeSpan.Zero ? TimeSpan.Zero : delta;
+        if (header.Date is { } date)
         {
-            LastError = $"{url} {ex.GetType().Name}: {ex.Message}";
-            return null;
+            var wait = date - DateTimeOffset.UtcNow;
+            return wait < TimeSpan.Zero ? TimeSpan.Zero : wait;
         }
+
+        return null;
     }
 
     private static List<TidalTrackHit> ParseTrackList(JsonDocument? doc)

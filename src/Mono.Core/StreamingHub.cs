@@ -450,16 +450,34 @@ public sealed class StreamingHub
         var before = LiveTrackCount();
         foreach (var hit in Tidal.FetchFavorites(token, profile, 40))
             UpsertTidalHit(hit);
-        foreach (var seed in new[] { "Miles Davis", "Hiromi", "Kind of Blue", "Daft Punk" })
+
+        // 시드 질의는 즐겨찾기가 비었을 때 카탈로그를 채우는 보조 수단이다.
+        // 즐겨찾기를 이미 가져왔다면 굳이 한도를 더 쓸 이유가 없다.
+        var rateLimited = Tidal.RateLimited;
+        if (!rateLimited && LiveTrackCount() == before)
         {
-            foreach (var hit in Tidal.Search(token, seed, _tidalCountry, 12))
-                UpsertTidalHit(hit);
+            foreach (var seed in new[] { "Miles Davis", "Hiromi", "Kind of Blue", "Daft Punk" })
+            {
+                foreach (var hit in Tidal.Search(token, seed, _tidalCountry, 12))
+                    UpsertTidalHit(hit);
+
+                // 한도에 걸리면 남은 시드도 전부 거절당한다. 여기서 멈춘다.
+                if (Tidal.RateLimited)
+                {
+                    rateLimited = true;
+                    break;
+                }
+            }
         }
 
         var added = LiveTrackCount() - before;
         LastImportNote = added > 0
-            ? $"{added}곡을 Tidal에서 가져왔습니다."
-            : (Tidal.LastError ?? "Tidal API가 곡을 돌려주지 않았습니다.");
+            ? (rateLimited
+                ? $"{added}곡을 가져왔습니다. Tidal 요청 한도에 걸려 일부는 빠졌습니다 — 잠시 뒤 다시 시도하세요."
+                : $"{added}곡을 Tidal에서 가져왔습니다.")
+            : (rateLimited
+                ? "Tidal 요청 한도(429)에 걸렸습니다. 잠시 뒤 다시 시도하세요."
+                : (Tidal.LastError ?? "Tidal API가 곡을 돌려주지 않았습니다."));
     }
 
     private static string BuildQobuzAuthUrl(string state)
