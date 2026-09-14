@@ -200,32 +200,48 @@ internal sealed class WizardForm : Form
 
                 TryUnblock(setup);
                 if (_status is not null) _status.Text = "설치하는 중…";
-                var psi = new ProcessStartInfo(setup)
-                {
-                    Arguments = $"-s --installto \"{_installRoot}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-                using var p = Process.Start(psi);
-                if (p is null)
-                {
-                    FailInstall("설치 프로그램을 시작하지 못했습니다.");
-                    return;
-                }
 
-                var done = await Task.Run(() => p.WaitForExit(5 * 60 * 1000));
-                if (!done)
+                // Velopack 은 설치 루트를 제 것으로 보고 갈아엎는다. 그런데 그 루트 안에는
+                // Core 의 data/(카탈로그·스트리밍 토큰·백업)와 prefs.ini 도 같이 산다.
+                // 옆으로 빼 두지 않으면 "다시 설치" 한 번에 라이브러리와 로그인이 사라진다.
+                var stash = StashUserData();
+                int exitCode;
+                try
                 {
-                    try { p.Kill(entireProcessTree: true); } catch { /* ignore */ }
-                    FailInstall("설치가 끝나지 않았습니다.");
-                    return;
+                    var psi = new ProcessStartInfo(setup)
+                    {
+                        Arguments = $"-s --installto \"{_installRoot}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    };
+                    using var p = Process.Start(psi);
+                    if (p is null)
+                    {
+                        FailInstall("설치 프로그램을 시작하지 못했습니다.");
+                        return;
+                    }
+
+                    var done = await Task.Run(() => p.WaitForExit(5 * 60 * 1000));
+                    if (!done)
+                    {
+                        try { p.Kill(entireProcessTree: true); } catch { /* ignore */ }
+                        FailInstall("설치가 끝나지 않았습니다.");
+                        return;
+                    }
+
+                    exitCode = p.ExitCode;
+                }
+                finally
+                {
+                    // 설치가 실패해서 빠져나가더라도 사용자 데이터는 제자리로 돌려놓는다.
+                    RestoreUserData(stash);
                 }
 
                 // 다시 설치일 때는 파일이 원래 있었으므로 존재 여부로는 성공을 알 수 없다.
                 // 종료 코드를 봐야 "덮어썼다"와 "덮어쓰려다 실패했다"가 갈린다.
-                if (p.ExitCode != 0)
+                if (exitCode != 0)
                 {
-                    FailInstall($"설치 프로그램이 오류로 끝났습니다 (코드 {p.ExitCode}).");
+                    FailInstall($"설치 프로그램이 오류로 끝났습니다 (코드 {exitCode}).");
                     return;
                 }
 
@@ -259,6 +275,91 @@ internal sealed class WizardForm : Form
         {
             _busy = false;
         }
+    }
+
+    /// <summary>
+    /// 설치 루트 안에서 Velopack 것이 아닌 항목. current·packages·Update.exe 는 설치가
+    /// 다시 만들지만, 이것들은 사용자가 쌓은 것이라 지워지면 되돌릴 방법이 없다.
+    /// </summary>
+    private static readonly string[] PreservedEntries = ["data", "prefs.ini"];
+
+    /// <summary>
+    /// 설치 전에 사용자 데이터를 루트 밖으로 옮긴다. 같은 볼륨에 두어야 이동이
+    /// 복사 없이 끝나므로, 임시 폴더가 아니라 설치 루트 바로 옆에 만든다.
+    /// 옮길 것이 없으면 null.
+    /// </summary>
+    private string? StashUserData()
+    {
+        string? stash = null;
+        foreach (var name in PreservedEntries)
+        {
+            var src = Path.Combine(_installRoot, name);
+            var isDir = Directory.Exists(src);
+            if (!isDir && !File.Exists(src)) continue;
+
+            try
+            {
+                if (stash is null)
+                {
+                    var beside = Path.GetDirectoryName(_installRoot.TrimEnd(Path.DirectorySeparatorChar));
+                    stash = Path.Combine(
+                        string.IsNullOrEmpty(beside) ? Path.GetTempPath() : beside,
+                        "mono-stash-" + Guid.NewGuid().ToString("n")[..8]);
+                    Directory.CreateDirectory(stash);
+                }
+
+                var dest = Path.Combine(stash, name);
+                if (isDir) Directory.Move(src, dest);
+                else File.Move(src, dest);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 옮기지 못했으면 원래 자리에 남는다. 설치가 지울 수도 있지만,
+                // 여기서 멈추면 설치 자체를 못 하므로 진행한다.
+            }
+        }
+
+        return stash;
+    }
+
+    /// <summary>설치가 끝났거나 실패한 뒤 사용자 데이터를 제자리로 되돌린다.</summary>
+    private void RestoreUserData(string? stash)
+    {
+        if (stash is null || !Directory.Exists(stash)) return;
+
+        try { Directory.CreateDirectory(_installRoot); } catch (IOException) { return; }
+
+        foreach (var name in PreservedEntries)
+        {
+            var src = Path.Combine(stash, name);
+            var dest = Path.Combine(_installRoot, name);
+            try
+            {
+                if (Directory.Exists(src))
+                {
+                    // 설치가 같은 이름으로 새로 만들어 뒀다면 빼 둔 쪽이 이긴다 —
+                    // 그쪽이 사용자의 것이고, 새로 생긴 쪽은 빈 껍데기다.
+                    if (Directory.Exists(dest)) Directory.Delete(dest, recursive: true);
+                    Directory.Move(src, dest);
+                }
+                else if (File.Exists(src))
+                {
+                    File.Move(src, dest, overwrite: true);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 되돌리지 못한 것은 stash 폴더에 그대로 남겨 둔다. 지우는 것보다 낫다.
+            }
+        }
+
+        // 전부 되돌렸을 때만 치운다. 남은 게 있으면 사용자가 찾아갈 수 있어야 한다.
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(stash).Any())
+                Directory.Delete(stash);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private void FailInstall(string message)
