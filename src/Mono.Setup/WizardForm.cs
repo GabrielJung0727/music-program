@@ -66,7 +66,7 @@ internal sealed class WizardForm : Form
             {
                 _step = 1;
                 Render();
-                await InstallAndFinishAsync(launch: true);
+                await InstallAndFinishAsync(launch: true, force: true);
                 return;
             }
 
@@ -146,7 +146,7 @@ internal sealed class WizardForm : Form
         {
             _step = 1;
             Render();
-            _ = InstallAndFinishAsync(launch: true);
+            _ = InstallAndFinishAsync(launch: true, force: true);
         };
         if (AlreadyInstalled)
         {
@@ -175,7 +175,12 @@ internal sealed class WizardForm : Form
         _body.Controls.Add(VStack(400, 48, title, sub, Gap(20), _bar, Gap(8), _status));
     }
 
-    private async Task InstallAndFinishAsync(bool launch)
+    /// <param name="force">
+    /// 이미 설치돼 있어도 페이로드를 다시 푼다. 사용자가 "다시 설치"를 눌렀거나
+    /// --silent 로 특정 버전을 지정해 돌렸다면, 설치가 실제로 일어나야 한다.
+    /// 그냥 띄우고 싶을 때는 환영 화면의 "바로 실행" 링크가 따로 있다.
+    /// </param>
+    private async Task InstallAndFinishAsync(bool launch, bool force = false)
     {
         if (_busy) return;
         _busy = true;
@@ -183,7 +188,7 @@ internal sealed class WizardForm : Form
         {
             WritePrefs();
 
-            if (!AlreadyInstalled)
+            if (force || !AlreadyInstalled)
             {
                 if (_status is not null) _status.Text = "패키지 준비 중…";
                 var setup = await Task.Run(ExtractPayload);
@@ -212,6 +217,16 @@ internal sealed class WizardForm : Form
                 if (!done)
                 {
                     try { p.Kill(entireProcessTree: true); } catch { /* ignore */ }
+                    FailInstall("설치가 끝나지 않았습니다.");
+                    return;
+                }
+
+                // 다시 설치일 때는 파일이 원래 있었으므로 존재 여부로는 성공을 알 수 없다.
+                // 종료 코드를 봐야 "덮어썼다"와 "덮어쓰려다 실패했다"가 갈린다.
+                if (p.ExitCode != 0)
+                {
+                    FailInstall($"설치 프로그램이 오류로 끝났습니다 (코드 {p.ExitCode}).");
+                    return;
                 }
 
                 if (!AlreadyInstalled)
