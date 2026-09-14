@@ -58,7 +58,7 @@ public sealed class AppUpdater
         if (!string.IsNullOrWhiteSpace(feed))
             return new UpdateManager(feed.Trim());
 
-        return new UpdateManager(new GithubSource(GitHubRepo, accessToken: ResolveGitHubToken(), prerelease: true));
+        return new UpdateManager(new GithubSource(GitHubRepo, accessToken: ResolveGitHubToken(), prerelease: false));
     }
 
     public async Task<string> CheckAsync(IProgress<int>? progress = null, CancellationToken ct = default)

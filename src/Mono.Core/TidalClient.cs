@@ -498,11 +498,7 @@ internal sealed class TidalClient
     private static string Base64Url(byte[] data)
         => Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    private static string? Env(string key)
-    {
-        var v = Environment.GetEnvironmentVariable(key);
-        return string.IsNullOrWhiteSpace(v) ? null : v.Trim();
-    }
+    private static string? Env(string key) => CredentialStore.Get(key);
 }
 
 internal sealed record TidalTokens(string AccessToken, string? RefreshToken, DateTimeOffset ExpiresAt);

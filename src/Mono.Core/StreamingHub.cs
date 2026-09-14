@@ -110,6 +110,24 @@ public sealed class StreamingHub
 
         if (!HasLiveCredentials(provider))
         {
+            // Tidal은 임베디드 QA Client ID가 있으므로 여기 오면 DEMO 강제뿐.
+            // 조용히 데모로 떨어지지 않고 이유를 돌려준다.
+            if (provider == StreamingProvider.Tidal)
+            {
+                return new
+                {
+                    provider,
+                    state,
+                    authUrl = "",
+                    liveSdk = false,
+                    demo = false,
+                    connected = false,
+                    note = "Tidal 실연동이 꺼져 있습니다 (MONO_TIDAL_DEMO=1). 끄고 다시 시도하세요.",
+                    clientIdPrefix = TidalClient.ClientId.Length >= 4 ? TidalClient.ClientId[..4] : "",
+                    hasSecret = !string.IsNullOrWhiteSpace(TidalClient.ClientSecret)
+                };
+            }
+
             var acc = CompleteOAuth(provider, null, state, displayName: null);
             return new
             {
@@ -662,11 +680,7 @@ public sealed class StreamingHub
     private static string Sanitize(string s)
         => new(s.Select(c => char.IsLetterOrDigit(c) ? char.ToLowerInvariant(c) : '-').ToArray());
 
-    private static string? Env(string key)
-    {
-        var v = Environment.GetEnvironmentVariable(key);
-        return string.IsNullOrWhiteSpace(v) ? null : v.Trim();
-    }
+    private static string? Env(string key) => CredentialStore.Get(key);
 
     private static ArgumentOutOfRangeException Unexpected(StreamingProvider provider)
         => new(nameof(provider), provider, null);

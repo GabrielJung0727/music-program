@@ -53,23 +53,17 @@ public partial class MainViewModel
                     StatusText = "Tidal이 이미 연동되어 있습니다.";
                 else if (IsDemoLinkBody(msg.Body))
                     StatusText = "파트너 키 없음 — 데모 토큰으로 연동했습니다.";
+                else if (TryReadLinkNote(msg.Body, out var linkNote) && !string.IsNullOrWhiteSpace(linkNote))
+                    StatusText = linkNote!;
                 else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase)
-                         && msg.Body.Contains("\"connected\":false", StringComparison.OrdinalIgnoreCase))
+                         && msg.Body.Contains("\"connected\":false", StringComparison.OrdinalIgnoreCase)
+                         && msg.Body.Contains("\"liveSdk\":true", StringComparison.OrdinalIgnoreCase))
                     StatusText = "브라우저에서 Tidal에 로그인하세요";
                 else if ((msg.Ok ?? false) && msg.Provider == StreamingProvider.Tidal)
                 {
                     StatusText = "Tidal 연동 완료";
-                    if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"note\":", StringComparison.Ordinal))
-                    {
-                        try
-                        {
-                            using var doc = JsonDocument.Parse(msg.Body.StartsWith('[') ? msg.Body : "{}");
-                            if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0
-                                && doc.RootElement[0].TryGetProperty("note", out var n))
-                                StatusText = n.GetString() ?? StatusText;
-                        }
-                        catch { /* keep default */ }
-                    }
+                    if (TryReadArrayNote(msg.Body, out var n) && !string.IsNullOrWhiteSpace(n))
+                        StatusText = n!;
                     _ = _session.CatalogAsync();
                 }
                 break;
@@ -370,6 +364,41 @@ public partial class MainViewModel
                 && doc.RootElement.TryGetProperty("demo", out var demo)
                 && demo.ValueKind is JsonValueKind.True)
                 return true;
+        }
+        catch { /* ignore */ }
+        return false;
+    }
+
+    private static bool TryReadLinkNote(string? body, out string? note)
+    {
+        note = null;
+        if (string.IsNullOrWhiteSpace(body) || body[0] != '{') return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("note", out var n) && n.ValueKind == JsonValueKind.String)
+            {
+                note = n.GetString();
+                return !string.IsNullOrWhiteSpace(note);
+            }
+        }
+        catch { /* ignore */ }
+        return false;
+    }
+
+    private static bool TryReadArrayNote(string? body, out string? note)
+    {
+        note = null;
+        if (string.IsNullOrWhiteSpace(body) || body[0] != '[') return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0
+                && doc.RootElement[0].TryGetProperty("note", out var n))
+            {
+                note = n.GetString();
+                return !string.IsNullOrWhiteSpace(note);
+            }
         }
         catch { /* ignore */ }
         return false;

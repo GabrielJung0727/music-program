@@ -356,6 +356,7 @@ public partial class MainViewModel : ObservableObject
         LibraryPath = Prefs.Get("library_path", LibraryPath);
         ZoneName = Prefs.Get("zone_name", string.IsNullOrWhiteSpace(ZoneName) ? "This PC" : ZoneName);
         _session.DisplayName = DisplayName;
+        PersistStreamingCredentials();
 
         StatusText = "Core 확인 중…";
         if (!await _supervisor.EnsureCoreAsync())
@@ -761,6 +762,41 @@ public partial class MainViewModel : ObservableObject
     {
         var item = NavItems.FirstOrDefault(n => n.Id == navId);
         if (item is not null) SelectedNav = item;
+    }
+
+    /// <summary>
+    /// User 환경변수의 Tidal/Qobuz 키를 %LOCALAPPDATA%\Mono\credentials.env 에 복사한다.
+    /// Control이 오래된 env로 떠도 Core가 파일을 읽을 수 있게 한다.
+    /// </summary>
+    private static void PersistStreamingCredentials()
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "credentials.env");
+            var keys = new[]
+            {
+                "MONO_TIDAL_CLIENT_ID", "MONO_TIDAL_CLIENT_SECRET", "MONO_OAUTH_REDIRECT",
+                "MONO_QOBUZ_APP_ID", "MONO_QOBUZ_APP_SECRET"
+            };
+            var lines = new List<string>();
+            foreach (var key in keys)
+            {
+                var value = Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.User)
+                            ?? Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.Machine)
+                            ?? Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(value))
+                    lines.Add($"{key}={value.Trim()}");
+            }
+            if (lines.Count > 0)
+                File.WriteAllLines(path, lines);
+        }
+        catch (Exception ex)
+        {
+            Program.LogDiagnostic("credentials", ex);
+        }
     }
 
     private async Task Safe(Func<Task> action)
