@@ -47,17 +47,27 @@ public sealed class RoomBroadcaster
     private readonly ConnectionRegistry _connections;
     private readonly RoomManager _rooms;
     private readonly CatalogStore _catalog;
+    private readonly StreamingHub _streaming;
 
-    public RoomBroadcaster(ConnectionRegistry connections, RoomManager rooms, CatalogStore catalog)
+    public RoomBroadcaster(ConnectionRegistry connections, RoomManager rooms, CatalogStore catalog, StreamingHub streaming)
     {
         _connections = connections;
         _rooms = rooms;
         _catalog = catalog;
+        _streaming = streaming;
     }
 
     public MonoMessage StateMessage(ListeningRoom room)
     {
         var track = room.CurrentTrack(_catalog.Tracks);
+        string? path = null;
+        if (room.SourceMode == PlaybackSourceMode.ClockSync && track is not null)
+        {
+            path = track.Source is StreamingProvider.Tidal or StreamingProvider.Qobuz
+                ? _streaming.ResolvePlayablePath(track)
+                : track.LocalPath;
+        }
+
         return new MonoMessage
         {
             Type = MessageTypes.RoomState,
@@ -74,7 +84,7 @@ public sealed class RoomBroadcaster
             Channels = track?.Channels,
             IsDsd = track?.IsDsd,
             DurationMs = track?.DurationMs,
-            LocalPath = room.SourceMode == PlaybackSourceMode.ClockSync ? track?.LocalPath : null,
+            LocalPath = path,
             SourceMode = room.SourceMode,
             Body = _rooms.SnapshotJson(room)
         };

@@ -1,6 +1,7 @@
 using Mono.Core;
 using Mono.Protocol;
 using Mono.Shared;
+using System.Text.Json;
 using Xunit;
 
 namespace Mono.Tests;
@@ -484,11 +485,21 @@ public class RoomAndClockTests
     [Fact]
     public void BeginOAuthWithoutPartnerKeysUsesDemoToken()
     {
-        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_ID", null);
-        Environment.SetEnvironmentVariable("MONO_TIDAL_CLIENT_SECRET", null);
+        Environment.SetEnvironmentVariable("MONO_QOBUZ_APP_ID", null);
         var (_, _, _, streaming) = NewStack();
-        streaming.BeginOAuth(StreamingProvider.Tidal);
-        Assert.True(streaming.IsConnected(StreamingProvider.Tidal));
+        streaming.BeginOAuth(StreamingProvider.Qobuz);
+        Assert.True(streaming.IsConnected(StreamingProvider.Qobuz));
+    }
+
+    [Fact]
+    public void BeginOAuthWithTidalClientIdDoesNotAutoConnect()
+    {
+        var (_, _, _, streaming) = NewStack();
+        var begin = streaming.BeginOAuth(StreamingProvider.Tidal);
+        Assert.False(streaming.IsConnected(StreamingProvider.Tidal));
+        var json = JsonSerializer.Serialize(begin);
+        Assert.Contains("login.tidal.com/authorize", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("code_challenge", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

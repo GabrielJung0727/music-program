@@ -184,6 +184,8 @@ public sealed class StreamingAccount
 {
     public required StreamingProvider Provider { get; init; }
     public required string Token { get; set; }
+    public string? RefreshToken { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
     public bool Connected { get; set; }
     public string? DisplayName { get; set; }
 }

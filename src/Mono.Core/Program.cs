@@ -1,6 +1,9 @@
+using System.Net;
 using System.Text.Json;
-using Mono.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Mono.Core;
+using Mono.Protocol;
+using Mono.Shared;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702");
@@ -26,7 +29,9 @@ wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi
 builder.Services.AddSingleton(new WikipediaService(wikiHttp, Path.Combine(data, "wiki")));
 builder.Services.AddSingleton(new ArtworkService(art));
 builder.Services.AddSingleton<LibraryScanner>();
-builder.Services.AddSingleton<StreamingHub>();
+builder.Services.AddSingleton(sp => new StreamingHub(
+    sp.GetRequiredService<CatalogStore>(),
+    Path.Combine(data, "streaming.json")));
 builder.Services.AddSingleton<PairingService>();
 builder.Services.AddSingleton(sp => new RoomManager(
     sp.GetRequiredService<CatalogStore>(),
@@ -59,6 +64,37 @@ builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanSc
 var app = builder.Build();
 // 레거시 wwwroot SPA 제거 — Control은 Avalonia exe. HTTP는 art/REST API만.
 app.MapHub<LoungeHub>("/hub");
+
+app.MapGet("/oauth/callback", (string? code, string? state, string? error, StreamingHub streaming, CatalogStore catalog, RoomBroadcaster bus) =>
+{
+    if (!string.IsNullOrWhiteSpace(error))
+        return Results.Content(OAuthPage("Tidal 연동을 취소했거나 거부했습니다.", error), "text/html; charset=utf-8");
+    if (string.IsNullOrWhiteSpace(code))
+        return Results.Content(OAuthPage("로그인 코드가 없습니다.", "code missing"), "text/html; charset=utf-8");
+    try
+    {
+        var acc = streaming.CompleteOAuth(StreamingProvider.Tidal, code, state, null);
+        var accounts = new MonoMessage
+        {
+            Type = MessageTypes.LinkStreaming,
+            Ok = acc.Connected,
+            Provider = StreamingProvider.Tidal,
+            Body = JsonSerializer.Serialize(streaming.AccountViews, LineFraming.JsonOptions)
+        };
+        var catalogMsg = new MonoMessage
+        {
+            Type = MessageTypes.Catalog,
+            Body = JsonSerializer.Serialize(catalog.CatalogView(), LineFraming.JsonOptions)
+        };
+        _ = bus.PushCatalogAsync(accounts);
+        _ = bus.PushCatalogAsync(catalogMsg);
+        return Results.Content(OAuthPage("Tidal 연동이 완료됐습니다. 이 창을 닫고 Mono로 돌아가세요.", null), "text/html; charset=utf-8");
+    }
+    catch (Exception ex)
+    {
+        return Results.Content(OAuthPage("Tidal 토큰 교환에 실패했습니다.", ex.Message), "text/html; charset=utf-8");
+    }
+});
 
 app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegistry endpoints) => Results.Ok(new
 {
@@ -158,3 +194,18 @@ app.MapGet("/api/session/{archiveId}", (string archiveId, HistoryStore history, 
 });
 
 app.Run();
+
+static string OAuthPage(string title, string? detail)
+{
+    var extra = string.IsNullOrWhiteSpace(detail)
+        ? ""
+        : $"<p style=\"color:#888;font-size:13px\">{WebUtility.HtmlEncode(detail)}</p>";
+    return $"""
+        <!doctype html><html lang="ko"><head><meta charset="utf-8"><title>Mono · Tidal</title></head>
+        <body style="font-family:Segoe UI,sans-serif;background:#121317;color:#f2f2f6;display:flex;min-height:100vh;align-items:center;justify-content:center">
+        <div style="max-width:28rem;text-align:center">
+        <h1 style="font-weight:600;font-size:1.25rem">{WebUtility.HtmlEncode(title)}</h1>
+        {extra}
+        </div></body></html>
+        """;
+}

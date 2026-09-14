@@ -106,6 +106,10 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 
     public static ILocalChunkSource? TryOpen(string path)
     {
+        if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return MfStreamingLocalRenderer.TryOpen(path);
+
         if (!File.Exists(path))
             return null;
 

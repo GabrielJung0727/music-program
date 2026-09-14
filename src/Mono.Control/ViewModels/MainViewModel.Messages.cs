@@ -44,10 +44,15 @@ public partial class MainViewModel
                 break;
             case MessageTypes.LinkStreaming:
                 StatusText = (msg.Ok ?? false) ? "스트리밍 연동 응답" : (msg.Error ?? "스트리밍");
-                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"demo\":true", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"already\":true", StringComparison.OrdinalIgnoreCase))
+                    StatusText = "Tidal이 이미 연동되어 있습니다.";
+                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"demo\":true", StringComparison.OrdinalIgnoreCase))
                     StatusText = "파트너 키 없음 — 데모 토큰으로 연동했습니다.";
-                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase))
-                    StatusText = "OAuth 브라우저 열림 — 데모면 ‘데모 토큰’으로 완료";
+                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase)
+                         && msg.Body.Contains("\"connected\":false", StringComparison.OrdinalIgnoreCase))
+                    StatusText = "브라우저에서 Tidal에 로그인하세요";
+                else if ((msg.Ok ?? false) && msg.Provider == StreamingProvider.Tidal)
+                    StatusText = "Tidal 연동 완료";
                 break;
             case MessageTypes.History:
                 LoadHistory(msg.Body);

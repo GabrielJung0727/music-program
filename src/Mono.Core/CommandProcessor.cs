@@ -357,6 +357,7 @@ public sealed class CommandProcessor
                 return Direct(CatalogMessage());
 
             case MessageTypes.Search:
+                _streaming.EnrichSearch(msg.Text ?? "");
                 return Direct(new MonoMessage
                 {
                     Type = MessageTypes.Search,
@@ -525,14 +526,27 @@ public sealed class CommandProcessor
 
                 if (string.Equals(msg.Text, "oauth_complete", StringComparison.OrdinalIgnoreCase))
                 {
-                    var acc = _streaming.CompleteOAuth(provider, msg.Token, msg.PairingCode, msg.DisplayName);
-                    return new CommandResult(null, new MonoMessage
+                    try
                     {
-                        Type = MessageTypes.LinkStreaming,
-                        Ok = acc.Connected,
-                        Provider = provider,
-                        Body = JsonSerializer.Serialize(_streaming.AccountViews, LineFraming.JsonOptions)
-                    }, CatalogMessage());
+                        var acc = _streaming.CompleteOAuth(provider, msg.Token, msg.PairingCode, msg.DisplayName);
+                        return new CommandResult(null, new MonoMessage
+                        {
+                            Type = MessageTypes.LinkStreaming,
+                            Ok = acc.Connected,
+                            Provider = provider,
+                            Body = JsonSerializer.Serialize(_streaming.AccountViews, LineFraming.JsonOptions)
+                        }, CatalogMessage());
+                    }
+                    catch (Exception ex)
+                    {
+                        return Direct(new MonoMessage
+                        {
+                            Type = MessageTypes.LinkStreaming,
+                            Ok = false,
+                            Provider = provider,
+                            Error = ex.Message
+                        });
+                    }
                 }
 
                 if (string.IsNullOrWhiteSpace(msg.Token))
