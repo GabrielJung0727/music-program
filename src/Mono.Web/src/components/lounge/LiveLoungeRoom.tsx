@@ -1,7 +1,7 @@
 import type { QueueTrack, LoungeRoom } from "../../data/types"
 import type { ShareData } from "../ShareModal"
 import type { PlayerMode } from "../PlayerBar"
-import { useMono, useMonoCommands } from "../../state/MonoProvider"
+import { useMono, useMediaClock, useMonoCommands } from "../../state/MonoProvider"
 import { useLiveSession } from "../../state/useLiveSession"
 import { initials as initialsOf } from "../../lib/adapters"
 import { MonoIcon } from "../icons/MonoIcons"
@@ -81,6 +81,15 @@ export default function LiveLoungeRoom({
   const { albums } = useLiveSession()
   // 출력 엔드포인트는 청취자가 아니다 — 사람만 센다.
   const listenerCount = snapshot?.members.filter((m) => !m.isOutput).length ?? 0
+
+  // 진행률은 Core 의 미디어 시계가 진실이다. 호스트가 끌면 룸 전체가 같이 움직인다.
+  const { positionMs, durationMs } = useMediaClock()
+  const progress = durationMs > 0 ? (positionMs / durationMs) * 100 : 0
+  const currentSecs = Math.round(positionMs / 1000)
+  const fmt = (s: number) => {
+    if (!s || isNaN(s) || s < 0) return "00:00"
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`
+  }
 
   const isUnlistedSession = isHost
     ? hostSessionPrivacy === "unlisted"
@@ -178,13 +187,21 @@ export default function LiveLoungeRoom({
                 }
               </div>
               <div className="lounge-stage-title mb-1">{currentTrack.title}</div>
-              <div className="text-sm text-slate-500 mb-4">{currentTrack.artist}{currentTrack.album ? ` — ${currentTrack.album}` : ""}</div>
-              <div className={`w-full max-w-md border backdrop-blur-md rounded-2xl p-4 text-center ${isDark ? "bg-neutral-900/85 border-white/10 shadow-2xl" : "bg-white/95 border-slate-200/80 shadow-md"}`}>
-                <span className={`text-xs font-mono tracking-wider mb-2 block ${isDark ? "text-neutral-400" : "text-slate-500"}`}><span className="text-sky-500 animate-pulse">●</span> Bit-Perfect Stream Sync Locked (Host Controlled)</span>
-                <div className={`h-1.5 w-full rounded-full overflow-hidden ${isDark ? "bg-white/10" : "bg-slate-200/70"}`}>
-                  <div className="h-full bg-sky-500 rounded-full" style={{ width: "40%" }} />
+              <div className="text-sm text-slate-600 dark:text-zinc-400 mb-4">{currentTrack.artist}{currentTrack.album ? ` — ${currentTrack.album}` : ""}</div>
+              <div className="lounge-central-card w-full max-w-md backdrop-blur-md rounded-2xl p-4 text-center">
+                <span className="text-xs font-mono tracking-wider mb-2 block text-zinc-400 dark:text-zinc-500"><span className="text-sky-600 dark:text-sky-400 animate-pulse">●</span> Bit-Perfect Stream Sync Locked (Host Controlled)</span>
+                <div
+                  className="h-1.5 w-full rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-800 relative"
+                  style={isHost ? { cursor: "pointer" } : undefined}
+                  onClick={isHost && durationMs > 0 ? (e) => {
+                    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                    const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+                    cmd.seek(pct * durationMs)
+                  } : undefined}
+                >
+                  <div className="h-full bg-sky-600 dark:bg-sky-400 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
                 </div>
-                <div className={`text-xs font-mono mt-2 ${isDark ? "text-neutral-500" : "text-slate-400"}`}>00:00 / {currentTrack.duration ?? "--:--"}</div>
+                <div className="text-xs font-mono mt-2 text-zinc-400 dark:text-zinc-500">{fmt(currentSecs)} / {currentTrack.duration ?? "--:--"}</div>
               </div>
             </>
           ) : isHost ? (
@@ -291,13 +308,13 @@ export default function LiveLoungeRoom({
                 <div className="text-lg font-semibold text-zinc-700 mb-1">Live Lounge · Standby</div>
                 <div className="text-sm text-zinc-400 font-mono">Host is queuing master records</div>
               </div>
-              <div className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-4">
-                <div className="text-[11px] font-mono text-zinc-500 mb-2">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-zinc-400 mr-1.5 align-middle" />
+              <div className="lounge-central-card rounded-xl p-4 w-full">
+                <div className="text-[11px] font-mono text-zinc-400 dark:text-zinc-500 mb-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-600 dark:bg-sky-400 mr-1.5 align-middle" />
                   Direct Bitstream Lock Active · Waiting for host playback
                 </div>
-                <div className="h-1.5 w-full bg-zinc-200 rounded-full" />
-                <div className="text-[10px] font-mono text-zinc-400 mt-2">00:00 / --:--</div>
+                <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+                <div className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 mt-2">00:00 / --:--</div>
               </div>
             </div>
           )}

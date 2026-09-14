@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react"
 import { useMono, useMonoCommands } from "../../state/MonoProvider"
 import { MSG } from "../../lib/protocol"
 import { applyUpdate, checkForUpdate, hasShell, onUpdateProgress, type UpdateStatus } from "../../lib/shell"
+import { clearSetup } from "../../lib/setup"
 
 type RamBuffer = "Direct Disk Stream" | "512 MB" | "1 GB (Recommended)" | "2 GB Full Album"
 type SpecBadge = "Minimal" | "Detailed Studio" | "Full Lab Specs"
@@ -171,9 +172,10 @@ function Btn({
       background: "var(--gs-btn-solid-bg)",
       color: "var(--gs-btn-solid-text)",
       border: "none",
+      boxShadow: "0 2px 8px var(--gs-btn-solid-shadow, rgba(0,0,0,0.15))",
     },
     outline: {
-      background: "transparent",
+      background: "var(--gs-btn-outline-bg, transparent)",
       color: "var(--gs-btn-outline-text)",
       border: "1px solid var(--gs-btn-outline-border)",
     },
@@ -184,7 +186,17 @@ function Btn({
     },
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} style={{ ...base, ...styles[variant] }}>
+    <button
+      type="button" onClick={onClick} disabled={disabled}
+      style={{ ...base, ...styles[variant] }}
+      onMouseEnter={(e) => {
+        if (disabled) return
+        if (variant === "solid") (e.currentTarget as HTMLButtonElement).style.filter = "brightness(0.9)"
+      }}
+      onMouseLeave={(e) => {
+        if (variant === "solid") (e.currentTarget as HTMLButtonElement).style.filter = ""
+      }}
+    >
       {children}
     </button>
   )
@@ -686,7 +698,7 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
         style={{
           background: "var(--gs-modal-bg)",
           borderRadius: 20,
-          border: "1px solid #FECACA",
+          border: "1px solid var(--gs-modal-border)",
           boxShadow: "0 24px 80px rgba(239,68,68,0.15)",
           width: "100%", maxWidth: 460, position: "relative",
         }}
@@ -695,11 +707,10 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
         <div style={{ padding: "28px 28px 24px" }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12, background: "#FEE2E2",
-              border: "1px solid #FECACA", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            <div className="modal-danger-icon-box" style={{
+              width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
@@ -715,7 +726,7 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
           </div>
 
           {/* Checklist */}
-          <div style={{ background: "#FFF1F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 14px", marginBottom: 20 }}>
+          <div className="modal-danger-callout" style={{ marginBottom: 20 }}>
             {[
               "All indexed tracks and album metadata",
               "12 custom LENS DSP acoustic profiles",
@@ -723,10 +734,8 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
               "Audio engine configuration and preferences",
               "Playback history and custom queue orders",
             ].map((item) => (
-              <div key={item} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 11.5, color: "#9F1239" }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <div key={item} className="modal-danger-list-item" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ flexShrink: 0 }}>×</span>
                 {item}
               </div>
             ))}
@@ -738,7 +747,8 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
               type="checkbox"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
-              style={{ marginTop: 2, accentColor: "#DC2626", width: 15, height: 15, flexShrink: 0 }}
+              className="accent-rose-500"
+              style={{ marginTop: 2, width: 15, height: 15, flexShrink: 0 }}
             />
             <span style={{ fontSize: 12, color: "var(--settings-row-label)", lineHeight: 1.5 }}>
               I understand that all workspace data and settings will be permanently wiped.
@@ -747,18 +757,24 @@ function FactoryResetModal({ onCancel, onConfirm, wiping }: { onCancel: () => vo
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <Btn variant="outline" onClick={onCancel} disabled={wiping}>Cancel</Btn>
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={wiping}
+              className="modal-danger-cancel-btn"
+              style={{ fontSize: 12, fontWeight: 600, fontFamily: "inherit", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}
+            >Cancel</button>
             <button
               type="button"
               disabled={!confirmed || wiping}
               onClick={onConfirm}
+              className={confirmed && !wiping ? "modal-danger-confirm-active" : "modal-danger-confirm-disabled"}
               style={{
                 fontSize: 12, fontWeight: 700, fontFamily: "inherit",
-                background: confirmed && !wiping ? "#DC2626" : "#F87171",
-                color: "#FFFFFF", border: "none", borderRadius: 8,
+                border: "none", borderRadius: 8,
                 padding: "8px 16px", cursor: confirmed && !wiping ? "pointer" : "not-allowed",
                 display: "inline-flex", alignItems: "center", gap: 6,
-                transition: "background 0.15s", opacity: !confirmed ? 0.6 : 1,
+                transition: "background 0.15s, box-shadow 0.15s",
               }}
             >
               {wiping ? (
@@ -800,6 +816,9 @@ function DangerZoneSection({ showToast, onReset }: { showToast: (msg: string) =>
       for (const key of MONO_STORAGE_KEYS) {
         try { localStorage.removeItem(key) } catch {}
       }
+      // 첫 실행 설정은 Core 에 있다. 여기까지 지워야 초기화 뒤 마법사가 다시 뜬다 —
+      // 안 지우면 "공장 초기화"를 했는데 예전 출력 장치로 되돌아간다.
+      void clearSetup()
       setWiping(false)
       setShowFactoryModal(false)
       if (onReset) {
@@ -1096,6 +1115,7 @@ export default function GeneralSystemSettings({
 } = {}) {
   const [s, setS] = useState<GeneralSettings>(load)
   const [toast, setToast] = useState<string | null>(null)
+  const [interfaceLanguage, setInterfaceLanguage] = useState<"en" | "ko" | "ja" | "de">("en")
 
   function patch<K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) {
     setS((prev) => {
@@ -1202,7 +1222,33 @@ export default function GeneralSystemSettings({
         />
       </Section>
 
-      {/* Section 3: Backup & Restore */}
+      {/* Section 3: Language */}
+      <Section>
+        <SectionHeader
+          title="Language"
+          subtitle="Select your preferred display language for the Mono Studio Console."
+        />
+        <Row
+          label="Interface Language"
+          subtitle="Applies to navigation menus, audio telemetry readouts, and modal controls."
+          control={
+            <div className="settings-select-wrapper">
+              <select
+                className="settings-select-input"
+                value={interfaceLanguage}
+                onChange={(e) => setInterfaceLanguage(e.target.value as "en" | "ko" | "ja" | "de")}
+              >
+                <option value="en">English (US)</option>
+                <option value="ko">한국어 (Korean)</option>
+                <option value="ja">日本語 (Japanese)</option>
+                <option value="de">Deutsch (German)</option>
+              </select>
+            </div>
+          }
+        />
+      </Section>
+
+      {/* Section 4: Backup & Restore */}
       <BackupSection showToast={(msg) => setToast(msg)} />
 
       {/* Section 4: Diagnostics & Support */}

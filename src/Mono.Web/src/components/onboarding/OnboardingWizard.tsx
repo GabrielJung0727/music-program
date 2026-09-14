@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { Sun, Moon, FolderOpen, Plus, X, Check } from "lucide-react";
 import StreamingAuthModal from "./StreamingAuthModal";
-import SettingsPage from "../SettingsPage";
 import { type ListenerProfile } from "./Step3AudiophileRig";
-import { type AudioEngineConfig } from "./Step1AudioEngine";
+import Step1AudioEngine, { type AudioEngineConfig } from "./Step1AudioEngine";
 import { useMono, useMonoCommands } from "../../state/MonoProvider";
 import { StreamingProvider } from "../../lib/protocol";
-import { hasShell, pickFolder } from "../../lib/shell";
+import { hasShell, pickFolder, startOutput } from "../../lib/shell";
+import { saveSetup, backendFor, type AudioSetup } from "../../lib/setup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -288,32 +288,201 @@ function StepStorage({
   );
 }
 
-// ─── Step 3: Audio Output — SettingsPage (audio tab) ─────────────────────────
+// ─── Hardware status readout (step 4 footer center) ──────────────────────────
 
-function StepAudioOutput() {
+function HardwareStatusReadout({ audio }: { audio: AudioSetup | null }) {
+  if (!audio?.deviceName) return null;
+  const spec = [audio.driverType === "ASIO" ? "ASIO Direct" : "WASAPI Exclusive", audio.bufferSize + " samples"].join(" · ");
   return (
-    <div className="ob-settings-embed rounded-2xl overflow-hidden border" style={{ borderColor: "var(--ob-card-border)" }}>
-      <SettingsPage initialTab="audio" />
+    <div
+      className="flex items-center gap-2 flex-shrink-0 overflow-hidden px-3 py-1.5 rounded-full border"
+      style={{
+        background: "var(--ob-hw-pill-bg)",
+        borderColor: "var(--ob-hw-pill-border)",
+        color: "var(--ob-hw-pill-text)",
+      }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#10b981", boxShadow: "0 0 6px rgba(16,185,129,0.8)" }} />
+      <span className="text-[11px] font-medium truncate" style={{ fontFamily: "'DM Mono', monospace" }}>
+        Output: <span className="font-semibold">{audio.deviceName}</span> · {spec} Ready
+      </span>
     </div>
   );
 }
 
-// ─── Step 4: Streaming Accounts — SettingsPage (accounts tab) ────────────────
+// ─── Step 4: Hi-Res Streaming Integration ────────────────────────────────────
 
-function StepStreamingAccounts({
+const STREAMING_FEATURES = [
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+    title: "Zero Transcoding",
+    desc: "Mono routes audio directly from provider CDNs. No intermediary re-encoding, ever.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    ),
+    title: "Token Licensing",
+    desc: "Your credentials are stored locally and encrypted. Mono never proxies authentication.",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    ),
+    title: "Real-Time Sync",
+    desc: "Synchronized playback across Lounge sessions preserves bit-perfect integrity.",
+  },
+];
+
+function StepHiResStreaming({
   services,
-  onToggleService,
+  onConnect,
 }: {
   services: { qobuz: boolean; tidal: boolean };
-  onToggleService: (service: "qobuz" | "tidal") => void;
+  onConnect: (service: "qobuz" | "tidal") => void;
 }) {
   return (
-    <div className="ob-settings-embed rounded-2xl overflow-hidden border" style={{ borderColor: "var(--ob-card-border)" }}>
-      <SettingsPage
-        initialTab="accounts"
-        connectedServices={services}
-        onToggleService={onToggleService}
-      />
+    <div className="flex flex-col gap-5 w-full">
+      {/* Service cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Qobuz */}
+        <div
+          className="flex flex-col gap-4 rounded-2xl p-6 border transition-all"
+          style={{
+            background: "var(--ob-card-bg)",
+            borderColor: services.qobuz ? "rgba(124,58,237,0.45)" : "var(--ob-card-border)",
+            boxShadow: services.qobuz
+              ? "0 0 0 1px rgba(124,58,237,0.12), 0 4px 20px -2px rgba(0,0,0,0.05)"
+              : "var(--ob-card-shadow)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-black font-black text-lg select-none"
+              style={{ background: "linear-gradient(135deg,#C9A227 0%,#F5D06B 50%,#B8891A 100%)", fontFamily: "Georgia,serif", letterSpacing: "-1px", boxShadow: "0 2px 8px rgba(201,162,39,0.28)" }}
+            >
+              Q
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold leading-tight" style={{ color: "var(--ob-title)" }}>Qobuz Studio</p>
+              <p className="text-[11px] font-medium mt-0.5" style={{ ...mono(), color: "var(--ob-body)" }}>Direct API · 24-Bit / 192kHz Studio Master</p>
+            </div>
+            {services.qobuz && (
+              <span className="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ ...mono(), background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#10b981" }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#10b981", boxShadow: "0 0 5px rgba(16,185,129,0.7)" }} />
+                Connected
+              </span>
+            )}
+          </div>
+          <ul className="flex flex-col gap-2">
+            {["Lossless 16-Bit / 44.1kHz CD Quality", "Hi-Res 24-Bit / 192kHz Studio Master", "Direct CDN · Zero Transcoding"].map((item) => (
+              <li key={item} className="flex items-center gap-2.5 text-[11px] font-medium" style={{ ...mono(), color: "var(--ob-list-text, #475569)" }}>
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#C9A227" }} />
+                {item}
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => onConnect("qobuz")}
+            className="ob-connect-btn mt-auto w-full py-2.5 rounded-xl transition-all cursor-pointer"
+            style={services.qobuz ? {
+              background: "rgba(16,185,129,0.08)",
+              border: "1px solid rgba(16,185,129,0.3)",
+              color: "#10b981",
+              fontSize: 13,
+              fontWeight: 600,
+            } : undefined}
+          >
+            {services.qobuz ? "✓ Connected — Click to Disconnect" : "Connect Account"}
+          </button>
+        </div>
+
+        {/* TIDAL */}
+        <div
+          className="flex flex-col gap-4 rounded-2xl p-6 border transition-all"
+          style={{
+            background: "var(--ob-card-bg)",
+            borderColor: services.tidal ? "rgba(124,58,237,0.45)" : "var(--ob-card-border)",
+            boxShadow: services.tidal
+              ? "0 0 0 1px rgba(124,58,237,0.12), 0 4px 20px -2px rgba(0,0,0,0.05)"
+              : "var(--ob-card-shadow)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#0D0D0D", border: "1.5px solid rgba(0,200,220,0.4)", boxShadow: "0 0 10px rgba(0,200,220,0.18)" }}>
+              <svg width="20" height="16" viewBox="0 0 18 14" fill="none">
+                <path d="M9 0 L12 4 L15 0 L18 4 L15 8 L12 4 L9 8 L6 4 L3 8 L0 4 L3 0 L6 4 Z" fill="#00C8DC" opacity="0.9" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold leading-tight" style={{ color: "var(--ob-title)" }}>TIDAL Max</p>
+              <p className="text-[11px] font-medium mt-0.5" style={{ ...mono(), color: "var(--ob-body)" }}>OAuth 2.0 · HiRes FLAC &amp; Lossless Master</p>
+            </div>
+            {services.tidal && (
+              <span className="ml-auto flex-shrink-0 inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ ...mono(), background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#10b981" }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#10b981", boxShadow: "0 0 5px rgba(16,185,129,0.7)" }} />
+                Connected
+              </span>
+            )}
+          </div>
+          <ul className="flex flex-col gap-2">
+            {["Lossless FLAC · MQA / HiRes FLAC", "TIDAL Connect · Native Device Sync", "PKCE OAuth 2.0 · Secure Token Auth"].map((item) => (
+              <li key={item} className="flex items-center gap-2.5 text-[11px] font-medium" style={{ ...mono(), color: "var(--ob-list-text, #475569)" }}>
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#00C8DC" }} />
+                {item}
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => onConnect("tidal")}
+            className="ob-connect-btn mt-auto w-full py-2.5 rounded-xl transition-all cursor-pointer"
+            style={services.tidal ? {
+              background: "rgba(16,185,129,0.08)",
+              border: "1px solid rgba(16,185,129,0.3)",
+              color: "#10b981",
+              fontSize: 13,
+              fontWeight: 600,
+            } : undefined}
+          >
+            {services.tidal ? "✓ Connected — Click to Disconnect" : "Connect Account"}
+          </button>
+        </div>
+      </div>
+
+      {/* Security & architecture panel */}
+      <div
+        className="grid grid-cols-1 md:grid-cols-3 rounded-2xl overflow-hidden border"
+        style={{ borderColor: "var(--ob-card-border)", boxShadow: "var(--ob-card-shadow)" }}
+      >
+        {STREAMING_FEATURES.map(({ icon, title, desc }, i) => (
+          <div
+            key={title}
+            className="flex flex-col gap-3 p-5"
+            style={{
+              background: "var(--ob-card-bg)",
+              borderRight: i < STREAMING_FEATURES.length - 1 ? "1px solid var(--ob-card-border)" : undefined,
+            }}
+          >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "var(--ob-chip-bg)", color: "var(--accent-solo)" }}>
+              {icon}
+            </div>
+            <div>
+              <p className="text-xs font-bold mb-1" style={{ color: "var(--ob-title)" }}>{title}</p>
+              <p className="text-[11px] leading-relaxed" style={{ color: "var(--ob-body)" }}>{desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -459,38 +628,27 @@ function StepProfile({
 function StepReady({
   profile,
   storage,
+  services,
+  audio,
   onLaunch,
 }: {
   profile: ListenerProfile;
   storage: StorageConfig;
+  services: { qobuz: boolean; tidal: boolean };
+  audio: AudioEngineConfig;
   onLaunch: () => void;
 }) {
   const colorDef = AVATAR_COLORS.find((c) => c.key === profile.avatarColor) ?? AVATAR_COLORS[0];
   const initStr = initials(profile.displayName) || "AL";
 
-  // Read streaming state from localStorage (SettingsPage writes there on connect)
-  const [liveServices, setLiveServices] = useState({ qobuz: false, tidal: false });
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("mono_streaming_services");
-      if (raw) {
-        const parsed = JSON.parse(raw) as { qobuz?: { connected?: boolean }; tidal?: { connected?: boolean } };
-        setLiveServices({
-          qobuz: parsed.qobuz?.connected === true,
-          tidal: parsed.tidal?.connected === true,
-        });
-      }
-    } catch {}
-  }, []);
+  // 장치를 고르지 않았으면 출력은 OS 기본으로 간다. 고르지도 않은 DAC 이름을 적어 두면
+  // 사용자는 설정이 끝났다고 믿고, 소리는 다른 데서 난다.
+  const activeDevice = audio.deviceName
+    ? `${audio.deviceName} · ${audio.driverType === "ASIO" ? "ASIO Direct" : "WASAPI Exclusive"}`
+    : "System default output";
 
-  const [activeDevice] = useState(() => {
-    // SettingsPage keeps device in its own state; surface the label from localStorage if written,
-    // otherwise fall back to "Living Room · Holo May L3" (the default selected device)
-    return localStorage.getItem("mono_output_device") ?? "Living Room · Holo May L3";
-  });
-
-  const connectedCount = [liveServices.qobuz, liveServices.tidal].filter(Boolean).length;
-  const serviceLabel = connectedCount === 0 ? "Local library only" : [liveServices.qobuz && "Qobuz Studio", liveServices.tidal && "TIDAL Max"].filter(Boolean).join(" · ");
+  const connectedCount = [services.qobuz, services.tidal].filter(Boolean).length;
+  const serviceLabel = connectedCount === 0 ? "Local library only" : [services.qobuz && "Qobuz Studio", services.tidal && "TIDAL Max"].filter(Boolean).join(" · ");
 
   const rows = [
     { label: "Source",   value: storage.folders.length > 0 ? `${storage.folders.length} local folder${storage.folders.length > 1 ? "s" : ""} indexed` : "Streaming only" },
@@ -601,6 +759,15 @@ export default function OnboardingWizard({
     gear: { headphonesOrSpeakers: "", amplifier: "", dac: "" },
   });
 
+  const [audioConfig, setAudioConfig] = useState<AudioEngineConfig>({
+    driverType: "ASIO",
+    deviceId: "",
+    deviceName: "",
+    bufferSize: 256,
+    exclusiveMode: false,
+  });
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
   // 연동/해제는 Core 가 수행한다. 마법사는 요청만 보내고, 결과는 streamingAccounts 로 돌아온다.
   function handleToggleService(service: "qobuz" | "tidal") {
     const provider = service === "qobuz" ? StreamingProvider.Qobuz : StreamingProvider.Tidal;
@@ -620,7 +787,6 @@ export default function OnboardingWizard({
   }
 
   function handleComplete() {
-    localStorage.setItem("mono_onboarding_completed", "true");
     const name = profile.displayName.trim() || "Audiophile Listener";
     // 이름은 룸 멤버 목록·아카이브 참가자에 그대로 쓰인다.
     cmd.setDisplayName(name);
@@ -632,6 +798,23 @@ export default function OnboardingWizard({
         void cmd.scanLibrary(folder);
       }
     }
+    // 고른 값을 이 PC 에 남긴다. 다음 실행 때 마법사를 건너뛰고 이대로 복원한다.
+    // Core 에 쓰므로 WebView 캐시를 지워도, 브라우저로 열어도 같은 설정을 본다.
+    const chosen = audioConfig.deviceId ? audioConfig : null;
+    // 다음 실행이 아니라 지금부터 그 장치로 들리게 한다. 마법사에서 DAC 를 고르고
+    // 첫 곡이 내장 스피커로 나오면 무엇을 고른 건지 알 수 없다.
+    if (chosen && hasShell()) {
+      void startOutput(null, backendFor(chosen), chosen.deviceName);
+    }
+    void saveSetup({
+      completed: true,
+      theme: isDark ? "dark" : "light",
+      folders: storage.folders.filter((f) => f && f !== DEFAULT_MUSIC_FOLDER),
+      autoWatch: storage.autoWatch,
+      audio: chosen ?? undefined,
+      profile: { ...profile, displayName: name },
+    });
+
     onComplete({ ...profile, displayName: name });
   }
 
@@ -647,7 +830,7 @@ export default function OnboardingWizard({
     1: "Welcome to Mono",
     2: "Where is your music stored?",
     3: "Audio Output Device",
-    4: "Streaming Accounts",
+    4: "Hi-Res Streaming Integration",
     5: "Listener Profile & Signature Rig",
     6: "All Set for Bit-Perfect Listening",
   };
@@ -744,13 +927,31 @@ export default function OnboardingWizard({
             {step === 2 && (
               <StepStorage storage={storage} setStorage={setStorage} onSkip={advance} />
             )}
-            {step === 3 && <StepAudioOutput />}
+            {step === 3 && (
+              <Step1AudioEngine
+                initialConfig={audioConfig}
+                selectedDeviceId={selectedDeviceId}
+                onSelectDevice={(id) => setSelectedDeviceId(id || null)}
+                onNext={setAudioConfig}
+              />
+            )}
             {step === 4 && (
-              <StepStreamingAccounts services={services} onToggleService={handleToggleService} />
+              <StepHiResStreaming
+                services={services}
+                onConnect={(service) => {
+                  if (services[service]) {
+                    // Already connected → disconnect immediately
+                    handleToggleService(service);
+                  } else {
+                    // Not connected → open auth modal
+                    setAuthService(service);
+                  }
+                }}
+              />
             )}
             {step === 5 && <StepProfile profile={profile} setProfile={setProfile} />}
             {step === 6 && (
-              <StepReady profile={profile} storage={storage} onLaunch={handleComplete} />
+              <StepReady profile={profile} storage={storage} services={services} audio={audioConfig} onLaunch={handleComplete} />
             )}
           </div>
         )}
@@ -785,13 +986,18 @@ export default function OnboardingWizard({
               {step === 4 && (
                 <button
                   onClick={advance}
-                  className="text-[10px] text-zinc-400 hover:text-zinc-600 underline underline-offset-2 transition-colors"
-                  style={mono()}
+                  className="text-xs font-medium transition-colors"
+                  style={{ ...mono(), color: "var(--ob-body)" }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ob-title)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--ob-body)"; }}
                 >
                   Skip (Local Only)
                 </button>
               )}
             </div>
+
+            {/* Center: hardware status readout (step 4 only) */}
+            {step === 4 && <HardwareStatusReadout audio={audioConfig.deviceId ? audioConfig : null} />}
 
             {/* Right: primary CTA */}
             {step === 2 && (
@@ -800,15 +1006,23 @@ export default function OnboardingWizard({
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             )}
+            {/* 장치를 못 고르는 PC(브라우저·열거 실패)에서 마법사가 막히면 안 된다.
+                고르지 않으면 저장할 오디오 설정이 없고, 출력은 OS 기본 장치로 간다. */}
             {step === 3 && (
-              <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => {
+                  (document.getElementById("ae-emit-config") as HTMLButtonElement | null)?.click();
+                  advance();
+                }}
+                className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0"
+              >
                 Next: Streaming Services
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             )}
             {step === 4 && (
               <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
-                Next: Listener Profile
+                Continue to Profile
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             )}

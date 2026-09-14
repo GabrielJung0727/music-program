@@ -10,6 +10,15 @@ using NAudio.Wave;
 // Mono Output — 클럭 슬레이브 오디오 엔드포인트.
 // Core가 준 PTS와 클럭 오프셋으로 지정 시각에 출력한다. UI도, 선곡도 하지 않는다.
 
+// 장치 목록만 찍고 빠지는 모드. 셸의 마법사가 "이 PC 에 뭐가 달렸나"를 물을 때 쓴다.
+// Core 도 룸도 건드리지 않으니 앱이 떠 있든 말든 안전하다.
+if (args.Contains("--list-devices"))
+{
+    Console.Out.WriteLine(DeviceCatalog.ToJson());
+    Console.Out.Flush();
+    return;
+}
+
 var host = Arg("--host=") ?? "127.0.0.1";
 var roomId = Arg("--room=");
 var invite = Arg("--invite=");

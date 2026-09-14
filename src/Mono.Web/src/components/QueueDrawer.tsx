@@ -73,6 +73,7 @@ export default function QueueDrawer({
 
       {/* Drawer panel */}
       <div
+        data-queue-drawer
         className="queue-drawer-panel"
         style={{
           position: "fixed", right: 0, top: "4rem", bottom: "5rem",
@@ -248,14 +249,15 @@ export default function QueueDrawer({
 
                     {/* Track row */}
                     <div
+                      data-queue-track
                       onMouseEnter={() => setHoveredIdx(idx)}
                       onMouseLeave={() => setHoveredIdx(null)}
                       style={{
                         display: "flex", alignItems: "center", gap: 10,
                         padding: "7px 8px", borderRadius: 8,
-                        background: hoveredIdx === idx ? "rgba(250,250,250,0.8)" : "transparent",
+                        background: "transparent",
                         transition: "background 0.12s",
-                        cursor: canControl ? "default" : "default",
+                        cursor: "default",
                       }}
                     >
                       {/* Index / play button */}
@@ -288,12 +290,12 @@ export default function QueueDrawer({
 
                       {/* Meta */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 500, color: "#18181B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 1 }}>
+                        <div className="queue-track-title track-title" style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 1 }}>
                           {track.title}
                         </div>
-                        <div style={{ fontSize: 11, color: "#A1A1AA", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <p className="track-artist" style={{ fontSize: 11, color: "#A1A1AA", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
                           {track.artist}
-                        </div>
+                        </p>
                       </div>
 
                       {/* Duration */}
@@ -303,11 +305,10 @@ export default function QueueDrawer({
 
                       {/* Format badge — shown when not hovering with controls */}
                       {!(canControl && hoveredIdx === idx) && (
-                        <span style={{
+                        <span className="queue-service-badge" style={{
                           fontFamily: "'DM Mono', monospace", fontSize: 9.5, fontWeight: 500,
-                          color: "#71717A", background: "#F4F4F5",
-                          border: "1px solid #E4E4E7",
                           borderRadius: 4, padding: "2px 6px", flexShrink: 0, whiteSpace: "nowrap",
+                          textTransform: "uppercase", letterSpacing: "0.05em",
                         }}>
                           {track.source === "tidal" ? "TIDAL" : track.source === "local" ? "Local" : "Qobuz"}
                         </span>

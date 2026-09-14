@@ -1,389 +1,395 @@
-import { useState } from "react";
-
-export interface AudioDevice {
-  id: string;
-  name: string;
-  driverType: "ASIO" | "WASAPI_EXCLUSIVE";
-  sampleRates: string[];
-  isBitPerfectVerified: boolean;
-  capabilityTag: string;
-}
+import { useEffect, useState } from "react";
+import { hasShell, listAudioDevices, type AudioDeviceListing } from "../../lib/shell";
 
 export interface AudioEngineConfig {
   driverType: "ASIO" | "WASAPI_EXCLUSIVE";
   deviceId: string;
+  /** Output 워커가 부분 일치로 장치를 찾을 때 쓰는 이름. id 는 재부팅 뒤에도 같지만 사람이 못 읽는다. */
+  deviceName: string;
   bufferSize: number;
   exclusiveMode: boolean;
 }
 
 interface Props {
-  onNext: (config: AudioEngineConfig) => void;
-  initialConfig?: AudioEngineConfig;
+  onNext?: (config: AudioEngineConfig) => void;
+  initialConfig?: Partial<AudioEngineConfig>;
+  selectedDeviceId?: string | null;
+  onSelectDevice?: (deviceId: string) => void;
 }
 
-const MOCK_DEVICES: AudioDevice[] = [
-  {
-    id: "holo-spring-3",
-    name: "Holo Audio Spring 3 (ASIO Direct)",
-    driverType: "ASIO",
-    sampleRates: ["DSD512", "PCM 32/768k"],
-    isBitPerfectVerified: true,
-    capabilityTag: "DSD512",
-  },
-  {
-    id: "chord-hugo-tt2",
-    name: "Chord Hugo TT 2 (Kernel Streaming / ASIO)",
-    driverType: "ASIO",
-    sampleRates: ["PCM 32/768k"],
-    isBitPerfectVerified: true,
-    capabilityTag: "PCM 32/768k",
-  },
-  {
-    id: "system-wasapi",
-    name: "Default System Output (WASAPI Exclusive)",
-    driverType: "WASAPI_EXCLUSIVE",
-    sampleRates: ["PCM 24/192k"],
-    isBitPerfectVerified: true,
-    capabilityTag: "PCM 24/192k",
-  },
-];
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const BUFFER_SIZES = [64, 128, 256, 512, 1024] as const;
 
-function calcLatencyMs(bufferSize: number, sampleRate = 44100): string {
-  return ((bufferSize / sampleRate) * 1000).toFixed(1);
+type AudioDevice = AudioDeviceListing;
+
+const DRIVER_OPTIONS = [
+  {
+    type: "ASIO" as const,
+    label: "ASIO Direct",
+    badge: "Recommended",
+    desc: "Direct hardware buffer access. Zero OS mixer latency. Required for DSD.",
+  },
+  {
+    type: "WASAPI_EXCLUSIVE" as const,
+    label: "WASAPI Exclusive",
+    badge: null,
+    desc: "Windows Audio endpoint bypass. No third-party driver needed.",
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function calcLatencyMs(bufferSize: number): string {
+  return ((bufferSize / 44100) * 1000).toFixed(1);
 }
 
-function latencyLabel(bufferSize: number): string {
-  const ms = calcLatencyMs(bufferSize);
-  const stable = bufferSize >= 128;
-  return `Calculated Latency: ${ms} ms @ 44.1kHz (${stable ? "Stable Stream" : "Aggressive — may glitch"})`;
+function latencyGaugePct(bufferSize: number): number {
+  const lo = Math.log2(64);
+  const hi = Math.log2(1024);
+  return Math.round(((Math.log2(bufferSize) - lo) / (hi - lo)) * 100);
 }
 
-function latencyGaugePercent(bufferSize: number): number {
-  const MAX_BUFFER = 1024;
-  return Math.round((bufferSize / MAX_BUFFER) * 100);
-}
+// ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Step1AudioEngine({ onNext, initialConfig }: Props) {
+export default function Step1AudioEngine({
+  onNext,
+  initialConfig,
+  selectedDeviceId: controlledDeviceId,
+  onSelectDevice,
+}: Props) {
   const [driverType, setDriverType] = useState<"ASIO" | "WASAPI_EXCLUSIVE">(
     initialConfig?.driverType ?? "ASIO"
   );
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(
+  const [internalDeviceId, setInternalDeviceId] = useState<string>(
     initialConfig?.deviceId ?? ""
   );
   const [bufferSize, setBufferSize] = useState<number>(
     initialConfig?.bufferSize ?? 256
   );
   const [scanning, setScanning] = useState(false);
-  const [scanKey, setScanKey] = useState(0);
+  const [devices, setDevices] = useState<AudioDevice[]>([]);
+  const [scanned, setScanned] = useState(false);
 
-  const filteredDevices = MOCK_DEVICES.filter((d) => d.driverType === driverType);
-  const selectedDevice = filteredDevices.find((d) => d.id === selectedDeviceId) ?? null;
+  // 장치 목록은 이 PC 에 실제로 달린 것만 보여 준다. 브라우저에서는 열거할 방법이 없다.
+  async function rescan() {
+    setScanning(true);
+    try {
+      setDevices(await listAudioDevices());
+    } finally {
+      setScanning(false);
+      setScanned(true);
+    }
+  }
 
-  // If current selection is not valid for driver switch, clear it
-  const resolvedDeviceId =
-    filteredDevices.some((d) => d.id === selectedDeviceId) ? selectedDeviceId : "";
+  useEffect(() => { void rescan() }, []);
 
-  function handleDriverChange(type: "ASIO" | "WASAPI_EXCLUSIVE") {
+  // Parent-controlled selection wins; fall back to internal
+  const selectedDeviceId: string = controlledDeviceId ?? internalDeviceId;
+
+  function selectDevice(id: string) {
+    const next = selectedDeviceId === id ? "" : id;
+    setInternalDeviceId(next);
+    onSelectDevice?.(next);
+  }
+
+  // 고른 드라이버에 해당하는 장치만. ASIO 드라이버가 없는 PC 에서는 이 목록이 비는 게 맞다.
+  const visibleDevices = devices.filter((d) => d.driverType === driverType);
+  const selectedDevice = devices.find((d) => d.id === selectedDeviceId) ?? null;
+
+  function handleDriverSwitch(type: "ASIO" | "WASAPI_EXCLUSIVE") {
     setDriverType(type);
-    const stillValid = MOCK_DEVICES.find(
-      (d) => d.id === selectedDeviceId && d.driverType === type
-    );
-    if (!stillValid) setSelectedDeviceId("");
   }
 
   function handleRescan() {
     if (scanning) return;
-    setScanning(true);
-    setScanKey((k) => k + 1);
-    setTimeout(() => setScanning(false), 1000);
+    void rescan();
   }
 
-  function handleContinue() {
-    if (!resolvedDeviceId) return;
-    onNext({
+  // Called by the wizard footer's "Next: Streaming Services" button via onNext
+  // (wizard passes onNext={(cfg) => { setAudioConfig(cfg); advance(); }})
+  function emitConfig() {
+    if (!selectedDevice) return;
+    onNext?.({
       driverType,
-      deviceId: resolvedDeviceId,
+      deviceId: selectedDevice.id,
+      deviceName: selectedDevice.name,
       bufferSize,
       exclusiveMode: driverType === "WASAPI_EXCLUSIVE",
     });
   }
 
-  const canContinue = resolvedDeviceId !== "";
+  // Expose emitConfig on the DOM so the wizard footer can trigger it
+  // without coupling parent ↔ child state unnecessarily
+  const latencyMs = calcLatencyMs(bufferSize);
+  const gaugePct = latencyGaugePct(bufferSize);
+  const isStable = bufferSize >= 128;
 
   return (
-    <div className="flex flex-col gap-8 w-full max-w-xl mx-auto px-1">
-      {/* Header */}
-      <div className="flex flex-col gap-1.5">
-        <span
-          style={{ fontFamily: "'DM Mono', monospace" }}
-          className="text-[10px] tracking-widest text-zinc-400 uppercase"
-        >
-          Step 01 / 04 · Engine Setup
-        </span>
-        <h2 className="text-xl font-semibold ob-title tracking-tight leading-snug">
-          Audio Output &amp; Hardware DAC
-        </h2>
-        <p className="text-sm ob-body leading-relaxed max-w-md">
-          Select your primary playback interface. Mono bypasses the OS mixer to
-          establish a direct, bit-perfect stream.
-        </p>
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
 
-      {/* Section 1: Driver Architecture */}
-      <div className="flex flex-col gap-3">
-        <span className="text-[10px] font-semibold tracking-widest text-zinc-400 uppercase"
-          style={{ fontFamily: "'DM Mono', monospace" }}>
-          Driver Architecture
-        </span>
-        <div className="inline-flex ob-driver-pool rounded-xl p-1 gap-1 self-start">
-          {(
-            [
-              {
-                type: "ASIO" as const,
-                label: "ASIO",
-                badge: "Recommended",
-                desc: "Direct hardware buffer access, zero OS latency.",
-              },
-              {
-                type: "WASAPI_EXCLUSIVE" as const,
-                label: "WASAPI Exclusive",
-                badge: null,
-                desc: "Direct Windows Audio Endpoint bypass.",
-              },
-            ] as const
-          ).map(({ type, label, badge, desc }) => {
-            const active = driverType === type;
-            return (
-              <button
-                key={type}
-                onClick={() => handleDriverChange(type)}
-                className={[
-                  "flex flex-col items-start px-4 py-2.5 rounded-lg transition-all text-left",
-                  active ? "ob-driver-tab-active shadow-sm" : "ob-driver-tab",
-                ].join(" ")}
+      {/* ── LEFT COLUMN ───────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-5">
+
+        {/* Driver Architecture */}
+        <div className="ae-panel">
+          <p className="ae-section-label">Driver Architecture</p>
+          <div className="flex flex-col gap-2.5">
+            {DRIVER_OPTIONS.map(({ type, label, badge, desc }) => {
+              const active = driverType === type;
+              return (
+                <button
+                  key={type}
+                  onClick={() => handleDriverSwitch(type)}
+                  className={["ae-selcard", active ? "ae-active" : ""].join(" ")}
+                >
+                  {/* Radio dot */}
+                  <div className="ae-radio">
+                    {active && (
+                      <div
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: "#a78bfa" }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Text */}
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="ae-card-name">{label}</span>
+                      {badge && (
+                        <span className={active ? "ae-rec-badge" : "ae-rec-badge-dim"}>
+                          {badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="ae-card-desc">{desc}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Buffer Size */}
+        <div className="ae-panel">
+          <p className="ae-section-label">Hardware Buffer Size</p>
+
+          {/* Pills */}
+          <div className="flex items-center gap-1.5 mb-4">
+            {BUFFER_SIZES.map((size) => {
+              const active = bufferSize === size;
+              return (
+                <button
+                  key={size}
+                  onClick={() => setBufferSize(size)}
+                  className={["ae-buffer-pill", active ? "ae-active" : ""].join(" ")}
+                >
+                  {size}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Latency card */}
+          <div className="ae-latency-card">
+            {/* Gauge bar */}
+            <div className="ae-latency-track">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${gaugePct}%`,
+                  background: isStable
+                    ? "linear-gradient(90deg, #059669, #10b981)"
+                    : "linear-gradient(90deg, #d97706, #f59e0b)",
+                  boxShadow: isStable
+                    ? "0 0 6px rgba(16,185,129,0.5)"
+                    : "0 0 6px rgba(245,158,11,0.5)",
+                }}
+              />
+            </div>
+
+            {/* Readout row */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="ae-latency-readout">
+                {latencyMs} ms @ 44.1kHz &bull; {bufferSize} samples
+              </span>
+              <span
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold"
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  color: isStable ? "#059669" : "#d97706",
+                }}
               >
-                <span className="flex items-center gap-2 text-xs font-semibold leading-none mb-1">
-                  <span
-                    className={["inline-block w-1.5 h-1.5 rounded-full", !active ? "bg-zinc-400" : ""].join(" ")}
-                    style={active ? { background: "var(--ob-driver-tab-active-text)" } : {}}
-                  />
-                  {label}
-                  {badge && (
-                    <span
-                      className={[
-                        "text-[9px] tracking-wider px-1.5 py-0.5 rounded-full font-mono font-medium",
-                        active ? "" : "ob-chip",
-                      ].join(" ")}
-                      style={active ? { background: "rgba(128,128,128,0.2)", color: "currentColor" } : { fontFamily: "'DM Mono', monospace" }}
-                    >
-                      {badge}
-                    </span>
-                  )}
-                </span>
-                <span className="text-[10px] leading-snug opacity-60">
-                  {desc}
-                </span>
-              </button>
-            );
-          })}
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{
+                    background: isStable ? "#10b981" : "#f59e0b",
+                    boxShadow: isStable
+                      ? "0 0 5px rgba(16,185,129,0.7)"
+                      : "0 0 5px rgba(245,158,11,0.7)",
+                  }}
+                />
+                {isStable ? "Stable" : "Aggressive"}
+              </span>
+            </div>
+
+            {/* Hint */}
+            <p className="ae-latency-hint">
+              {isStable
+                ? "Stream-stable. Recommended for all DACs and long listening sessions."
+                : "Low latency mode — may cause glitches on slower USB controllers."}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Section 2: Detected Devices */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span
-            className="text-[10px] font-semibold tracking-widest text-zinc-400 uppercase"
-            style={{ fontFamily: "'DM Mono', monospace" }}
-          >
-            Detected Devices
-          </span>
+      {/* ── RIGHT COLUMN ──────────────────────────────────────────────────── */}
+      <div className="ae-panel flex flex-col" style={{ minHeight: 0 }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="ae-section-label" style={{ marginBottom: 0 }}>Detected Hardware</p>
           <button
             onClick={handleRescan}
             disabled={scanning}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors font-mono disabled:cursor-wait"
-            style={{ fontFamily: "'DM Mono', monospace" }}
+            className="ae-rescan-btn"
           >
-            {scanning ? (
-              <>
-                <svg
-                  className="w-3 h-3 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    d="M12 3a9 9 0 1 0 9 9"
-                    strokeDasharray="4 2"
-                  />
-                </svg>
-                Scanning…
-              </>
-            ) : (
-              <>
-                <svg
-                  className="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0 1 15.46-2M20 15a8 8 0 0 1-15.46 2"
-                  />
-                </svg>
-                Rescan Hardware
-              </>
-            )}
+            <svg
+              className={["w-3 h-3", scanning ? "animate-spin" : ""].join(" ")}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0 1 15.46-2M20 15a8 8 0 0 1-15.46 2" />
+            </svg>
+            {scanning ? "Scanning…" : "↻ Rescan"}
           </button>
         </div>
 
-        <div key={scanKey} className="flex flex-col gap-2">
-          {filteredDevices.map((device) => {
-            const selected = resolvedDeviceId === device.id;
-            return (
-              <button
-                key={device.id}
-                onClick={() => setSelectedDeviceId(device.id)}
-                className={[
-                  "w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border",
-                  selected ? "ob-card-active" : "ob-card",
-                ].join(" ")}
+        {/* Scrollable device list */}
+        <div
+          className="ae-device-scroll flex flex-col gap-2.5 overflow-y-auto pr-1"
+          style={{ maxHeight: 460 }}
+        >
+          {visibleDevices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <svg
+                className="w-8 h-8 opacity-20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
               >
-                {/* Radio indicator */}
-                <div
-                  className={["mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center", !selected ? "border-zinc-300" : ""].join(" ")}
-                  style={selected ? { borderColor: "var(--ob-radio-active)" } : {}}
+                <circle cx="12" cy="12" r="10" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              <p
+                className="text-xs text-center ae-latency-hint"
+                style={{ opacity: 1 }}
+              >
+                {!hasShell() ? (
+                  <>
+                    출력 장치는 Mono 데스크톱 앱에서만 찾을 수 있습니다.
+                    <br />
+                    브라우저에서는 목록이 비어 있습니다.
+                  </>
+                ) : !scanned ? (
+                  <>장치를 찾는 중…</>
+                ) : (
+                  <>
+                    {driverType === "ASIO" ? "ASIO" : "WASAPI"} 장치를 찾지 못했습니다.
+                    <br />
+                    다른 아키텍처를 고르거나 Rescan 을 눌러 보세요.
+                  </>
+                )}
+              </p>
+            </div>
+          ) : (
+            visibleDevices.map((device) => {
+              const selected = selectedDeviceId === device.id;
+              return (
+                <button
+                  key={device.id}
+                  onClick={() => selectDevice(device.id)}
+                  className={["ae-selcard", selected ? "ae-active" : ""].join(" ")}
+                  style={{ padding: "1rem" }}
                 >
-                  {selected && (
-                    <div className="w-2 h-2 rounded-full" style={{ background: "var(--ob-radio-active)" }} />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex flex-col gap-2 min-w-0">
-                  <span className="text-sm font-semibold ob-title leading-tight">
-                    {device.name}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {device.sampleRates.map((tag) => (
-                      <span
-                        key={tag}
-                        className="ob-chip text-[10px] px-2 py-0.5 rounded"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {device.isBitPerfectVerified && (
-                      <span
-                        className="badge-bitperfect-verified"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        <span className="badge-bitperfect-dot" />
-                        Bit-Perfect Verified
-                      </span>
+                  {/* Radio dot */}
+                  <div className="ae-radio" style={{ marginTop: 3 }}>
+                    {selected && (
+                      <div
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: "#a78bfa" }}
+                      />
                     )}
                   </div>
-                </div>
-              </button>
-            );
-          })}
 
-          {filteredDevices.length === 0 && (
-            <p
-              className="text-xs text-zinc-400 py-4 text-center"
-              style={{ fontFamily: "'DM Mono', monospace" }}
-            >
-              No {driverType === "ASIO" ? "ASIO" : "WASAPI"} devices detected.
-              Try Rescan Hardware.
-            </p>
+                  {/* Content */}
+                  <div className="flex flex-col gap-2 min-w-0 flex-1">
+                    {/* Name + arch chip */}
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <span className="ae-card-name leading-tight">{device.name}</span>
+                      <span className="ae-arch-chip">{device.architecture}</span>
+                    </div>
+
+                    {/* Subtitle */}
+                    <p className="ae-card-desc">{device.subtitle}</p>
+
+                    {/* Spec + DSD badges */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {device.specs.map((s) => (
+                        <span key={s} className="ae-spec-badge">{s}</span>
+                      ))}
+                      {device.dsdSupport && (
+                        <span className="ae-dsd-badge">{device.dsdSupport}</span>
+                      )}
+                    </div>
+
+                    {/* Bit-perfect / shared mode status */}
+                    {device.bitPerfectVerified ? (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{
+                            background: "#10b981",
+                            boxShadow: "0 0 5px rgba(16,185,129,0.6)",
+                          }}
+                        />
+                        <span className="ae-bitperfect">● Bit-Perfect Link Verified</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{ background: "#a1a1aa" }}
+                        />
+                        <span className="ae-shared-mode">Shared Mode — not bit-perfect</span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* Section 3: Buffer Size */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="text-[10px] font-semibold tracking-widest text-zinc-400 uppercase"
-            style={{ fontFamily: "'DM Mono', monospace" }}
-          >
-            Buffer Size &amp; Latency
-          </span>
-          <span
-            className="text-[10px] latency-telemetry-text"
-            style={{ fontFamily: "'DM Mono', monospace" }}
-          >
-            (Default: 256 samples)
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {BUFFER_SIZES.map((size) => {
-            const active = bufferSize === size;
-            return (
-              <button
-                key={size}
-                onClick={() => setBufferSize(size)}
-                className={[
-                  "w-14 py-1.5 rounded-lg text-xs border text-center transition-all",
-                  active ? "setup-pill-active" : "setup-pill-inactive",
-                ].join(" ")}
-                style={{ fontFamily: "'DM Mono', monospace" }}
-              >
-                {size}
-              </button>
-            );
-          })}
-        </div>
-        {/* Latency Gauge */}
-        <div className="flex flex-col gap-2 pt-0.5">
-          <div className="latency-gauge-track">
-            <div
-              className="latency-gauge-fill"
-              style={{ width: `${latencyGaugePercent(bufferSize)}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="latency-telemetry-text">
-              {calcLatencyMs(bufferSize)} ms @ 44.1kHz • {bufferSize} samples
-            </span>
-            <span
-              className="inline-flex items-center gap-1.5 latency-telemetry-text"
-              style={{ color: bufferSize >= 128 ? "var(--gauge-text-stable)" : "#f59e0b" }}
-            >
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{
-                  background: bufferSize >= 128 ? "var(--gauge-dot-stable)" : "#f59e0b",
-                  boxShadow: bufferSize >= 128 ? "0 0 4px var(--gauge-dot-stable)" : "0 0 4px #f59e0b",
-                }}
-              />
-              {bufferSize >= 128 ? "Stable" : "Aggressive"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Action Bar */}
-      <div className="ob-divider flex items-center justify-between pt-2 border-t">
-        <span className="text-xs ob-body">
-          Configure advanced DSP later in Settings
-        </span>
-        <button
-          onClick={handleContinue}
-          disabled={!canContinue}
-          className="ob-action-btn text-xs font-semibold px-6 py-2.5 rounded-xl shadow-sm"
-        >
-          Continue to Services →
-        </button>
-      </div>
+      {/*
+        The parent OnboardingWizard renders its own Back / Next footer.
+        onNext is called by the wizard's "Next: Streaming Services" button
+        via the onNext prop passed in from OnboardingWizard.tsx.
+        We expose a hidden trigger so the wizard can call emitConfig()
+        if it needs the config before advancing.
+      */}
+      <button
+        id="ae-emit-config"
+        onClick={emitConfig}
+        style={{ display: "none" }}
+        aria-hidden="true"
+      />
     </div>
   );
 }

@@ -3,8 +3,44 @@ import type { HomeAlbum, InsightCard, LabelTile, LoungeCard as LoungeCardData } 
 import { MonoIcon } from "../icons/MonoIcons"
 
 // ── Lounge Card ──────────────────────────────────────────────────────────────
-function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoined: boolean; onToggle: (id: string, e: React.MouseEvent) => void }) {
+function LoungeCard({ card, isJoined, onJoin, onLeave }: {
+  card: LoungeCardData
+  isJoined: boolean
+  onJoin: (id: string, e: React.MouseEvent) => void
+  onLeave: (e: React.MouseEvent) => void
+}) {
   const [btnHovered, setBtnHovered] = useState(false)
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isJoined) {
+      onLeave(e)
+    } else {
+      onJoin(card.id, e)
+    }
+  }
+
+  // Button appearance
+  let btnColor: string
+  let btnBg: string
+  let btnBorder: string
+  if (isJoined && btnHovered) {
+    btnColor = "var(--home-leave-text-hover)"
+    btnBg = "var(--home-leave-bg-hover)"
+    btnBorder = "1px solid var(--home-leave-border-hover)"
+  } else if (isJoined) {
+    btnColor = "var(--home-joined-text)"
+    btnBg = "var(--home-joined-bg)"
+    btnBorder = "1px solid var(--home-joined-border)"
+  } else if (btnHovered) {
+    btnColor = "var(--home-join-text-hover)"
+    btnBg = "var(--home-join-bg-hover)"
+    btnBorder = "1px solid var(--home-join-border-hover)"
+  } else {
+    btnColor = "var(--home-join-text)"
+    btnBg = "var(--home-join-bg)"
+    btnBorder = "1px solid var(--home-join-border)"
+  }
 
   return (
     <div
@@ -17,8 +53,8 @@ function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoin
         transition: "box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s, background 0.15s",
         flexShrink: 0,
       }}
-      onMouseEnter={(e) => { ;(e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.3)"; (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.18)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)" }}
-      onMouseLeave={(e) => { ;(e.currentTarget as HTMLDivElement).style.boxShadow = "none"; (e.currentTarget as HTMLDivElement).style.borderColor = isJoined ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)" }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.3)"; (e.currentTarget as HTMLDivElement).style.borderColor = isJoined ? "rgba(59,130,246,0.6)" : "rgba(255,255,255,0.18)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)" }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; (e.currentTarget as HTMLDivElement).style.borderColor = isJoined ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)" }}
     >
       <div className="flex items-start gap-3">
         <img src={card.art} alt={card.title} style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover", background: "var(--surface-hover)", flexShrink: 0 }} />
@@ -37,27 +73,23 @@ function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoin
       <div className="flex items-center justify-between">
         <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 500, color: "var(--text-muted)", background: "var(--home-badge-bg)", border: "1px solid var(--home-badge-border)", borderRadius: 4, padding: "2px 6px" }}>{card.spec || "Live"}</span>
         <button
-          onClick={(e) => onToggle(card.id, e)}
+          onClick={handleClick}
           onMouseEnter={() => setBtnHovered(true)}
           onMouseLeave={() => setBtnHovered(false)}
           style={{
             fontSize: 12, fontWeight: 500,
-            color: isJoined
-              ? (btnHovered ? "var(--home-leave-text-hover)" : "var(--home-joined-text)")
-              : "var(--home-join-text)",
-            background: isJoined
-              ? (btnHovered ? "var(--home-leave-bg-hover)" : "var(--home-joined-bg)")
-              : "var(--home-join-bg)",
-            border: isJoined
-              ? (btnHovered ? "1px solid var(--home-leave-border-hover)" : "1px solid var(--home-joined-border)")
-              : "1px solid var(--home-join-border)",
+            color: btnColor,
+            background: btnBg,
+            border: btnBorder,
             borderRadius: 7, padding: "5px 12px", cursor: "pointer",
-            transition: "all 0.15s ease", fontFamily: "inherit",
+            transition: "color 0.15s ease, background 0.15s ease, border-color 0.15s ease",
+            fontFamily: "inherit",
+            whiteSpace: "nowrap",
           }}
         >
           {isJoined ? (
             btnHovered ? (
-              <span className="inline-flex items-center gap-1"><MonoIcon.Close size={11} /><span>Leave</span></span>
+              <span className="inline-flex items-center gap-1"><MonoIcon.Close size={11} /><span>Leave Lounge</span></span>
             ) : (
               <span className="inline-flex items-center gap-1"><MonoIcon.Check size={11} strokeWidth={2.5} /><span>Joined</span></span>
             )
@@ -71,7 +103,7 @@ function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoin
 }
 
 // ── Mono Sessions Section ────────────────────────────────────────────────────
-function SocialLoungesSection({ joinedLoungeId, onToggleJoin, cards, archiveCount }: { joinedLoungeId: string | null; onToggleJoin: (id: string, e: React.MouseEvent) => void; cards: LoungeCardData[]; archiveCount: number }) {
+function SocialLoungesSection({ joinedLoungeId, onToggleJoin, onLeaveLounge, cards, archiveCount }: { joinedLoungeId: string | null; onToggleJoin: (id: string, e: React.MouseEvent) => void; onLeaveLounge: (e: React.MouseEvent) => void; cards: LoungeCardData[]; archiveCount: number }) {
   const railRef = useRef<HTMLDivElement>(null)
   const [activeSessionTab, setActiveSessionTab] = useState<"live" | "hof">("live")
 
@@ -88,14 +120,14 @@ function SocialLoungesSection({ joinedLoungeId, onToggleJoin, cards, archiveCoun
       <div className="flex items-center gap-2 mb-5">
         <button
           onClick={() => setActiveSessionTab("live")}
-          style={{ fontSize: 12, fontWeight: activeSessionTab === "live" ? 600 : 500, color: activeSessionTab === "live" ? "var(--home-session-tab-live-text)" : "var(--text-secondary)", background: activeSessionTab === "live" ? "var(--home-session-tab-live-bg)" : "transparent", border: activeSessionTab === "live" ? "1px solid var(--home-session-tab-live-border)" : "1px solid transparent", borderRadius: 20, padding: "5px 13px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "none", transition: "all 0.15s", fontFamily: "inherit" }}
+          className={`session-pill ${activeSessionTab === "live" ? "session-pill-active" : "session-pill-inactive"}`}
         >
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3B82F6", display: "inline-block", flexShrink: 0 }} />
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: activeSessionTab === "live" ? "currentColor" : "#3B82F6", display: "inline-block", flexShrink: 0 }} />
           Live Now ({cards.length})
         </button>
         <button
           onClick={() => setActiveSessionTab("hof")}
-          style={{ fontSize: 12, fontWeight: activeSessionTab === "hof" ? 600 : 500, color: activeSessionTab === "hof" ? "var(--home-session-tab-hof-text)" : "var(--text-secondary)", background: activeSessionTab === "hof" ? "var(--home-session-tab-hof-bg)" : "transparent", border: activeSessionTab === "hof" ? "1px solid var(--home-session-tab-hof-border)" : "1px solid transparent", borderRadius: 20, padding: "5px 13px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "none", transition: "all 0.15s", fontFamily: "inherit" }}
+          className={`session-pill ${activeSessionTab === "hof" ? "session-pill-active" : "session-pill-inactive"}`}
         >
           <MonoIcon.Trophy size={13} className="text-amber-400" />
           <span>Hall of Fame</span>
@@ -104,7 +136,7 @@ function SocialLoungesSection({ joinedLoungeId, onToggleJoin, cards, archiveCoun
 
       <div ref={railRef} style={{ display: "flex", gap: 16, overflowX: "hidden", paddingBottom: 4 }}>
         {cards.map((card) => (
-          <LoungeCard key={card.id} card={card} isJoined={joinedLoungeId === card.roomId} onToggle={onToggleJoin} />
+          <LoungeCard key={card.id} card={card} isJoined={joinedLoungeId === card.roomId} onJoin={onToggleJoin} onLeave={onLeaveLounge} />
         ))}
         {cards.length === 0 && (
           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "var(--text-muted)", padding: "32px 4px" }}>
@@ -273,7 +305,7 @@ function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, 
                 color: "var(--home-filter-chip-active-text)",
                 border: "1px solid var(--home-filter-chip-active-border)",
                 fontWeight: 600,
-                boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                boxShadow: "var(--home-filter-chip-active-shadow, 0 1px 4px rgba(0,0,0,0.15))",
                 fontFamily: "inherit",
               } : {
                 background: "var(--home-filter-chip-bg)",
@@ -402,11 +434,12 @@ function LabelArchivesSection({ labels }: { labels: LabelTile[] }) {
 
 // ── Home Page ────────────────────────────────────────────────────────────────
 export default function HomePage({
-  joinedLoungeId, onToggleJoin, onNavigateToTracks, onPlayAlbum, onSelectAlbum,
+  joinedLoungeId, onToggleJoin, onLeaveLounge, onNavigateToTracks, onPlayAlbum, onSelectAlbum,
   displayName, loungeCards, archiveCount, albums, chips, insights, labels,
 }: {
   joinedLoungeId: string | null
   onToggleJoin: (id: string, e: React.MouseEvent) => void
+  onLeaveLounge: (e: React.MouseEvent) => void
   onNavigateToTracks: () => void
   onPlayAlbum?: (album: HomeAlbum) => void
   onSelectAlbum?: (album: HomeAlbum) => void
@@ -422,7 +455,7 @@ export default function HomePage({
     <div style={{ maxWidth: 1260, margin: "0 auto", padding: "40px 64px" }}>
       <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text-primary)", marginBottom: 56, letterSpacing: "-0.4px" }}>Welcome, {displayName}!</h1>
       <div style={{ marginBottom: 56 }}>
-        <SocialLoungesSection joinedLoungeId={joinedLoungeId} onToggleJoin={onToggleJoin} cards={loungeCards} archiveCount={archiveCount} />
+        <SocialLoungesSection joinedLoungeId={joinedLoungeId} onToggleJoin={onToggleJoin} onLeaveLounge={onLeaveLounge} cards={loungeCards} archiveCount={archiveCount} />
       </div>
       <div style={{ marginBottom: 56 }}>
         <RecentlyAddedSection onNavigateToTracks={onNavigateToTracks} onPlayAlbum={onPlayAlbum} onSelectAlbum={onSelectAlbum} albums={albums} chips={chips} />

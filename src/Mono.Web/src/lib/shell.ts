@@ -8,6 +8,19 @@ export interface OutputStatus {
   coreRunning: boolean
 }
 
+/** 이 PC 에 실제로 달린 출력 하나. 열거는 Output 워커가 한다. */
+export interface AudioDeviceListing {
+  id: string
+  name: string
+  driverType: "ASIO" | "WASAPI_EXCLUSIVE"
+  architecture: string
+  subtitle: string
+  specs: string[]
+  dsdSupport: string | null
+  bitPerfectVerified: boolean
+  isDefault: boolean
+}
+
 export interface UpdateStatus {
   message: string
   available: boolean
@@ -24,10 +37,11 @@ interface MonoBridge {
   pickFile(title?: string, filter?: string): Promise<string | null>
   openExternal(url: string): Promise<boolean>
   output: {
-    start(roomId?: string | null, backend?: string): Promise<{ ok: boolean; error?: string | null }>
+    start(roomId?: string | null, backend?: string, device?: string): Promise<{ ok: boolean; error?: string | null }>
     stop(): Promise<{ ok: boolean }>
     restart(): Promise<{ ok: boolean; error?: string | null }>
     status(): Promise<OutputStatus>
+    devices(): Promise<AudioDeviceListing[]>
   }
   update: {
     check(): Promise<UpdateStatus>
@@ -87,13 +101,27 @@ export function openExternal(url: string) {
 }
 
 /** 출력 워커. 셸이 없으면 Output 프로세스를 띄울 방법이 없으므로 안내가 필요하다. */
-export async function startOutput(roomId?: string | null, backend?: string) {
+export async function startOutput(roomId?: string | null, backend?: string, device?: string) {
   const bridge = shell()
   if (!bridge) return { ok: false, error: "출력은 Mono 데스크톱 앱에서만 연결할 수 있습니다." }
   try {
-    return await bridge.output.start(roomId ?? null, backend)
+    return await bridge.output.start(roomId ?? null, backend, device)
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * 이 PC 에 달린 출력 목록. 브라우저에서는 열거할 방법이 없으므로 빈 배열이고,
+ * 호출부는 그때 "데스크톱 앱에서만 보인다"고 말해야 한다.
+ */
+export async function listAudioDevices(): Promise<AudioDeviceListing[]> {
+  const bridge = shell()
+  if (!bridge) return []
+  try {
+    return await bridge.output.devices()
+  } catch {
+    return []
   }
 }
 

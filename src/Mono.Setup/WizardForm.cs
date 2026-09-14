@@ -5,7 +5,11 @@ using System.Reflection;
 namespace Mono.Setup;
 
 /// <summary>
-/// Roon형 step 0–4 설치 위저드. 선택값은 prefs.ini에 쓰고 onboarded=1 로 남긴다.
+/// 설치만 하는 위저드. 설치 위치를 묻고, 풀고, 앱을 띄운다.
+///
+/// 예전에는 여기서 이름·라이브러리·출력 장치·스트리밍까지 물었다. 같은 질문을 앱의
+/// 첫 실행 마법사가 훨씬 나은 화면으로 다시 하고 있었고, 두 답이 갈라지면 어느 쪽이
+/// 이기는지도 분명하지 않았다. 설치 프로그램은 파일을 놓는 일만 한다.
 /// </summary>
 internal sealed class WizardForm : Form
 {
@@ -14,18 +18,11 @@ internal sealed class WizardForm : Form
     private static readonly Color SoftAccent = Color.FromArgb(236, 236, 248);
     private static readonly Color TextCol = Color.FromArgb(26, 26, 30);
     private static readonly Color Muted = Color.FromArgb(107, 111, 122);
-    private static readonly Color Border = Color.FromArgb(230, 231, 236);
-    private static readonly Color CardBg = Color.FromArgb(247, 247, 250);
 
     private readonly bool _silent;
     private int _step;
     private string _installRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
-    private string _displayName = Environment.UserName;
-    private string _libraryPath = "";
-    private string _zoneName = "This PC";
-    private bool _enableLocalOutput = true;
-    private string _streaming = "none";
     private bool _busy;
     private Image? _bgImage;
 
@@ -67,7 +64,7 @@ internal sealed class WizardForm : Form
         {
             if (_silent)
             {
-                _step = 5;
+                _step = 1;
                 Render();
                 await InstallAndFinishAsync(launch: true);
                 return;
@@ -87,15 +84,7 @@ internal sealed class WizardForm : Form
         _body.Controls.Clear();
         _footer.Controls.Clear();
 
-        string bgName = _step switch
-        {
-            0 => "welcome",
-            1 => "name",
-            2 => "library",
-            3 => "audio",
-            4 => "streaming",
-            _ => "installing",
-        };
+        string bgName = _step == 0 ? "welcome" : "installing";
         var bg = LoadBg(bgName);
         if (bg is not null)
         {
@@ -106,15 +95,8 @@ internal sealed class WizardForm : Form
             old?.Dispose();
         }
 
-        switch (_step)
-        {
-            case 0: RenderWelcome(); break;
-            case 1: RenderName(); break;
-            case 2: RenderLibrary(); break;
-            case 3: RenderAudio(); break;
-            case 4: RenderStreaming(); break;
-            default: RenderInstalling(); break;
-        }
+        if (_step == 0) RenderWelcome();
+        else RenderInstalling();
 
         _body.ResumeLayout();
         _footer.ResumeLayout();
@@ -125,7 +107,7 @@ internal sealed class WizardForm : Form
         // 워드마크만 — 큰 앱 아이콘 PictureBox는 제거 (텍스트와 겹침)
         var brand = TitleLabel("mono", 36, 400);
         var tag = TitleLabel("혼자서도, 같이서도\n하나의 소리로.", 20, 400);
-        var sub = MutedLabel("이름·라이브러리·출력·스트리밍을 여기서 맞춘 뒤 설치합니다.\n본 앱을 열면 바로 쓸 수 있습니다.", 400);
+        var sub = MutedLabel("설치만 하면 됩니다.\n이름·라이브러리·출력 장치·스트리밍은 처음 실행할 때 앱 안에서 고릅니다.", 400);
 
         var pathCaption = MutedLabel("설치 위치", 400);
         var pathBox = new TextBox
@@ -159,8 +141,13 @@ internal sealed class WizardForm : Form
 
         _body.Controls.Add(VStack(400, 28, brand, tag, sub, Gap(20), pathCaption, Row(12, pathBox, change)));
 
-        var start = Pill(AlreadyInstalled ? "설정 계속" : "시작하기", Accent, Color.White, 200);
-        start.Click += (_, _) => { _step = 1; Render(); };
+        var start = Pill(AlreadyInstalled ? "다시 설치" : "설치하기", Accent, Color.White, 200);
+        start.Click += (_, _) =>
+        {
+            _step = 1;
+            Render();
+            _ = InstallAndFinishAsync(launch: true);
+        };
         if (AlreadyInstalled)
         {
             var launch = Link("이미 설치됨 — 바로 실행");
@@ -171,216 +158,6 @@ internal sealed class WizardForm : Form
         {
             FooterCenter(start);
         }
-    }
-
-    private void RenderName()
-    {
-        AddBack();
-        var title = TitleLabel("어떻게 불러드릴까요?", 26, 400);
-        var sub = MutedLabel("라운지와 기기에서 보이는 표시 이름입니다.", 400);
-        var box = new TextBox
-        {
-            Text = _displayName,
-            Width = 320,
-            Height = 36,
-            Font = new Font("Segoe UI", 12f),
-            BorderStyle = BorderStyle.FixedSingle,
-        };
-        box.TextChanged += (_, _) => _displayName = box.Text;
-        _body.Controls.Add(VStack(400, 36, title, sub, Gap(12), box));
-
-        var next = Pill("계속", Accent, Color.White, 160);
-        next.Click += (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(_displayName))
-                _displayName = Environment.UserName;
-            _step = 2;
-            Render();
-        };
-        FooterCenter(next);
-    }
-
-    private void RenderLibrary()
-    {
-        AddBack();
-        var title = TitleLabel("음원 라이브러리", 26, 400);
-        var sub = MutedLabel("로컬 음악 폴더를 지정하면 첫 실행 때 스캔합니다. 나중에 Settings에서도 바꿀 수 있습니다.", 400);
-        var pathBox = new TextBox
-        {
-            Text = _libraryPath,
-            Width = 280,
-            Height = 34,
-            BorderStyle = BorderStyle.FixedSingle,
-            ReadOnly = true,
-            PlaceholderText = "폴더 선택…",
-        };
-        var browse = Pill("폴더…", SoftAccent, TextCol, 100);
-        browse.Click += (_, _) =>
-        {
-            using var dlg = new FolderBrowserDialog { Description = "음악 라이브러리 폴더" };
-            if (dlg.ShowDialog(this) == DialogResult.OK)
-            {
-                _libraryPath = dlg.SelectedPath;
-                pathBox.Text = _libraryPath;
-            }
-        };
-
-        _body.Controls.Add(VStack(400, 36, title, sub, Gap(12), Row(12, pathBox, browse)));
-
-        var skip = Link("건너뛰기");
-        skip.Click += (_, _) => { _libraryPath = ""; _step = 3; Render(); };
-        var next = Pill("계속", Accent, Color.White, 160);
-        next.Click += (_, _) => { _step = 3; Render(); };
-        FooterPair(skip, next);
-    }
-
-    private void RenderAudio()
-    {
-        AddBack();
-        var title = TitleLabel("출력 장치", 26, 400);
-        var sub = MutedLabel("이 PC의 WASAPI/ASIO 출력을 쓰려면 Enable 하세요. 존 이름은 나중에 Audio에서 바꿀 수 있습니다.", 400);
-
-        var card = new Panel
-        {
-            Width = 400,
-            Height = 88,
-            BackColor = CardBg,
-        };
-        card.Paint += (_, e) =>
-        {
-            using var pen = new Pen(Border);
-            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
-        };
-        var icon = new Label
-        {
-            Text = "♪",
-            Font = new Font("Segoe UI Semibold", 22f),
-            ForeColor = Accent,
-            Location = new Point(18, 22),
-            AutoSize = true,
-        };
-        var name = new Label
-        {
-            Text = "System Output",
-            Font = new Font("Segoe UI Semibold", 12f),
-            ForeColor = TextCol,
-            Location = new Point(64, 20),
-            AutoSize = true,
-        };
-        var kind = new Label
-        {
-            Text = "WASAPI / ASIO · This PC",
-            ForeColor = Muted,
-            Location = new Point(64, 48),
-            AutoSize = true,
-        };
-        var enable = Pill(_enableLocalOutput ? "Enabled" : "Enable",
-            _enableLocalOutput ? Accent : SoftAccent,
-            _enableLocalOutput ? Color.White : TextCol, 110);
-        enable.Location = new Point(280, 24);
-        enable.Click += (_, _) =>
-        {
-            _enableLocalOutput = !_enableLocalOutput;
-            Render();
-        };
-        card.Controls.Add(icon);
-        card.Controls.Add(name);
-        card.Controls.Add(kind);
-        card.Controls.Add(enable);
-
-        var zoneCaption = MutedLabel("존 이름", 280);
-        var zone = new TextBox
-        {
-            Text = _zoneName,
-            Width = 280,
-            Height = 32,
-            BorderStyle = BorderStyle.FixedSingle,
-        };
-        zone.TextChanged += (_, _) => _zoneName = zone.Text;
-
-        _body.Controls.Add(VStack(400, 28, title, sub, Gap(16), card, Gap(12), zoneCaption, zone));
-
-        var skip = Link("건너뛰기");
-        skip.Click += (_, _) => { _enableLocalOutput = false; _step = 4; Render(); };
-        var next = Pill("계속", Accent, Color.White, 160);
-        next.Click += (_, _) => { _step = 4; Render(); };
-        var note = MutedLabel("걱정 마세요. Audio에서 언제든 장치를 추가할 수 있습니다.", 420);
-        FooterActions(Row(16, skip, next), note);
-    }
-
-    private void RenderStreaming()
-    {
-        AddBack();
-        var title = TitleLabel("스트리밍 연동", 24, 400);
-        var sub = MutedLabel("Tidal·Qobuz를 연결하거나 데모로 미리 볼 수 있습니다.", 400);
-
-        Panel Card(string heading, string body, string choice)
-        {
-            var p = new Panel { Width = 120, Height = 200, BackColor = CardBg, Margin = new Padding(4) };
-            p.Paint += (_, e) =>
-            {
-                var selected = _streaming == choice;
-                using var pen = new Pen(selected ? Accent : Border, selected ? 2f : 1f);
-                e.Graphics.DrawRectangle(pen, 1, 1, p.Width - 3, p.Height - 3);
-            };
-            var h = new Label
-            {
-                Text = heading,
-                Font = new Font("Segoe UI Semibold", 12f),
-                ForeColor = TextCol,
-                Location = new Point(14, 16),
-                AutoSize = true,
-            };
-            var b = new Label
-            {
-                Text = body,
-                ForeColor = Muted,
-                Location = new Point(8, 44),
-                Size = new Size(104, 90),
-                Font = new Font("Segoe UI", 8.5f),
-            };
-            FitLabel(b, 104);
-            b.Location = new Point(8, 44);
-            b.TextAlign = ContentAlignment.TopLeft;
-            var go = Pill("선택", SoftAccent, TextCol, 96);
-            go.Location = new Point(12, 148);
-            go.Click += (_, _) =>
-            {
-                _streaming = choice;
-                _step = 5;
-                Render();
-                _ = InstallAndFinishAsync(launch: true);
-            };
-            p.Controls.Add(h);
-            p.Controls.Add(b);
-            p.Controls.Add(go);
-            return p;
-        }
-
-        var row = new FlowLayoutPanel
-        {
-            Width = 400,
-            Height = 220,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            BackColor = Color.Transparent,
-            AutoSize = false,
-        };
-        row.Controls.Add(Card("TIDAL", "HiFi / Max", "tidal"));
-        row.Controls.Add(Card("Qobuz", "Studio / Hi-Res", "qobuz"));
-        row.Controls.Add(Card("데모", "키 없이 미리보기", "demo"));
-
-        _body.Controls.Add(VStack(400, 28, title, sub, Gap(12), row));
-
-        var no = Link("나중에 — 설치만 진행");
-        no.Click += (_, _) =>
-        {
-            _streaming = "none";
-            _step = 5;
-            Render();
-            _ = InstallAndFinishAsync(launch: true);
-        };
-        FooterStack(no, MutedLabel("나중에 Settings에서도 연동할 수 있습니다.", 360));
     }
 
     private void RenderInstalling()
@@ -496,13 +273,8 @@ internal sealed class WizardForm : Form
             }
         }
 
-        map["onboarded"] = "1";
-        map["name"] = string.IsNullOrWhiteSpace(_displayName) ? Environment.UserName : _displayName.Trim();
-        map["library_path"] = _libraryPath.Trim();
-        map["zone_name"] = string.IsNullOrWhiteSpace(_zoneName) ? "This PC" : _zoneName.Trim();
-        map["connect_local_output"] = _enableLocalOutput ? "1" : "0";
-        map["scan_library_on_start"] = string.IsNullOrWhiteSpace(_libraryPath) ? "0" : "1";
-        map["streaming_choice"] = _streaming;
+        // 나머지 설정은 첫 실행 마법사가 Core 의 setup.json 에 쓴다. 같은 값을 여기에도
+        // 남기면 둘이 어긋났을 때 어느 쪽이 맞는지 알 수 없다.
         map["install_root"] = _installRoot;
 
         File.WriteAllLines(prefs, map.Select(kv => kv.Key + "=" + kv.Value));
@@ -592,25 +364,8 @@ internal sealed class WizardForm : Form
         return File.Exists(directPath) ? Image.FromFile(directPath) : null;
     }
 
-    private void AddBack()
-    {
-        var back = Link("← 뒤로");
-        back.Location = new Point(20, 16);
-        back.Click += (_, _) =>
-        {
-            if (_step > 0)
-            {
-                _step--;
-                Render();
-            }
-        };
-        _body.Controls.Add(back);
-        back.BringToFront();
-    }
-
     private void FooterCenter(Control c) => FooterStack(c);
 
-    private void FooterPair(Control left, Control right) => FooterStack(Row(16, left, right));
 
     private void FooterStack(params Control[] items) => FooterActions(items);
 

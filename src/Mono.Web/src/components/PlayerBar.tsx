@@ -74,7 +74,7 @@ function IconLoop() {
 
 function IconQueue() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ fontWeight: 400 }}>
       <line x1="8" y1="6" x2="21" y2="6" />
       <line x1="8" y1="12" x2="21" y2="12" />
       <line x1="8" y1="18" x2="21" y2="18" />
@@ -264,8 +264,7 @@ export default function PlayerBar({
     return (
       <button
         onClick={(e) => { e.stopPropagation(); onStartLounge() }}
-        className="h-7 px-2.5 text-[11px] font-mono font-normal rounded-md border border-zinc-300 dark:border-zinc-700/50 bg-transparent text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors shrink-0 ml-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
-        style={{ fontFamily: "inherit" }}
+        className="btn-host-lounge lounge-active-trigger inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors shrink-0 ml-2 whitespace-nowrap cursor-pointer"
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
           <circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 7.76a6 6 0 0 0 0 8.49"/><path d="M20.49 3.51a12 12 0 0 1 0 16.97"/><path d="M3.51 3.51a12 12 0 0 0 0 16.97"/>
@@ -466,13 +465,13 @@ export default function PlayerBar({
             {/* Queue toggle */}
             <button
               onClick={(e) => { e.stopPropagation(); onToggleQueue() }}
-              className={`player-btn-icon ml-3 gap-1.5 ${queueCount > 0 ? "is-active" : ""}`}
+              className={`player-btn-icon ml-3 gap-1.5 ${queueCount > 0 ? "is-active" : ""} ${(isHosting || isListener) ? "text-sky-600 dark:text-sky-400 dark:drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" : ""}`}
               style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
               title={`Queue (${queueCount})`}
             >
               <IconQueue />
               {queueCount > 0 && (
-                <span className="transport-queue-count">{queueCount}</span>
+                <span className="transport-queue-count font-normal">{queueCount}</span>
               )}
             </button>
           </div>

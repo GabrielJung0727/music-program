@@ -141,23 +141,24 @@ input[type='range']::-webkit-slider-thumb {
   --home-badge-tooltip-arrow: #1e1e22;
   --home-play-overlay-bg: rgba(9,9,11,0.82);
   --home-play-overlay-bg-hover: rgba(9,9,11,0.92);
-  --home-filter-chip-bg: #f4f4f5;
-  --home-filter-chip-border: #e4e4e7;
-  --home-filter-chip-text: #71717a;
-  --home-filter-chip-active-bg: #09090b;
-  --home-filter-chip-active-border: #09090b;
+  --home-filter-chip-bg: #f1f5f9;
+  --home-filter-chip-border: #e2e8f0;
+  --home-filter-chip-text: #64748b;
+  --home-filter-chip-active-bg: #7c3aed;
+  --home-filter-chip-active-border: #7c3aed;
   --home-filter-chip-active-text: #ffffff;
+  --home-filter-chip-active-shadow: 0 2px 10px rgba(124,58,237,0.28);
   --home-sort-menu-bg: #ffffff;
   --home-sort-menu-border: #e4e4e7;
   --home-sort-menu-text: #52525b;
   --home-sort-menu-active: #09090b;
   --home-sort-menu-hover-bg: #f4f4f5;
-  --home-join-bg: rgba(56,189,248,0.08);
-  --home-join-border: rgba(56,189,248,0.30);
+  --home-join-bg: #eff6ff;
+  --home-join-border: #bfdbfe;
   --home-join-text: #0284c7;
-  --home-join-bg-hover: #0284c7;
-  --home-join-border-hover: #0284c7;
-  --home-join-text-hover: #ffffff;
+  --home-join-bg-hover: #dbeafe;
+  --home-join-border-hover: #93c5fd;
+  --home-join-text-hover: #0369a1;
   --home-joined-bg: rgba(16,185,129,0.08);
   --home-joined-border: rgba(16,185,129,0.25);
   --home-joined-text: #047857;
@@ -167,17 +168,20 @@ input[type='range']::-webkit-slider-thumb {
   --home-session-tab-live-bg: rgba(37,99,235,0.08);
   --home-session-tab-live-border: rgba(37,99,235,0.20);
   --home-session-tab-live-text: #1d4ed8;
-  --home-session-tab-hof-bg: #f4f4f5;
-  --home-session-tab-hof-border: #e4e4e7;
-  --home-session-tab-hof-text: #18181b;
+  --home-session-tab-hof-bg: #2563eb;
+  --home-session-tab-hof-border: rgba(255,255,255,0.15);
+  --home-session-tab-hof-text: #ffffff;
+  --home-session-tab-hof-shadow: 0 2px 8px rgba(37,99,235,0.30);
+  --home-session-tab-inactive-bg: #f1f5f9;
+  --home-session-tab-inactive-border: #e2e8f0;
   --lounge-bg-card: rgba(255, 255, 255, 0.95);
   --lounge-bg-card-hover: rgba(255, 255, 255, 1);
   --lounge-border-card: rgba(0, 0, 0, 0.08);
   --lounge-border-card-hover: rgba(0, 0, 0, 0.16);
 
-  --lounge-bg-row: rgba(248, 250, 252, 0.85);
-  --lounge-bg-row-hover: rgba(241, 245, 249, 1);
-  --lounge-border-row: rgba(0, 0, 0, 0.06);
+  --lounge-bg-row: #ffffff;
+  --lounge-bg-row-hover: #f9fafb;
+  --lounge-border-row: rgba(0, 0, 0, 0.08);
 
   --lounge-text-title: #0f172a;
   --lounge-text-muted: #64748b;
@@ -217,9 +221,9 @@ input[type='range']::-webkit-slider-thumb {
   --spotlight-tag-bg: rgba(120, 113, 108, 0.08);
   --spotlight-tag-border: rgba(120, 113, 108, 0.20);
   --spotlight-tag-text: #57534e;
-  --spotlight-spec-bg: rgba(244, 244, 245, 1);
-  --spotlight-spec-border: rgba(228, 228, 231, 1);
-  --spotlight-spec-text: #52525b;
+  --spotlight-spec-bg: #f4f4f5;
+  --spotlight-spec-border: #d4d4d8;
+  --spotlight-spec-text: #3f3f46;
   --spotlight-stat-color: #0369a1;
   --spotlight-stat-dot: #38bdf8;
 
@@ -264,6 +268,19 @@ input[type='range']::-webkit-slider-thumb {
   --lounge-btn-end-bg-hover: rgba(159, 18, 57, 0.13);
   --lounge-btn-end-border-hover: rgba(159, 18, 57, 0.38);
   --lounge-btn-end-text-hover: #9f1239;
+
+  /* ── Lounge: text & surface tokens (non-layered, light mode) ── */
+  --lounge-text-title: #0f172a;
+  --lounge-text-muted: #64748b;
+  --lounge-text-faint: #94a3b8;
+  --lounge-bg-row: #ffffff;
+  --lounge-bg-row-hover: #f9fafb;
+  --lounge-border-row: rgba(0,0,0,0.08);
+  --lounge-spotlight-title: #0f172a;
+  --lounge-spotlight-meta: #475569;
+  --spotlight-spec-bg: #f4f4f5;
+  --spotlight-spec-border: #d4d4d8;
+  --spotlight-spec-text: #3f3f46;
 }
 
 .dark {
@@ -278,23 +295,24 @@ input[type='range']::-webkit-slider-thumb {
   --home-badge-tooltip-arrow: #27272a;
   --home-play-overlay-bg: rgba(9,9,11,0.82);
   --home-play-overlay-bg-hover: rgba(9,9,11,0.92);
-  --home-filter-chip-bg: rgba(39,39,42,0.80);
-  --home-filter-chip-border: #3f3f46;
-  --home-filter-chip-text: #71717a;
-  --home-filter-chip-active-bg: #ffffff;
-  --home-filter-chip-active-border: transparent;
-  --home-filter-chip-active-text: #09090b;
+  --home-filter-chip-bg: #1a1b1f;
+  --home-filter-chip-border: #27272a;
+  --home-filter-chip-text: #a1a1aa;
+  --home-filter-chip-active-bg: rgba(167,139,250,0.18);
+  --home-filter-chip-active-border: #a78bfa;
+  --home-filter-chip-active-text: #f4f4f5;
+  --home-filter-chip-active-shadow: 0 2px 10px rgba(124,58,237,0.30);
   --home-sort-menu-bg: #1e1e22;
   --home-sort-menu-border: #3f3f46;
   --home-sort-menu-text: #a1a1aa;
   --home-sort-menu-active: #f4f4f5;
   --home-sort-menu-hover-bg: #27272a;
-  --home-join-bg: #27272a;
-  --home-join-border: rgba(255,255,255,0.12);
-  --home-join-text: #e4e4e7;
-  --home-join-bg-hover: #3f3f46;
-  --home-join-border-hover: rgba(255,255,255,0.20);
-  --home-join-text-hover: #f4f4f5;
+  --home-join-bg: rgba(56,189,248,0.12);
+  --home-join-border: rgba(56,189,248,0.35);
+  --home-join-text: #38bdf8;
+  --home-join-bg-hover: rgba(56,189,248,0.22);
+  --home-join-border-hover: rgba(56,189,248,0.60);
+  --home-join-text-hover: #7dd3fc;
   --home-joined-bg: rgba(16,185,129,0.10);
   --home-joined-border: rgba(52,211,153,0.22);
   --home-joined-text: #34d399;
@@ -304,22 +322,98 @@ input[type='range']::-webkit-slider-thumb {
   --home-session-tab-live-bg: #1e2738;
   --home-session-tab-live-border: rgba(59,130,246,0.25);
   --home-session-tab-live-text: #60a5fa;
-  --home-session-tab-hof-bg: var(--surface-elevated);
-  --home-session-tab-hof-border: rgba(255,255,255,0.10);
-  --home-session-tab-hof-text: var(--text-primary);
+  --home-session-tab-hof-bg: #2563eb;
+  --home-session-tab-hof-border: rgba(255,255,255,0.15);
+  --home-session-tab-hof-text: #ffffff;
+  --home-session-tab-hof-shadow: 0 2px 8px rgba(37,99,235,0.35);
+  --home-session-tab-inactive-bg: rgba(255,255,255,0.05);
+  --home-session-tab-inactive-border: rgba(255,255,255,0.10);
 
+  /* ── Lounge: text & surface tokens (non-layered override — always wins) ── */
+  --lounge-text-title: #f4f4f5;
+  --lounge-text-muted: #a1a1aa;
+  --lounge-text-faint: #71717a;
+  --lounge-bg-row: #1a1b1f;
+  --lounge-bg-row-hover: #22232a;
+  --lounge-border-row: #27272a;
+  --lounge-spotlight-title: #f4f4f5;
+  --lounge-spotlight-meta: #a1a1aa;
+  --spotlight-spec-bg: #27272a;
+  --spotlight-spec-border: rgba(255,255,255,0.10);
+  --spotlight-spec-text: #e4e4e7;
+}
+
+/* ── Mono Sessions filter pills ──────────────────────────────────────────── */
+.session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  padding: 5px 13px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Active — light */
+.session-pill-active {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.08);
+}
+
+/* Active — dark */
+.dark .session-pill-active {
+  background-color: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #93c5fd;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.20);
+}
+
+/* Inactive — light */
+.session-pill-inactive {
+  background-color: #f1f5f9;
+  border: 1px solid transparent;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.session-pill-inactive:hover {
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+/* Inactive — dark */
+.dark .session-pill-inactive {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.dark .session-pill-inactive:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+@layer base {
+  .dark {
   --lounge-bg-card: rgba(20, 20, 24, 0.75);
   --lounge-bg-card-hover: rgba(30, 30, 36, 0.88);
   --lounge-border-card: rgba(255, 255, 255, 0.08);
   --lounge-border-card-hover: rgba(255, 255, 255, 0.18);
 
-  --lounge-bg-row: rgba(20, 20, 24, 0.55);
-  --lounge-bg-row-hover: rgba(28, 28, 34, 0.75);
-  --lounge-border-row: rgba(255, 255, 255, 0.06);
+  --lounge-bg-row: #1a1b1f;
+  --lounge-bg-row-hover: #22232a;
+  --lounge-border-row: #27272a;
 
-  --lounge-text-title: #ffffff;
-  --lounge-text-muted: #9ca3af;
-  --lounge-text-faint: #6b7280;
+  --lounge-text-title: #f4f4f5;
+  --lounge-text-muted: #a1a1aa;
+  --lounge-text-faint: #71717a;
 
   --lounge-accent-blue: #2563eb;
   --lounge-accent-blue-border: rgba(37, 99, 235, 0.45);
@@ -336,12 +430,12 @@ input[type='range']::-webkit-slider-thumb {
   --lounge-spotlight-bg: radial-gradient(ellipse 65% 120% at 18% 50%, rgba(56, 189, 248, 0.07) 0%, transparent 68%), var(--surface-card, #16171a);
   --lounge-spotlight-border: rgba(255, 255, 255, 0.08);
   --lounge-spotlight-border-top: rgba(56, 189, 248, 0.28);
-  --lounge-spotlight-title: #f1f5f9;
-  --lounge-spotlight-meta: #94a3b8;
-  --lounge-spotlight-art-border: rgba(56, 189, 248, 0.22);
-  --lounge-spotlight-tab-active-bg: rgba(56, 189, 248, 0.12);
+  --lounge-spotlight-title: #f4f4f5;
+  --lounge-spotlight-meta: #a1a1aa;
+  --lounge-spotlight-art-border: rgba(56, 189, 248, 0.30);
+  --lounge-spotlight-tab-active-bg: rgba(56, 189, 248, 0.14);
   --lounge-spotlight-tab-active-text: #7dd3fc;
-  --lounge-spotlight-tab-idle-text: #52525b;
+  --lounge-spotlight-tab-idle-text: #71717a;
   --lounge-spotlight-tab-hover-text: #bae6fd;
   --lounge-spotlight-divider: rgba(56, 189, 248, 0.14);
   --lounge-spotlight-btn-bg: rgba(56, 189, 248, 0.10);
@@ -355,9 +449,9 @@ input[type='range']::-webkit-slider-thumb {
   --spotlight-tag-bg: rgba(63, 63, 70, 0.60);
   --spotlight-tag-border: rgba(161, 161, 170, 0.20);
   --spotlight-tag-text: #a1a1aa;
-  --spotlight-spec-bg: rgba(255, 255, 255, 0.05);
-  --spotlight-spec-border: rgba(255, 255, 255, 0.09);
-  --spotlight-spec-text: #a1a1aa;
+  --spotlight-spec-bg: #27272a;
+  --spotlight-spec-border: rgba(255, 255, 255, 0.10);
+  --spotlight-spec-text: #e4e4e7;
   --spotlight-stat-color: #7dd3fc;
   --spotlight-stat-dot: #38bdf8;
 
@@ -372,29 +466,29 @@ input[type='range']::-webkit-slider-thumb {
   --player-btn-violet-shadow: rgba(124, 58, 237, 0.45);
   --player-btn-violet-shadow-hover: rgba(124, 58, 237, 0.65);
 
-  --modal-host-bg: rgba(18, 18, 22, 0.97);
-  --modal-host-border: rgba(255, 255, 255, 0.09);
-  --modal-host-shadow: rgba(0, 0, 0, 0.6);
-  --modal-host-title: #f1f5f9;
-  --modal-host-subtitle: #6b7280;
-  --modal-host-label: #cbd5e1;
-  --modal-host-label-muted: #64748b;
-  --modal-host-close: #4b5563;
-  --modal-host-close-hover: #e2e8f0;
-  --modal-host-input-bg: rgba(255, 255, 255, 0.05);
-  --modal-host-input-border: rgba(255, 255, 255, 0.1);
-  --modal-host-input-border-focus: rgba(147, 197, 253, 0.5);
-  --modal-host-input-text: #e2e8f0;
-  --modal-host-infobox-bg: rgba(255, 255, 255, 0.04);
-  --modal-host-infobox-border: rgba(255, 255, 255, 0.07);
-  --modal-host-infobox-text: #64748b;
-  --modal-host-option-idle-bg: rgba(255, 255, 255, 0.04);
-  --modal-host-option-idle-border: rgba(255, 255, 255, 0.09);
-  --modal-host-option-idle-text: #94a3b8;
-  --modal-host-option-desc: #4b5563;
-  --modal-host-cancel-text: #4b5563;
-  --modal-host-cancel-hover: #94a3b8;
-  --modal-host-checkbox-text: #cbd5e1;
+  --modal-host-bg: #1a1b1f;
+  --modal-host-border: #27272a;
+  --modal-host-shadow: rgba(0, 0, 0, 0.65);
+  --modal-host-title: #f4f4f5;
+  --modal-host-subtitle: #a1a1aa;
+  --modal-host-label: #a1a1aa;
+  --modal-host-label-muted: #71717a;
+  --modal-host-close: #a1a1aa;
+  --modal-host-close-hover: #f4f4f5;
+  --modal-host-input-bg: #121316;
+  --modal-host-input-border: #27272a;
+  --modal-host-input-border-focus: #38bdf8;
+  --modal-host-input-text: #f4f4f5;
+  --modal-host-infobox-bg: #18181b;
+  --modal-host-infobox-border: #27272a;
+  --modal-host-infobox-text: #a1a1aa;
+  --modal-host-option-idle-bg: #18181b;
+  --modal-host-option-idle-border: #27272a;
+  --modal-host-option-idle-text: #a1a1aa;
+  --modal-host-option-desc: #71717a;
+  --modal-host-cancel-text: #a1a1aa;
+  --modal-host-cancel-hover: #f4f4f5;
+  --modal-host-checkbox-text: #a1a1aa;
 
   --lounge-btn-end-bg: rgba(244, 63, 94, 0.07);
   --lounge-btn-end-border: rgba(244, 63, 94, 0.2);
@@ -402,6 +496,103 @@ input[type='range']::-webkit-slider-thumb {
   --lounge-btn-end-bg-hover: rgba(244, 63, 94, 0.13);
   --lounge-btn-end-border-hover: rgba(244, 63, 94, 0.35);
   --lounge-btn-end-text-hover: #fda4af;
+  }
+}
+
+/* ── Dark Mode: Host Modal — direct element overrides ───────────────────────
+   The --modal-host-* variables are declared in a non-layered :root block that
+   always outranks the @layer-base dark overrides, so we target elements
+   directly here instead.
+   ─────────────────────────────────────────────────────────────────────────── */
+.dark .modal-host-container {
+  background: #1a1b1f !important;
+  border: 1px solid #27272a !important;
+  border-radius: 16px !important;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.65) !important;
+}
+
+.dark .modal-host-title {
+  color: #f4f4f5 !important;
+}
+
+.dark .modal-host-subtitle {
+  color: #a1a1aa !important;
+}
+
+.dark .modal-host-label {
+  color: #a1a1aa !important;
+}
+
+.dark .modal-host-label-muted {
+  color: #71717a !important;
+}
+
+.dark .modal-host-close {
+  color: #a1a1aa !important;
+}
+
+.dark .modal-host-close:hover {
+  color: #f4f4f5 !important;
+}
+
+.dark .modal-host-input {
+  background: #121316 !important;
+  border: 1px solid #27272a !important;
+  color: #f4f4f5 !important;
+}
+
+.dark .modal-host-input::placeholder {
+  color: #71717a !important;
+}
+
+.dark .modal-host-input:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12) !important;
+  outline: none !important;
+}
+
+.dark .modal-host-infobox {
+  background: #18181b !important;
+  border: 1px solid #27272a !important;
+  color: #a1a1aa !important;
+}
+
+/* Idle privacy option cards */
+.dark .modal-host-container button[style] {
+  background: #18181b !important;
+  border-color: #27272a !important;
+  color: #a1a1aa !important;
+}
+
+/* Selected privacy card — override inline bg/border/color back to sky-blue */
+.dark .modal-host-container button[style*="2563EB"],
+.dark .modal-host-container button[style*="37,99,235"] {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+
+.dark .modal-host-container button[style*="7C3AED"],
+.dark .modal-host-container button[style*="109,40,217"] {
+  background: rgba(167, 139, 250, 0.12) !important;
+  border-color: #a78bfa !important;
+  color: #a78bfa !important;
+}
+
+.dark .modal-host-cancel {
+  color: #a1a1aa !important;
+}
+
+.dark .modal-host-cancel:hover {
+  color: #f4f4f5 !important;
+}
+
+.dark .modal-host-checkbox-label {
+  color: #a1a1aa !important;
+}
+
+.dark .modal-host-checkbox-muted {
+  color: #71717a !important;
 }
 
 .lounge-section-title {
@@ -454,9 +645,9 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .lounge-spec-badge {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #d1d5db;
+  background: var(--lounge-spec-bg);
+  border: 1px solid var(--lounge-spec-border);
+  color: var(--lounge-spec-text);
   font-size: 10.5px;
   font-family: ui-monospace, monospace;
   padding: 0.2rem 0.5rem;
@@ -567,6 +758,45 @@ input[type='range']::-webkit-slider-thumb {
   transform: scale(0.98);
 }
 
+/* ── Host New Lounge button — light mode ────────────────────────────────── */
+.lounge-btn-host {
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  color: #0284c7 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08) !important;
+  transition: all 0.2s ease !important;
+}
+
+.lounge-btn-host:hover {
+  background: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #0369a1 !important;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.20) !important;
+  transform: translateY(-1px);
+}
+
+/* ── Host New Lounge button — dark mode studio ambient ──────────────────── */
+.dark .lounge-btn-host {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  color: #38bdf8 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.12) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.dark .lounge-btn-host:hover {
+  background: rgba(56, 189, 248, 0.22) !important;
+  border-color: rgba(56, 189, 248, 0.70) !important;
+  color: #e0f2fe !important;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.40) !important;
+}
+
 .lounge-spotlight-banner {
   background: var(--lounge-spotlight-bg);
   border: 1px solid var(--lounge-spotlight-border);
@@ -582,18 +812,19 @@ input[type='range']::-webkit-slider-thumb {
 
 .spotlight-category-tag {
   font-family: 'DM Mono', ui-monospace, monospace;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--spotlight-tag-text);
-  background: var(--spotlight-tag-bg);
-  border: 1px solid var(--spotlight-tag-border);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   border-radius: 4px;
   padding: 2px 8px;
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
-  backdrop-filter: blur(8px);
+  /* light mode defaults */
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
 }
 
 .spotlight-spec-tag {
@@ -628,6 +859,36 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: 0 0 6px var(--spotlight-stat-dot);
 }
 
+/* ── Light Mode: Spotlight banner refinements ───────────────────────────────
+   Scoped to html:not(.dark) — dark mode rules are completely untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Listener stat — unified sky-blue telemetry, dot and text as one cohesive read */
+html:not(.dark) .spotlight-listener-stat {
+  font-size: 12px;
+  font-weight: 500;
+  color: #0284c7;
+}
+
+/* Live dot — crisp sky-600 with a soft contained glow */
+html:not(.dark) .spotlight-listener-stat::before {
+  background: #0284c7;
+  box-shadow: 0 0 5px rgba(2, 132, 199, 0.45);
+}
+
+/* Active spotlight tab pill — airy sky tint with subtle border */
+html:not(.dark) .lounge-spotlight-banner [style*="spotlight-tab-active-bg"] {
+  background: #f0f9ff !important;
+  border: 1px solid #bae6fd !important;
+  color: #0369a1 !important;
+  font-weight: 500 !important;
+}
+
+/* Inactive spotlight tabs — clean slate, no saturation */
+html:not(.dark) .lounge-spotlight-banner [style*="spotlight-tab-idle-text"] {
+  color: #64748b !important;
+}
+
 .lounge-spotlight-title {
   color: var(--lounge-spotlight-title);
 }
@@ -636,26 +897,44 @@ input[type='range']::-webkit-slider-thumb {
   color: var(--lounge-spotlight-meta);
 }
 
+/* ── Spotlight CTA button — light mode base ─────────────────────────────── */
 .lounge-spotlight-btn {
-  background: var(--lounge-spotlight-btn-bg);
-  color: var(--lounge-spotlight-btn-text);
-  border: 1px solid var(--lounge-spotlight-btn-border);
-  border-radius: 9999px;
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  color: #0284c7 !important;
+  border-radius: 9999px !important;
   padding: 7px 18px;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px !important;
+  font-weight: 500 !important;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 2px 10px 0 var(--lounge-spotlight-btn-shadow);
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: none !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
+/* Light mode — hover */
 .lounge-spotlight-btn:hover {
-  background: var(--lounge-spotlight-btn-bg-hover);
-  color: var(--lounge-spotlight-btn-text-hover);
-  border-color: var(--lounge-spotlight-btn-bg-hover);
-  box-shadow: 0 4px 16px 0 var(--lounge-spotlight-btn-shadow);
+  background: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #0369a1 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
+}
+
+/* Dark mode — resting: translucent sky tint */
+.dark .lounge-spotlight-btn {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  color: #38bdf8 !important;
+  box-shadow: none !important;
+}
+
+/* Dark mode — hover: ambient bloom, never solid cyan */
+.dark .lounge-spotlight-btn:hover {
+  background: rgba(56, 189, 248, 0.22) !important;
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  color: #e0f2fe !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35) !important;
 }
 
 /* Shared base for all center play button variants */
@@ -821,6 +1100,10 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--modal-host-input-border-focus);
 }
 
+.dark .modal-host-input:focus {
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
 .modal-host-input::placeholder {
   color: var(--modal-host-label-muted);
 }
@@ -887,11 +1170,26 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .lounge-stage-title {
-  color: var(--lounge-text-title);
+  color: #09090b;
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.25;
+}
+.dark .lounge-stage-title {
+  color: #f4f4f5;
+}
+
+/* ── Central Lounge Player Card — surface tokens ─────────────────────────── */
+.lounge-central-card {
+  background: #ffffff !important;
+  border: 1px solid #e4e4e7 !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.06) !important;
+}
+.dark .lounge-central-card {
+  background: #1a1b1f !important;
+  border: 1px solid #27272a !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5) !important;
 }
 
 .library-title {
@@ -1634,39 +1932,50 @@ input[type='range']::-webkit-slider-thumb {
 @layer base {
   :root,
   .light {
-    --ob-surface: #fafafa;
-    --ob-header-bg: rgba(255, 255, 255, 0.85);
-    --ob-header-border: #e4e4e7;
-    --ob-title: #09090b;
-    --ob-body: #52525b;
+    --ob-surface: #f8fafc;
+    --ob-header-bg: rgba(248, 250, 252, 0.90);
+    --ob-header-border: #e2e8f0;
+    --ob-title: #0f172a;
+    --ob-body: #475569;
     --ob-card-bg: #ffffff;
-    --ob-card-bg-hover: #f9f9fb;
-    --ob-card-border: #e4e4e7;
-    --ob-card-border-hover: #d4d4d8;
+    --ob-card-bg-hover: #f8fafc;
+    --ob-card-border: #e2e8f0;
+    --ob-card-border-hover: #cbd5e1;
     --ob-card-bg-active: rgba(245, 243, 255, 0.7);
     --ob-card-border-active: #7c3aed;
     --ob-card-ring-active: rgba(124, 58, 237, 0.12);
+    --ob-card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.04);
     --ob-radio-active: #7c3aed;
-    --ob-driver-pool-bg: #f4f4f5;
-    --ob-driver-tab-active-bg: #09090b;
+    --ob-driver-pool-bg: #f1f5f9;
+    --ob-driver-tab-active-bg: #0f172a;
     --ob-driver-tab-active-text: #ffffff;
-    --ob-driver-tab-inactive-text: #52525b;
-    --ob-chip-bg: #f4f4f5;
-    --ob-chip-text: #71717a;
-    --ob-input-bg: #f9fafb;
-    --ob-input-border: #e4e4e7;
-    --ob-input-text: #09090b;
-    --ob-input-placeholder: #a1a1aa;
-    --ob-input-focus-ring: #09090b;
+    --ob-driver-tab-inactive-text: #475569;
+    --ob-chip-bg: #f1f5f9;
+    --ob-chip-text: #64748b;
+    --ob-input-bg: #f8fafc;
+    --ob-input-border: #e2e8f0;
+    --ob-input-text: #0f172a;
+    --ob-input-placeholder: #94a3b8;
+    --ob-input-focus-ring: #0f172a;
     --ob-input-focus-bg: #ffffff;
-    --ob-infobox-bg: #f9fafb;
-    --ob-infobox-border: #e4e4e7;
-    --ob-preview-bg: rgba(249, 250, 251, 0.85);
-    --ob-preview-border: #e4e4e7;
-    --ob-action-bg: #09090b;
+    --ob-infobox-bg: #f8fafc;
+    --ob-infobox-border: #e2e8f0;
+    --ob-preview-bg: rgba(248, 250, 252, 0.85);
+    --ob-preview-border: #e2e8f0;
+    --ob-action-bg: #0f172a;
     --ob-action-text: #ffffff;
-    --ob-action-bg-hover: #27272a;
-    --ob-divider: #e4e4e7;
+    --ob-action-bg-hover: #1e293b;
+    --ob-divider: #e2e8f0;
+    /* Step 04 Streaming connect button (light) */
+    --ob-connect-bg: #f1f5f9;
+    --ob-connect-border: #cbd5e1;
+    --ob-connect-text: #0f172a;
+    --ob-connect-bg-hover: #e2e8f0;
+    --ob-connect-border-hover: #94a3b8;
+    /* Hardware status pill (light) */
+    --ob-hw-pill-bg: #f1f5f9;
+    --ob-hw-pill-border: #e2e8f0;
+    --ob-hw-pill-text: #334155;
   }
 
   .dark {
@@ -1682,6 +1991,7 @@ input[type='range']::-webkit-slider-thumb {
     --ob-card-bg-active: rgba(167, 139, 250, 0.06);
     --ob-card-border-active: rgba(167, 139, 250, 0.45);
     --ob-card-ring-active: rgba(167, 139, 250, 0.12);
+    --ob-card-shadow: none;
     --ob-radio-active: #a78bfa;
     --ob-driver-pool-bg: #1f2024;
     --ob-driver-tab-active-bg: #e4e4e7;
@@ -1703,6 +2013,16 @@ input[type='range']::-webkit-slider-thumb {
     --ob-action-text: #09090b;
     --ob-action-bg-hover: #f4f4f5;
     --ob-divider: rgba(255, 255, 255, 0.07);
+    /* Step 04 Streaming connect button (dark) */
+    --ob-connect-bg: rgba(255, 255, 255, 0.06);
+    --ob-connect-border: rgba(255, 255, 255, 0.12);
+    --ob-connect-text: #e4e4e7;
+    --ob-connect-bg-hover: rgba(255, 255, 255, 0.10);
+    --ob-connect-border-hover: rgba(255, 255, 255, 0.20);
+    /* Hardware status pill (dark) */
+    --ob-hw-pill-bg: rgba(255, 255, 255, 0.05);
+    --ob-hw-pill-border: rgba(255, 255, 255, 0.09);
+    --ob-hw-pill-text: #a1a1aa;
   }
 }
 
@@ -1731,7 +2051,8 @@ input[type='range']::-webkit-slider-thumb {
 .ob-card {
   background: var(--ob-card-bg);
   border-color: var(--ob-card-border);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  box-shadow: var(--ob-card-shadow);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .ob-card:hover {
@@ -1810,6 +2131,31 @@ input[type='range']::-webkit-slider-thumb {
 .ob-action-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── Step 04 Streaming — Connect Account button ──────────────────────────── */
+.ob-connect-btn {
+  background: var(--ob-connect-bg);
+  border: 1px solid var(--ob-connect-border);
+  color: var(--ob-connect-text);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ob-connect-btn:hover {
+  background: var(--ob-connect-bg-hover);
+  border-color: var(--ob-connect-border-hover);
+}
+
+/* Bullet list text for streaming cards — slightly darker than body in light mode */
+:root,
+.light {
+  --ob-list-text: #334155;
+}
+
+.dark {
+  --ob-list-text: #a1a1aa;
 }
 
 /* ── Latency Gauge Tokens ────────────────────────────────────────────── */
@@ -1971,9 +2317,9 @@ input[type='range']::-webkit-slider-thumb {
     --lounge-card-border-hover: rgba(255, 255, 255, 0.14);
     --lounge-card-shadow: rgba(0, 0, 0, 0.30);
     --lounge-card-shadow-hover: rgba(56, 189, 248, 0.06);
-    --lounge-spec-bg: rgba(255, 255, 255, 0.05);
-    --lounge-spec-border: rgba(255, 255, 255, 0.09);
-    --lounge-spec-text: #a1a1aa;
+    --lounge-spec-bg: rgba(255, 255, 255, 0.06);
+    --lounge-spec-border: rgba(255, 255, 255, 0.11);
+    --lounge-spec-text: #d4d4d8;
     --lounge-filter-bg: #1a1b1f;
     --lounge-filter-border: #27272a;
     --lounge-filter-text: #a1a1aa;
@@ -2006,6 +2352,104 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--lounge-card-border-hover);
   box-shadow: 0 8px 28px var(--lounge-card-shadow-hover);
   transform: translateY(-2px);
+}
+
+/* ── Light Mode: lounge card contrast refinements ───────────────────────────
+   Scoped to html:not(.dark) so dark mode is completely unaffected.
+   Custom-property overrides cascade to inline style var() refs automatically.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Room title — soft charcoal Slate-800, medium weight, never harsh black */
+html:not(.dark) .lounge-room-card {
+  --lounge-text-title: #1e293b;
+}
+
+/* Room title — soft charcoal, medium weight */
+html:not(.dark) .lounge-room-card [style*="lounge-text-title"] {
+  font-weight: 500 !important;
+}
+
+/* Tier 1 — Host line: no text-overflow ellipsis in its inline style */
+html:not(.dark) .lounge-room-card [style*="lounge-text-muted"]:not([style*="text-overflow"]) {
+  color: #475569 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+/* Tier 2 — Track title line: has text-overflow ellipsis in its inline style */
+html:not(.dark) .lounge-room-card [style*="lounge-text-muted"][style*="text-overflow"] {
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+/* Tier 3 — Hardware gear line: DM Mono telemetry, whisper slate */
+html:not(.dark) .lounge-room-card [style*="lounge-text-faint"] {
+  color: #94a3b8 !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+}
+
+/* Card header media area — replace hardcoded #0F172A with a soft light recess */
+html:not(.dark) .lounge-room-card > div:first-child {
+  background: #f1f5f9 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+/* Artwork — full opacity, no lightening in light mode */
+html:not(.dark) .lounge-room-card > div:first-child img {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Listener badges ("● 248 live", "☕ 3 listening") — sky-blue telemetry pill */
+html:not(.dark) .lounge-room-card > div:first-child > div > span:first-child {
+  background: rgba(240, 249, 255, 0.9) !important;
+  border: 1px solid rgba(186, 230, 253, 0.85) !important;
+  color: #0284c7 !important;
+  font-weight: 500 !important;
+}
+
+/* ── DiscoveryBadge semantic tints — keyed on unique inline bg values ───── */
+
+/* 🔥 Hot Session (trending) — amber wash */
+html:not(.dark) .lounge-room-card > div:first-child [style*="127,29,29"] {
+  background: rgba(254, 243, 199, 0.9) !important;
+  border: 1px solid rgba(253, 230, 138, 0.85) !important;
+  color: #b45309 !important;
+  font-weight: 500 !important;
+}
+
+/* 🌱 Debut Host — emerald wash */
+html:not(.dark) .lounge-room-card > div:first-child [style*="6,78,59"] {
+  background: rgba(236, 253, 245, 0.9) !important;
+  border: 1px solid rgba(167, 243, 208, 0.85) !important;
+  color: #047857 !important;
+  font-weight: 500 !important;
+}
+
+/* 🎸 Deep Indie — violet wash */
+html:not(.dark) .lounge-room-card > div:first-child [style*="59,7,100"] {
+  background: rgba(245, 243, 255, 0.9) !important;
+  border: 1px solid rgba(221, 214, 254, 0.85) !important;
+  color: #6d28d9 !important;
+  font-weight: 500 !important;
+}
+
+/* ☕ Cozy Space — rose/copper wash */
+html:not(.dark) .lounge-room-card > div:first-child [style*="120,53,15"] {
+  background: rgba(255, 241, 242, 0.9) !important;
+  border: 1px solid rgba(254, 205, 211, 0.85) !important;
+  color: #9f1239 !important;
+  font-weight: 500 !important;
+}
+
+/* Format badge — Slate-100 bg, Slate-300 border, Slate-700 text */
+html:not(.dark) .lounge-room-card .lounge-spec-pill {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  font-weight: 500 !important;
 }
 
 .lounge-spec-pill {
@@ -2042,8 +2486,25 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .dark .lounge-filter-pill:hover:not(.lounge-filter-pill-active) {
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #f4f4f5;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+  color: #f4f4f5 !important;
+}
+
+/* Active filter pill — translucent sky tint, never solid royal blue */
+.dark .lounge-filter-pill-active {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: rgba(56, 189, 248, 0.50) !important;
+  color: #38bdf8 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.15) !important;
+}
+
+/* Inactive pills — dark chassis surface */
+.dark .lounge-filter-pill:not(.lounge-filter-pill-active) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: #a1a1aa !important;
 }
 
 .lounge-filter-pill-active {
@@ -2054,24 +2515,158 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: var(--lounge-filter-active-shadow);
 }
 
+/* Room counter ("6 rooms") — sibling of filter pills, Slate-500 in light mode */
+html:not(.dark) .lounge-filter-pill ~ .text-zinc-400 {
+  color: #64748b !important;
+  font-size: 12px !important;
+}
+
+/* ── Light Mode: lounge supporting elements ─────────────────────────────────
+   All scoped to html:not(.dark). Dark mode untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* "Load Session" buttons — visible slate border and text */
+html:not(.dark) .lounge-btn-load {
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  font-weight: 500 !important;
+  background: transparent !important;
+}
+html:not(.dark) .lounge-btn-load:hover {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* "Join Lounge" card button — sky-50 wash, sky-300 border, sky-600 text */
+html:not(.dark) .btn-join-lounge {
+  background: #f0f9ff !important;
+  border: 1px solid #7dd3fc !important;
+  color: #0284c7 !important;
+  box-shadow: none !important;
+}
+html:not(.dark) .btn-join-lounge:hover {
+  background: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #0369a1 !important;
+}
+
+/* Featured banner spec tags — Slate-300 border, Slate-600 text */
+html:not(.dark) .spotlight-spec-tag {
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+
+/* ── Dark Mode: restore elements overridden by light-mode rules ─────────────
+   Strictly scoped to .dark — light mode untouched.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* 1. Hardware gear line — luminous studio silver */
+.dark .lounge-room-card [style*="lounge-text-faint"] {
+  color: #a1a1aa !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+}
+
+/* 2. Format badges — subtle dark glass pill */
+.dark .lounge-room-card .lounge-spec-pill {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #e4e4e7 !important;
+  font-weight: 500 !important;
+}
+
+/* 3a. Featured banner category badge */
+.dark .spotlight-category-tag {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #a1a1aa !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+/* 3b. Featured banner spec tags */
+.dark .spotlight-spec-tag {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #e4e4e7 !important;
+}
+
+/* 4. "Host Lounge" player bar button — luminous sky-blue accent (dark override) */
+html.dark .btn-host-lounge {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15) !important;
+}
+
+html.dark .btn-host-lounge:hover {
+  background: rgba(56, 189, 248, 0.2) !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  color: #7dd3fc !important;
+}
+
+html.dark .btn-host-lounge-dot {
+  background: #38bdf8 !important;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.80) !important;
+}
+
+/* 5a. "Load Session" buttons */
+.dark .lounge-btn-load {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #d4d4d8 !important;
+  font-weight: 400 !important;
+}
+
+.dark .lounge-btn-load:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* 5b. Filter bar room counter */
+.dark .lounge-filter-pill ~ .text-zinc-400 {
+  color: #a1a1aa !important;
+}
+
+/* ── Join Lounge button — light mode base + hover ──────────────────────── */
 .btn-join-lounge {
-  background: var(--btn-join-bg);
-  border: 1px solid var(--btn-join-border);
-  color: var(--btn-join-text);
-  font-size: 0.75rem;
+  background: rgba(56, 189, 248, 0.08) !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+  color: #0284c7 !important;
+  font-size: 12px;
   font-weight: 500;
   padding: 0.35rem 0.85rem;
   border-radius: 9999px;
   cursor: pointer;
   white-space: nowrap;
   font-family: inherit;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.12) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-join-lounge:hover {
-  background: var(--btn-join-bg-hover);
-  border-color: var(--btn-join-border-hover);
-  color: var(--btn-join-text-hover);
+  background: #e0f2fe !important;
+  border: 1px solid #7dd3fc !important;
+  color: #0369a1 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
+}
+
+/* ── Join Lounge button — dark mode base + ambient bloom hover ──────────── */
+.dark .btn-join-lounge {
+  background: rgba(56, 189, 248, 0.08) !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+  color: #38bdf8 !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+}
+
+.dark .btn-join-lounge:hover {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px solid rgba(56, 189, 248, 0.60) !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.30) !important;
 }
 
 /* ── Now Playing / Expanded Stage Tokens ────────────────────────────────── */
@@ -2480,11 +3075,14 @@ input[type='range']::-webkit-slider-thumb {
 
 /* Queue drawer backdrop */
 .queue-drawer-backdrop {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .dark .queue-drawer-backdrop {
   background: rgba(0, 0, 0, 0.5) !important;
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 /* Queue drawer header border */
@@ -2855,27 +3453,63 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--border-strong);
 }
 
+/* ── Active state ── */
 .setup-btn-continue {
-  background: var(--accent-solo-solid);
+  background-color: #7c3aed;
   color: #ffffff;
-  box-shadow: 0 2px 14px var(--accent-solo-glow);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 
 .setup-btn-continue:hover:not(:disabled) {
-  background: var(--accent-solo-solid-hover);
-  box-shadow: 0 4px 22px var(--accent-solo-glow);
+  background-color: #6d28d9;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
 }
 
 .setup-btn-continue:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.setup-btn-continue:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  filter: none;
-  box-shadow: none;
+/* ── Disabled state: light mode ── */
+.setup-btn-continue:disabled,
+.setup-btn-continue[disabled] {
+  background-color: #e2e8f0 !important;
+  background-image: none !important;
+  color: #94a3b8 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+/* ── Dark mode active ── */
+.dark .setup-btn-continue {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.dark .setup-btn-continue:hover:not(:disabled) {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Disabled state: dark mode ── */
+.dark .setup-btn-continue:disabled,
+.dark .setup-btn-continue[disabled] {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-image: none !important;
+  color: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  opacity: 1 !important;
 }
 
 .onboarding-theme-toggle {
@@ -3536,12 +4170,12 @@ input[type='range']::-webkit-slider-thumb {
     --settings-title:                   #09090b;
     --settings-nav-active:              #09090b;
     --settings-nav-active-border:       var(--accent-solo);
-    --settings-nav-idle:                #94a3b8;
-    --settings-nav-idle-hover:          #475569;
+    --settings-nav-idle:                #64748b;
+    --settings-nav-idle-hover:          #0f172a;
     --settings-section-label:           #94a3b8;
     --settings-divider:                 #f1f5f9;
     --settings-row-label:               #0f172a;
-    --settings-row-sub:                 #94a3b8;
+    --settings-row-sub:                 #64748b;
     --settings-input-bg:                #f8fafc;
     --settings-input-border:            #e2e8f0;
     --settings-input-border-hover:      #94a3b8;
@@ -3610,11 +4244,13 @@ input[type='range']::-webkit-slider-thumb {
     --gs-seg-tray:                      #f1f5f9;
     --gs-seg-pill-bg:                   #ffffff;
     --gs-seg-pill-text:                 #0f172a;
-    --gs-seg-idle-text:                 #94a3b8;
-    --gs-btn-solid-bg:                  #0f172a;
+    --gs-seg-idle-text:                 #64748b;
+    --gs-btn-solid-bg:                  #7c3aed;
     --gs-btn-solid-text:                #ffffff;
+    --gs-btn-solid-shadow:              rgba(124, 58, 237, 0.25);
+    --gs-btn-outline-bg:                #ffffff;
     --gs-btn-outline-border:            #cbd5e1;
-    --gs-btn-outline-text:              #0f172a;
+    --gs-btn-outline-text:              #334155;
     --gs-btn-ghost-border:              #e2e8f0;
     --gs-btn-ghost-text:                #64748b;
     --gs-modal-bg:                      #ffffff;
@@ -3631,14 +4267,14 @@ input[type='range']::-webkit-slider-thumb {
   .dark {
     --settings-sidebar-border:          rgba(255,255,255,0.07);
     --settings-title:                   #f4f4f5;
-    --settings-nav-active:              #f4f4f5;
-    --settings-nav-active-border:       var(--accent-solo);
-    --settings-nav-idle:                #52525b;
-    --settings-nav-idle-hover:          #a1a1aa;
-    --settings-section-label:           #52525b;
+    --settings-nav-active:              #ffffff;
+    --settings-nav-active-border:       #a855f7;
+    --settings-nav-idle:                #94a3b8;
+    --settings-nav-idle-hover:          #ffffff;
+    --settings-section-label:           #94a3b8;
     --settings-divider:                 rgba(255,255,255,0.07);
     --settings-row-label:               #e4e4e7;
-    --settings-row-sub:                 #52525b;
+    --settings-row-sub:                 #94a3b8;
     --settings-input-bg:                rgba(255,255,255,0.04);
     --settings-input-border:            rgba(255,255,255,0.09);
     --settings-input-border-hover:      rgba(255,255,255,0.22);
@@ -3646,12 +4282,12 @@ input[type='range']::-webkit-slider-thumb {
     --settings-input-meta:              #22c55e;
     --settings-toggle-on:               #a78bfa;
     --settings-toggle-off:              #3f3f46;
-    --settings-card-bg:                 #16171a;
-    --settings-card-border:             rgba(255,255,255,0.08);
+    --settings-card-bg:                 #181b26;
+    --settings-card-border:             rgba(255,255,255,0.09);
     --settings-dsd-active-bg:           rgba(255,255,255,0.07);
     --settings-dsd-active-border:       rgba(255,255,255,0.18);
     --settings-dsd-active-text:         #f4f4f5;
-    --settings-dsd-idle-text:           #52525b;
+    --settings-dsd-idle-text:           #94a3b8;
     --settings-crossfeed-active-bg:     #a78bfa;
     --settings-crossfeed-active-text:   #09090b;
     --settings-crossfeed-idle-bg:       rgba(255,255,255,0.05);
@@ -3704,25 +4340,27 @@ input[type='range']::-webkit-slider-thumb {
     --gs-stat-bg:                       rgba(255,255,255,0.03);
     --gs-stat-border:                   #27272a;
     --gs-stat-num:                      #f4f4f5;
-    --gs-seg-tray:                      #16171a;
-    --gs-seg-pill-bg:                   #27272a;
-    --gs-seg-pill-text:                 #f4f4f5;
-    --gs-seg-idle-text:                 #71717a;
+    --gs-seg-tray:                      #13151f;
+    --gs-seg-pill-bg:                   rgba(255,255,255,0.10);
+    --gs-seg-pill-text:                 #ffffff;
+    --gs-seg-idle-text:                 #94a3b8;
     --gs-btn-solid-bg:                  #7c3aed;
     --gs-btn-solid-text:                #ffffff;
-    --gs-btn-outline-border:            #3f3f46;
-    --gs-btn-outline-text:              #a1a1aa;
-    --gs-btn-ghost-border:              #27272a;
-    --gs-btn-ghost-text:                #71717a;
+    --gs-btn-solid-shadow:              rgba(124, 58, 237, 0.30);
+    --gs-btn-outline-bg:                rgba(255, 255, 255, 0.06);
+    --gs-btn-outline-border:            rgba(255,255,255,0.14);
+    --gs-btn-outline-text:              #e2e8f0;
+    --gs-btn-ghost-border:              rgba(255,255,255,0.10);
+    --gs-btn-ghost-text:                #94a3b8;
     --gs-modal-bg:                      #1a1b1f;
     --gs-modal-border:                  #27272a;
     --gs-infobox-bg:                    rgba(255,255,255,0.03);
-    --gs-infobox-border:                #27272a;
-    --gs-infobox-text:                  #71717a;
-    --gs-danger-zone-bg:                rgba(127,29,29,0.10);
-    --gs-danger-zone-border:            rgba(239,68,68,0.22);
-    --gs-danger-card-bg:                #1a1b1f;
-    --gs-danger-card-border:            #27272a;
+    --gs-infobox-border:                rgba(255,255,255,0.09);
+    --gs-infobox-text:                  #94a3b8;
+    --gs-danger-zone-bg:                rgba(239, 68, 68, 0.05);
+    --gs-danger-zone-border:            rgba(239, 68, 68, 0.22);
+    --gs-danger-card-bg:                rgba(239, 68, 68, 0.06);
+    --gs-danger-card-border:            rgba(239, 68, 68, 0.18);
   }
 }
 
@@ -3733,6 +4371,155 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 14px;
   padding: 20px 24px;
   margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.dark .settings-card-surface {
+  background: #181b26 !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Solid Btn hover — violet in light, subtle lift in dark */
+button[type="button"]:not(:disabled):hover:where([style*="gs-btn-solid-bg"]) {
+  filter: brightness(0.92);
+}
+
+/* Named semantic button aliases for Backup section */
+.btn-settings-primary {
+  background: #7c3aed;
+  color: #ffffff;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.btn-settings-primary:hover:not(:disabled) {
+  background: #6d28d9;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+}
+
+.btn-settings-secondary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-settings-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.dark .btn-settings-primary {
+  background: #8b5cf6 !important;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3) !important;
+}
+.dark .btn-settings-primary:hover:not(:disabled) {
+  background: #7c3aed !important;
+}
+.dark .btn-settings-secondary {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #e2e8f0 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 7px 16px !important;
+  border-radius: 8px !important;
+}
+.dark .btn-settings-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.20) !important;
+  color: #ffffff !important;
+}
+
+/* Danger zone dark mode text */
+.dark [style*="gs-danger-zone-bg"] h3,
+.dark [style*="danger-zone"] h3 {
+  color: #f87171 !important;
+}
+.dark [style*="gs-danger-zone-bg"] p,
+.dark [style*="danger-zone"] p {
+  color: #fca5a5 !important;
+  opacity: 0.85;
+}
+
+/* Danger action buttons — dark mode */
+.dark [style*="gs-danger-card-bg"] button:not([style*="DC2626"]):not([style*="B91C1C"]) {
+  background: rgba(239, 68, 68, 0.10) !important;
+  border-color: rgba(239, 68, 68, 0.30) !important;
+  color: #fca5a5 !important;
+}
+.dark [style*="gs-danger-card-bg"] button:not([style*="DC2626"]):not([style*="B91C1C"]):hover {
+  background: rgba(239, 68, 68, 0.20) !important;
+  color: #ffffff !important;
+}
+
+/* Telemetry terminal — dark mode */
+.dark [style*="gs-infobox-bg"] {
+  background: #0e1118 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Language select wrapper */
+.settings-select-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.settings-select-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 7px 34px 7px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  outline: none;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.settings-select-input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+}
+.dark .settings-select-input {
+  color-scheme: dark !important;
+  background-color: #1e2230 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f1f5f9 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+.dark .settings-select-input option {
+  background-color: #161922 !important;
+  color: #f4f4f5 !important;
+  padding: 8px 12px;
+}
+.dark .settings-select-input:focus {
+  border-color: rgba(168, 85, 247, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2) !important;
 }
 
 .settings-gs-select {
@@ -3753,7 +4540,15 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .dark .settings-gs-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2352525b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  color-scheme: dark;
+  background-color: #1e2230 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f1f5f9 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.dark .settings-gs-select option {
+  background-color: #161922 !important;
+  color: #f4f4f5 !important;
 }
 
 .settings-gs-select:hover {
@@ -3771,38 +4566,49 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 9999px;
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 500 !important;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
-  background: rgba(224, 242, 254, 0.80);
-  border: 1px solid #7dd3fc;
-  color: #0369a1;
+  background: #f0f9ff !important;
+  border: 1px solid #7dd3fc !important;
+  color: #0284c7 !important;
 }
 
-.dark .btn-host-lounge {
-  background: rgba(8, 30, 60, 0.55) !important;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #7dd3fc;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.22), inset 0 0 0 0 transparent;
+.btn-host-lounge:hover {
+  background: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #0369a1 !important;
 }
 
-.dark .btn-host-lounge:hover {
-  background: rgba(10, 40, 78, 0.70) !important;
-  border-color: rgba(56, 189, 248, 0.65);
-  color: #bae6fd;
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.42);
+html.dark .btn-host-lounge {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15) !important;
+}
+
+html.dark .btn-host-lounge:hover {
+  background: rgba(56, 189, 248, 0.2) !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  color: #7dd3fc !important;
 }
 
 .btn-host-lounge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  background: #0284c7;
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.55);
+  flex-shrink: 0;
+}
+
+html.dark .btn-host-lounge-dot {
   background: #38bdf8;
   box-shadow: 0 0 6px rgba(56, 189, 248, 0.80);
-  flex-shrink: 0;
 }
 
 /* ── Player bar transport icon buttons ──────────────────────────────────────── */
@@ -4054,7 +4860,55 @@ input[type='range']::-webkit-slider-thumb {
 .dark .share-modal-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.16) !important;
   border-color: rgba(255, 255, 255, 0.26) !important;
-  color: #ffffff !important;
+  color: #f4f4f5 !important;
+}
+
+/* ── Share modal: Copy link button (overrides inline styles via !important) ─ */
+
+/* Light mode — resting */
+.share-modal-input + button {
+  background: rgba(56, 189, 248, 0.10) !important;
+  border: 1px solid rgba(56, 189, 248, 0.30) !important;
+  color: #0284c7 !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Light mode — hover */
+.share-modal-input + button:hover {
+  background: #e0f2fe !important;
+  border-color: #7dd3fc !important;
+  color: #0369a1 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
+}
+
+/* Dark mode — resting (override the #0F172A inline background) */
+.dark .share-modal-input + button {
+  background: rgba(56, 189, 248, 0.10) !important;
+  border: 1px solid rgba(56, 189, 248, 0.30) !important;
+  color: #38bdf8 !important;
+  box-shadow: none !important;
+}
+
+/* Dark mode — hover (deep translucent bloom, never solid/milky) */
+.dark .share-modal-input + button:hover {
+  background: rgba(56, 189, 248, 0.18) !important;
+  border-color: rgba(56, 189, 248, 0.60) !important;
+  color: #e0f2fe !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.30) !important;
+}
+
+/* ── Share modal: title & header in dark mode ──────────────────────────────
+   Selector chain: modal-box:has(3-step path to .share-modal-input)
+   modal-box > header > title-wrapper > title-div (all first-children)       */
+.dark div:has(> div > div > .share-modal-input) > div:first-child {
+  border-bottom-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.dark div:has(> div > div > .share-modal-input) > div:first-child > div:first-child > div:first-child {
+  color: #f4f4f5 !important;
 }
 
 /* ── Player bar center section ───────────────────────────────────────────────── */
@@ -4472,4 +5326,594 @@ input[type='range']::-webkit-slider-thumb {
 .dark .device-vol-db:hover {
   color: #c084fc !important;
   text-shadow: 0 0 10px rgba(192, 132, 252, 0.4);
+}
+
+/* ── Reset Confirmation Modal ─────────────────────────────────────────────── */
+
+/* Light-mode fallback (non-dark) */
+.modal-danger-icon-box {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 12px;
+  color: #dc2626;
+}
+
+.modal-danger-callout {
+  background: #fff1f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.modal-danger-list-item {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #9f1239;
+}
+
+.modal-danger-list-item span {
+  color: #dc2626;
+  font-weight: 700;
+  margin-right: 0;
+}
+
+.modal-danger-cancel-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #374151;
+}
+
+.modal-danger-confirm-disabled {
+  background: rgba(239, 68, 68, 0.25);
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.modal-danger-confirm-active {
+  background: #e11d48;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.35);
+}
+
+/* Dark-mode overrides */
+.dark .modal-danger-icon-box {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border: 1px solid rgba(239, 68, 68, 0.28) !important;
+  border-radius: 12px;
+  color: #f87171 !important;
+}
+
+.dark .modal-danger-callout {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border: 1px solid rgba(239, 68, 68, 0.2) !important;
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .modal-danger-list-item {
+  color: #fca5a5 !important;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.dark .modal-danger-list-item span {
+  color: #f87171 !important;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.dark .modal-danger-cancel-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+
+.dark .modal-danger-confirm-disabled {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  cursor: not-allowed;
+}
+
+.dark .modal-danger-confirm-active {
+  background: #e11d48 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.4);
+}
+
+/* ── Step 1 Audio Engine — buffer slider ─────────────────────────────────── */
+.ob-buffer-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9333ea;
+  box-shadow: 0 0 8px rgba(147, 51, 234, 0.5);
+  cursor: pointer;
+}
+
+.ob-buffer-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9333ea;
+  box-shadow: 0 0 8px rgba(147, 51, 234, 0.5);
+  cursor: pointer;
+  border: none;
+}
+
+.ob-buffer-slider::-webkit-slider-runnable-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  height: 6px;
+}
+
+.ob-buffer-slider::-moz-range-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  height: 6px;
+}
+
+/* ── Step 1 Audio Engine — dual-theme semantic classes ───────────────────── */
+
+.ae-panel {
+  background: var(--ob-card-bg);
+  border: 1px solid var(--ob-card-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+
+.ae-section-label {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ob-body);
+  margin-bottom: 0.75rem;
+}
+
+/* Driver / device selectable cards */
+.ae-selcard {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--ob-card-border);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+
+.ae-selcard:hover {
+  background: var(--ob-card-bg-hover);
+  border-color: var(--ob-card-border-hover);
+}
+
+.ae-selcard.ae-active {
+  background: var(--ob-card-bg-active);
+  border-color: var(--ob-card-border-active);
+  box-shadow: 0 0 0 1px var(--ob-card-ring-active),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Radio dot ring */
+.ae-radio {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid var(--ob-card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color 0.15s;
+}
+
+.ae-selcard.ae-active .ae-radio {
+  border-color: #a78bfa;
+}
+
+/* Card label (name) */
+.ae-card-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ob-body);
+  transition: color 0.15s;
+}
+
+.ae-selcard.ae-active .ae-card-name {
+  color: var(--ob-title);
+}
+
+/* Card description / subtitle */
+.ae-card-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ob-body);
+  opacity: 0.65;
+  font-family: "DM Mono", monospace;
+}
+
+/* Recommended badge — active driver */
+.ae-rec-badge {
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #ede9fe;
+  border: 1px solid #ddd6fe;
+  color: #5b21b6;
+}
+
+.dark .ae-rec-badge {
+  background: rgba(167, 139, 250, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  color: #c4b5fd;
+}
+
+/* Recommended badge — inactive (greyed) */
+.ae-rec-badge-dim {
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: var(--ob-card-bg-hover);
+  border: 1px solid var(--ob-card-border);
+  color: var(--ob-body);
+  opacity: 0.5;
+}
+
+/* Architecture chip on device cards */
+.ae-arch-chip {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--ob-card-bg-hover);
+  border: 1px solid var(--ob-card-border);
+  color: var(--ob-body);
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* Spec badge (PCM / bit-depth) */
+.ae-spec-badge {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.dark .ae-spec-badge {
+  background: rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  color: #c4b5fd;
+}
+
+/* DSD badge */
+.ae-dsd-badge {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.dark .ae-dsd-badge {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+/* Buffer size pill */
+.ae-buffer-pill {
+  flex: 1;
+  padding: 0.5rem 0;
+  border-radius: 0.5rem;
+  font-size: 11px;
+  text-align: center;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  font-family: "DM Mono", monospace;
+  cursor: pointer;
+}
+
+.ae-buffer-pill:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.dark .ae-buffer-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: #94a3b8;
+}
+
+.dark .ae-buffer-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #cbd5e1;
+}
+
+.ae-buffer-pill.ae-active {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.30);
+}
+
+/* Latency inner card */
+.ae-latency-card {
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--ob-card-bg-hover);
+  border: 1px solid var(--ob-card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ae-latency-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--ob-card-border);
+  overflow: hidden;
+}
+
+.ae-latency-readout {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  color: var(--ob-body);
+}
+
+.ae-latency-hint {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--ob-body);
+  opacity: 0.55;
+}
+
+/* Device scroll container */
+.ae-device-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 58, 237, 0.25) transparent;
+}
+
+.ae-device-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ae-device-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ae-device-scroll::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.25);
+  border-radius: 99px;
+}
+
+.ae-device-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.45);
+}
+
+/* Rescan button */
+.ae-rescan-btn {
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #7c3aed;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+
+.ae-rescan-btn:disabled {
+  color: var(--ob-body);
+  cursor: wait;
+  opacity: 0.45;
+}
+
+/* Bit-perfect verified label */
+.ae-bitperfect {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.dark .ae-bitperfect {
+  color: #34d399;
+}
+
+/* Shared mode (not bit-perfect) label */
+.ae-shared-mode {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  color: var(--ob-body);
+  opacity: 0.5;
+}
+
+/* ── Live Chat message stream — remove horizontal row dividers ───────────────
+   Scoped to the message feed container via its unique justify-end + space-y-4
+   combination; does not affect any other lists in the app.
+   ─────────────────────────────────────────────────────────────────────────── */
+[class*="justify-end"][class*="space-y-4"] > div {
+  border-top-width: 0 !important;
+  border-bottom-width: 0 !important;
+  border-color: transparent !important;
+  padding-bottom: 0 !important;
+}
+
+/* ── Queue Drawer — Track Titles ─────────────────────────────────────────── */
+.queue-track-title {
+  color: #18181b;
+}
+
+.dark .queue-track-title {
+  color: #f1f5f9 !important;
+}
+
+/* ── Queue Drawer — Streaming Service Badges ─────────────────────────────── */
+.queue-service-badge {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.dark .queue-service-badge {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #cbd5e1 !important;
+}
+
+/* ── Light Mode: Queue drawer frosted backdrop ───────────────────────────── */
+body:not(.dark) .queue-drawer-backdrop {
+  background-color: rgba(15, 23, 42, 0.22) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* ── Dark Mode: Unified Host Lounge button — both standby & playing states ──
+   Covers .lounge-active-trigger (active track row) and .btn-host-lounge
+   (standby row) so both instances are always glass-sky, never opaque white.
+   ─────────────────────────────────────────────────────────────────────────── */
+html.dark .lounge-active-trigger,
+html.dark .btn-host-lounge {
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15) !important;
+}
+
+html.dark .lounge-active-trigger:hover,
+html.dark .btn-host-lounge:hover {
+  background-color: rgba(56, 189, 248, 0.22) !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  color: #7dd3fc !important;
+}
+
+/* ── Light Mode: same two selectors — crisp ocean-blue pill ─────────────── */
+html:not(.dark) .lounge-active-trigger,
+html:not(.dark) .btn-host-lounge {
+  background-color: #f0f9ff !important;
+  border: 1px solid #7dd3fc !important;
+  color: #0284c7 !important;
+}
+
+html:not(.dark) .lounge-active-trigger:hover,
+html:not(.dark) .btn-host-lounge:hover {
+  background-color: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #0369a1 !important;
+}
+
+/* ── Track More-Options Button & Dropdown (Dark Mode) ───────────────────── */
+
+/* Light mode defaults */
+.track-more-btn {
+  color: #71717a;
+  border-color: transparent;
+}
+.track-more-btn[aria-expanded="true"] {
+  background-color: #f4f4f5;
+  border-color: #e4e4e7;
+  color: #18181b;
+}
+.track-dropdown-menu {
+  background: rgba(255,255,255,0.97);
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+}
+.track-menu-item { color: #18181b; }
+.track-menu-item p { color: #a1a1aa; }
+.track-menu-icon { color: #71717a; }
+.track-menu-item:hover { background: rgba(244,244,245,0.8); }
+
+/* Dark mode overrides */
+html.dark .track-more-btn {
+  color: #71717a;
+  border-color: transparent;
+}
+html.dark .track-more-btn[aria-expanded="true"],
+html.dark .track-more-btn[data-state="open"] {
+  background-color: #27272a !important;
+  border-color: #3f3f46 !important;
+  color: #f4f4f5 !important;
+}
+
+html.dark .track-dropdown-menu,
+html.dark [role="menu"],
+html.dark [data-radix-popper-content-wrapper] > div {
+  background-color: #1a1b1f !important;
+  border: 1px solid #27272a !important;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.7), 0 0 1px 1px rgba(255,255,255,0.05) !important;
+}
+
+html.dark .track-menu-item,
+html.dark [role="menuitem"] {
+  color: #f4f4f5 !important;
+}
+html.dark .track-menu-item:hover,
+html.dark [role="menuitem"]:hover {
+  background-color: #27272a !important;
+}
+html.dark .track-menu-item p,
+html.dark [role="menuitem"] p,
+html.dark [role="menuitem"] span:last-child {
+  color: #71717a !important;
+}
+html.dark .track-menu-icon {
+  color: #a1a1aa !important;
+}
+
+/* ── Play Queue Track Row Hover ─────────────────────────────────────────── */
+
+/* Light mode hover */
+[data-queue-track]:hover {
+  background-color: #f1f5f9;
+}
+
+/* Dark mode: override all possible light hover surfaces */
+html.dark [data-queue-drawer] [data-queue-track]:hover,
+html.dark .play-queue-track:hover,
+html.dark .queue-track-item:hover,
+html.dark [data-queue-track]:hover {
+  background-color: #27272a !important;
+}
+
+/* Title stays crisp on hover in dark mode */
+html.dark [data-queue-drawer] [data-queue-track]:hover .track-title,
+html.dark [data-queue-track]:hover h4,
+html.dark [data-queue-track]:hover .track-title {
+  color: #f4f4f5 !important;
+}
+
+/* Artist / secondary text stays readable on hover in dark mode */
+html.dark [data-queue-drawer] [data-queue-track]:hover .track-artist,
+html.dark [data-queue-track]:hover p,
+html.dark [data-queue-track]:hover .track-artist {
+  color: #a1a1aa !important;
 }

@@ -68,6 +68,50 @@ public sealed class ProcessSupervisor
     /// </summary>
     public string Backend { get; set; } = "exclusive";
 
+    /// <summary>
+    /// 마법사에서 고른 출력 장치 이름. 워커는 이걸 부분 일치로 찾는다.
+    /// 비어 있으면 OS 기본 장치로 간다 — 고른 적이 없을 때의 옳은 동작이다.
+    /// </summary>
+    public string DeviceHint { get; set; } = "";
+
+    /// <summary>
+    /// 이 PC 에 달린 출력 목록(JSON). 열거는 NAudio 를 든 Output 워커가 하고,
+    /// 여기서는 잠깐 띄워 stdout 한 줄을 받아 온다. 실패하면 빈 배열이다.
+    /// </summary>
+    public async Task<string> ListAudioDevicesAsync(CancellationToken ct = default)
+    {
+        var exe = FindExe("Mono.Output.exe", "Mono.Output");
+        if (exe is null) return "[]";
+
+        try
+        {
+            var psi = new ProcessStartInfo(exe, "--list-devices")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                WorkingDirectory = Path.GetDirectoryName(exe)!,
+            };
+            using var p = Process.Start(psi);
+            if (p is null) return "[]";
+
+            var json = await p.StandardOutput.ReadToEndAsync(ct);
+            // 드라이버 하나가 열거 중에 얼면 여기서 끝없이 기다리게 된다. 목록은 그 정도 값어치가 아니다.
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            try { await p.WaitForExitAsync(timeout.Token); }
+            catch (OperationCanceledException) { try { p.Kill(entireProcessTree: true); } catch { /* 이미 죽었다 */ } }
+
+            json = json.Trim();
+            return json.StartsWith('[') ? json : "[]";
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return "[]";
+        }
+    }
+
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
         // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
@@ -86,6 +130,7 @@ public sealed class ProcessSupervisor
         if (!string.IsNullOrWhiteSpace(roomId)) args += $" --room={roomId}";
         if (Backend == "shared") args += " --shared";
         else if (Backend == "asio") args += " --asio";
+        if (!string.IsNullOrWhiteSpace(DeviceHint)) args += $" --device=\"{DeviceHint}\"";
 
         try
         {

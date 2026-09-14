@@ -28,6 +28,8 @@ import {
   type LoungeRoom,
 } from "./data/types"
 import { useLiveSession, useToast } from "./state/useLiveSession"
+import { loadSetup, saveSetup, backendFor, type SetupState } from "./lib/setup"
+import { hasShell, startOutput } from "./lib/shell"
 import { useDebounced } from "./state/useDebounced"
 import { libArtists } from "./lib/libraryData"
 import {
@@ -234,6 +236,7 @@ export default function App() {
   const [crossfeedOn, setCrossfeedOn] = useState<boolean>(true)
 
   // ── Dark mode: persist + toggle ──────────────────────────────────────────
+  // (마법사가 고른 테마는 setup 을 읽은 뒤 아래 effect 가 덮어쓴다)
   const [theme, setTheme] = useState<"light" | "dark">(
     () => (localStorage.getItem("mono_theme") as "light" | "dark") || "dark"
   )
@@ -421,6 +424,13 @@ export default function App() {
     setActiveTab("live")
   }
 
+  // Leave without any tab/screen navigation — used when leaving from the Home view
+  const handleLeaveLoungeSilent = () => {
+    setPlayerMode("solo")
+    setActiveLoungeRoom(false)
+    setJoinedLoungeId(null)
+  }
+
   const handleGoToLibraryTracks = () => {
     setLibraryDefaultTab("tracks")
     setCurrentTab("library")
@@ -561,12 +571,53 @@ export default function App() {
   const activeProfile = profiles.find(p => p.id === activeProfileId) ?? profiles[0]
 
   // ── Onboarding state ───────────────────────────────────────────────────────
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(
-    () => localStorage.getItem("mono_onboarding_completed") !== "true"
-  )
+  // 마법사는 이 PC 에서 처음 열었을 때만 뜬다. 끝냈는지 여부는 Core 의 setup.json 이
+  // 안다 — WebView 캐시를 비워도, 브라우저로 열어도 같은 답이 나와야 하기 때문이다.
+  // 답이 오기 전에는 아무것도 띄우지 않는다. 띄웠다 감추면 첫 프레임이 깜빡인다.
+  const [setup, setSetup] = useState<SetupState | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false)
+
+  useEffect(() => {
+    const ac = new AbortController()
+    void loadSetup(ac.signal).then((state) => {
+      setSetup(state)
+      setShowOnboarding(!state.completed)
+      if (state.theme) setTheme(state.theme)
+    })
+    return () => ac.abort()
+  }, [])
+
+  // 테마도 이 PC 의 설정이다. 마법사를 마친 뒤의 변경만 남긴다 — 설정을 읽기 전에 쓰면
+  // 아직 모르는 값(기본 dark)으로 저장된 선택을 덮어쓴다.
+  useEffect(() => {
+    if (!setup?.completed || setup.theme === theme) return
+    void saveSetup({ theme })
+  }, [theme, setup])
+
+  // 마법사에서 고른 설정을 이번 실행에 되살린다. 폴더는 Core 가 이미 감시 중이지만,
+  // 이름과 출력 장치는 아무도 기억하지 않는다 — 여기서 되돌려 놓지 않으면 두 번째 실행부터
+  // "Welcome, Listener" 와 OS 기본 장치로 돌아간다.
+  const restored = useRef(false)
+  useEffect(() => {
+    if (!setup?.completed || restored.current) return
+    restored.current = true
+
+    const name = setup.profile?.displayName?.trim()
+    if (name) {
+      cmd.setDisplayName(name)
+      setProfiles((prev) => prev.map((p) => (p.id === activeProfileId ? { ...p, name } : p)))
+    }
+
+    const audio = setup.audio
+    // 셸이 없으면 Output 프로세스를 띄울 방법 자체가 없다.
+    if (audio?.deviceName && hasShell()) {
+      void startOutput(null, backendFor(audio), audio.deviceName)
+    }
+  }, [setup, cmd, activeProfileId])
 
   const handleOnboardingComplete = (profile: ListenerProfile) => {
-    localStorage.setItem("mono_onboarding_completed", "true")
+    // 고른 값 자체는 마법사가 Core 에 이미 저장했다. 여기서는 이번 화면에만 반영한다.
+    setSetup((prev) => ({ ...(prev ?? { completed: false }), completed: true, theme }))
     // 이름은 Core 의 멤버 목록·아카이브 참가자에 그대로 쓰인다.
     cmd.setDisplayName(profile.displayName)
     setProfiles(prev =>
@@ -898,6 +949,7 @@ export default function App() {
             labels={homeLabels}
             joinedLoungeId={joinedLoungeId}
             onToggleJoin={handleToggleJoinLounge}
+            onLeaveLounge={handleLeaveLoungeSilent}
             onNavigateToTracks={handleGoToLibraryTracks}
             onPlayAlbum={(album) => { void cmd.playAlbum(album.trackIds) }}
             onSelectAlbum={(album) => {

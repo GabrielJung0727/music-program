@@ -160,17 +160,17 @@ function LoungeGridCard({ room, onJoin, onShare }: { room: LoungeRoom; onJoin: (
         </div>
       </div>
       <div style={{ padding: "13px 15px 15px", flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-        <div className="lounge-title-text leading-snug line-clamp-2" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+        <div className="leading-snug line-clamp-2" style={{ fontSize: 15, fontWeight: 600, color: "var(--lounge-text-title)", lineHeight: 1.35 }}>
           {room.title}
         </div>
-        <div className="lounge-muted-text">
-          Host: <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{room.hostName}</span>
+        <div style={{ fontSize: 12, color: "var(--lounge-text-muted)" }}>
+          Host: <span style={{ color: "var(--lounge-text-title)", fontWeight: 500 }}>{room.hostName}</span>
         </div>
-        <div className="lounge-muted-text truncate" style={{ color: "var(--text-secondary)" }}>
+        <div style={{ fontSize: 12, color: "var(--lounge-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {room.currentTrackTitle} — {room.currentArtist}
         </div>
         {room.hostGear && (
-          <div className="lounge-muted-text truncate" style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--text-muted)" }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "var(--lounge-text-faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {room.hostGear}
           </div>
         )}
@@ -400,8 +400,8 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
             <img src={activeSpotlight.art} alt={activeSpotlight.title} style={{ width: 76, height: 76, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: "2px solid var(--lounge-spotlight-art-border)" }} />
             <div>
-              <div className="lounge-spotlight-title" style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.3px" }}>{activeSpotlight.title}</div>
-              <div className="lounge-spotlight-meta" style={{ fontSize: 12.5, marginBottom: 10 }}>{activeSpotlight.subtitle}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.3px", color: "var(--lounge-spotlight-title)" }}>{activeSpotlight.title}</div>
+              <div style={{ fontSize: 12.5, marginBottom: 10, color: "var(--lounge-spotlight-meta)" }}>{activeSpotlight.subtitle}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                 {activeSpotlight.specs.map((spec) => (
                   <span key={spec} className="spotlight-spec-tag">{spec}</span>
@@ -496,8 +496,8 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
               <div key={s.id} className="lounge-row p-4 flex items-center gap-4">
                 <img src={s.art} alt={s.title} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "rgba(255,255,255,0.05)" }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="lounge-title-text mb-0.5 truncate">{s.title}</div>
-                  <div className="lounge-muted-text">Host: {s.host} &nbsp;·&nbsp; {s.tracks} tracks &nbsp;·&nbsp; {s.date}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--lounge-text-title)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
+                  <div style={{ fontSize: 12, color: "var(--lounge-text-muted)" }}>Host: {s.host} &nbsp;·&nbsp; {s.tracks} tracks &nbsp;·&nbsp; {s.date}</div>
                 </div>
                 <button className="lounge-btn-load" style={{ fontFamily: "inherit" }} onClick={() => onLoadArchive(s.id)}>Load Session</button>
               </div>
@@ -518,11 +518,11 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
               <div key={item.rank} className="lounge-row flex items-center gap-3" style={{ padding: "11px 14px" }}>
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 700, color: item.rank === 1 ? "#60a5fa" : "var(--lounge-text-faint)", minWidth: 18, textAlign: "center" }}>#{item.rank}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="lounge-title-text truncate">{item.track}</div>
-                  <div className="lounge-muted-text">{item.artist}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--lounge-text-title)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.track}</div>
+                  <div style={{ fontSize: 12, color: "var(--lounge-text-muted)" }}>{item.artist}</div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="lounge-spec-badge" style={{ color: "#34d399" }}>{item.dr}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(52,211,153,0.10)", border: "1px solid rgba(52,211,153,0.22)", color: "#34d399" }}>{item.dr}</span>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "var(--lounge-text-faint)" }}>{item.plays} plays</span>
                   <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--lounge-text-faint)", padding: "0 2px", display: "flex", alignItems: "center" }} title="Preview">
                     <MonoIcon.PlayMini size={12} />

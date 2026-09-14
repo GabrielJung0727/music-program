@@ -68,9 +68,15 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
       <button
         ref={btnRef}
         onClick={openMenu}
-        className={`p-1.5 rounded-md text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 transition-all cursor-pointer ${isOpen ? "opacity-100 bg-zinc-100 text-zinc-800" : "opacity-0 group-hover:opacity-100"}`}
+        aria-expanded={isOpen}
+        className={`track-more-btn p-1.5 rounded-md transition-all cursor-pointer ${isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         title="More options"
-        style={{ border: "none", background: isOpen ? undefined : "none", lineHeight: 1, flexShrink: 0 }}
+        style={{
+          lineHeight: 1,
+          flexShrink: 0,
+          border: isOpen ? "1px solid" : "none",
+          background: "none",
+        }}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <circle cx="5"  cy="12" r="1.5"/>
@@ -90,11 +96,9 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
             width: 192,
           }}
         >
-          <div style={{
-            background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)",
-            border: "1px solid #E4E4E7",
+          <div className="track-dropdown-menu" style={{
+            backdropFilter: "blur(12px)",
             borderRadius: 12,
-            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04)",
             padding: 4,
             animation: "tam-in 0.1s ease",
           }}>
@@ -167,6 +171,7 @@ function MenuItem({ icon, label, sub, disabled, onClick }: {
   return (
     <button
       onClick={disabled ? undefined : onClick}
+      className="track-menu-item"
       style={{
         width: "100%", textAlign: "left", border: "none", cursor: disabled ? "default" : "pointer",
         background: "none", padding: "7px 10px", borderRadius: 8,
@@ -174,13 +179,11 @@ function MenuItem({ icon, label, sub, disabled, onClick }: {
         opacity: disabled ? 0.38 : 1, transition: "background 0.1s",
         fontFamily: "inherit",
       }}
-      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = "rgba(244,244,245,0.8)" }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "none" }}
     >
-      <span style={{ color: "#71717A", flexShrink: 0, display: "flex" }}>{icon}</span>
+      <span className="track-menu-icon" style={{ flexShrink: 0, display: "flex" }}>{icon}</span>
       <div>
-        <div style={{ fontSize: 12, fontWeight: 500, color: "#18181B", lineHeight: 1.2 }}>{label}</div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#A1A1AA", marginTop: 1 }}>{sub}</div>
+        <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2 }}>{label}</div>
+        <p style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, marginTop: 1 }}>{sub}</p>
       </div>
     </button>
   )

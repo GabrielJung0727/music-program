@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.FileProviders;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using Mono.Core;
 using Mono.Protocol;
@@ -28,6 +29,7 @@ builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db"))
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
 builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
 builder.Services.AddSingleton(new BackupService(data));
+builder.Services.AddSingleton(new SetupStore(data));
 var wikiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 // 위키미디어 API 정책상 User-Agent 없는 요청은 403으로 거부된다.
 wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi lounge app; https://github.com/mono-audio)");
@@ -193,6 +195,22 @@ app.MapGet("/api/art/{trackId}", (string trackId, CatalogStore catalog, ArtworkS
     }
 
     return Results.File(path, ArtworkService.ContentType(path));
+});
+
+// 첫 실행 마법사가 남긴 설정. 이 PC 에 매인 값이라 룸·카탈로그와 달리 Core 의 파일 한 장이다.
+app.MapGet("/api/setup", (SetupStore setup) => Results.Ok(setup.Read()));
+
+app.MapPut("/api/setup", async (HttpRequest req, SetupStore setup) =>
+{
+    var patch = await JsonSerializer.DeserializeAsync<JsonObject>(req.Body);
+    if (patch is null) return Results.BadRequest(new { error = "JSON 객체가 필요합니다." });
+    return Results.Ok(setup.Merge(patch));
+});
+
+app.MapDelete("/api/setup", (SetupStore setup) =>
+{
+    setup.Clear();
+    return Results.Ok(new { ok = true });
 });
 
 app.MapPost("/api/aliases/musicbrainz", async (CatalogStore catalog) =>

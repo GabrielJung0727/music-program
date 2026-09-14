@@ -229,10 +229,11 @@ public sealed class ShellForm : Form
             pickFile: (title, filter) => call('pickFile', { title, filter }),
             openExternal: (url) => call('openExternal', { url }),
             output: {
-              start: (roomId, backend) => call('output.start', { roomId, backend }),
+              start: (roomId, backend, device) => call('output.start', { roomId, backend, device }),
               stop: () => call('output.stop'),
               restart: () => call('output.restart'),
               status: () => call('output.status'),
+              devices: () => call('output.devices'),
             },
             update: {
               check: () => call('update.check'),
@@ -312,8 +313,18 @@ public sealed class ShellForm : Form
             {
                 var backend = Str("backend");
                 if (!string.IsNullOrWhiteSpace(backend)) _supervisor.Backend = backend;
+                var device = Str("device");
+                if (device is not null) _supervisor.DeviceHint = device;
                 var ok = _supervisor.StartOutput(Str("roomId"));
                 return new { ok, error = ok ? null : _supervisor.LastError };
+            }
+
+            case "output.devices":
+            {
+                // 목록은 Output 워커가 만든 JSON 그대로다. 여기서 한 번 더 모양을 바꾸면
+                // 두 군데를 같이 고쳐야 하는 짝이 하나 더 생긴다.
+                var json = await _supervisor.ListAudioDevicesAsync(_life.Token);
+                return JsonDocument.Parse(json).RootElement.Clone();
             }
 
             case "output.stop":
