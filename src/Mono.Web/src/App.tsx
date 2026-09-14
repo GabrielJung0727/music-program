@@ -27,6 +27,7 @@ import {
   type LoungeRoom,
 } from "./data/types"
 import { useLiveSession, useToast } from "./state/useLiveSession"
+import { useDebounced } from "./state/useDebounced"
 import { libArtists } from "./lib/libraryData"
 import {
   filterChips,
@@ -104,6 +105,16 @@ export default function App() {
 
   const filteredAlbums: SearchAlbum[] = live.searchAlbums(searchQuery)
   const filteredTracks: SearchTrack[] = live.searchTracks(searchQuery)
+
+  // 타이핑이 멎은 뒤에야 Core 로 검색을 보낸다. Core 는 그 질의로 Tidal 카탈로그를
+  // 보강하므로, 글자마다 보내면 곧장 요청 한도(429)에 걸린다.
+  // Core 쪽에도 같은 질의·짧은 질의·한도 상태를 거르는 방어가 따로 있다.
+  const debouncedQuery = useDebounced(searchQuery, 500)
+  useEffect(() => {
+    const q = debouncedQuery.trim()
+    if (q.length < 3) return
+    void cmd.search(q)
+  }, [debouncedQuery, cmd])
 
   // 검색어에 맞는 아티스트 한 명과 라운지들. 없으면 해당 섹션을 통째로 감춘다.
   const searchQ = searchQuery.toLowerCase().trim()

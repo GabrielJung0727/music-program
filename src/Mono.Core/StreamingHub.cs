@@ -257,17 +257,85 @@ public sealed class StreamingHub
         Save();
     }
 
+    /// <summary>이보다 짧은 질의는 타이핑 중간 상태로 본다. Tidal 로 보내지 않는다.</summary>
+    private const int MinEnrichLength = 3;
+
+    /// <summary>같은 질의를 다시 Tidal 로 보내기까지 기다리는 시간.</summary>
+    private static readonly TimeSpan EnrichCooldown = TimeSpan.FromMinutes(10);
+
+    /// <summary>한도에 걸린 뒤 검색 보강을 통째로 쉬는 시간.</summary>
+    private static readonly TimeSpan RateLimitBackoff = TimeSpan.FromMinutes(2);
+
+    /// <summary>캐시가 무한히 자라지 않게 하는 상한. 넘으면 오래된 것부터 버린다.</summary>
+    private const int MaxRememberedQueries = 200;
+
+    private readonly Dictionary<string, DateTimeOffset> _enriched = new(StringComparer.Ordinal);
+    private DateTimeOffset _enrichBlockedUntil = DateTimeOffset.MinValue;
+
+    private static string NormalizeQuery(string query)
+        => string.Join(' ', query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    /// <summary>
+    /// 이 질의를 Tidal 로 보낼 만한가. 검색창은 글자마다 질의를 보내므로
+    /// 짧은 것·최근에 이미 보낸 것·한도에 걸린 동안의 것을 모두 걸러 낸다.
+    /// </summary>
+    public bool ShouldEnrich(string query)
+    {
+        var q = NormalizeQuery(query ?? "");
+        if (q.Length < MinEnrichLength) return false;
+
+        lock (_gate)
+        {
+            if (DateTimeOffset.UtcNow < _enrichBlockedUntil) return false;
+            if (_enriched.TryGetValue(q, out var at) && DateTimeOffset.UtcNow - at < EnrichCooldown) return false;
+            return true;
+        }
+    }
+
+    /// <summary>이 질의를 Tidal 로 보냈다고 기록한다.</summary>
+    public void MarkEnriched(string query)
+    {
+        var q = NormalizeQuery(query ?? "");
+        if (q.Length == 0) return;
+
+        lock (_gate)
+        {
+            _enriched[q] = DateTimeOffset.UtcNow;
+            if (_enriched.Count <= MaxRememberedQueries) return;
+            foreach (var stale in _enriched.OrderBy(kv => kv.Value)
+                         .Take(_enriched.Count - MaxRememberedQueries)
+                         .Select(kv => kv.Key)
+                         .ToList())
+            {
+                _enriched.Remove(stale);
+            }
+        }
+    }
+
+    /// <summary>한도에 걸렸다. 잠시 모든 검색 보강을 멈춘다.</summary>
+    public void NoteRateLimited()
+    {
+        lock (_gate) _enrichBlockedUntil = DateTimeOffset.UtcNow + RateLimitBackoff;
+    }
+
     public void EnrichSearch(string query)
     {
         if (string.IsNullOrWhiteSpace(query) || !IsConnected(StreamingProvider.Tidal) || !HasLiveCredentials(StreamingProvider.Tidal))
             return;
+        if (!ShouldEnrich(query)) return;
         if (!EnsureFreshTidalToken()) return;
         var token = GetToken(StreamingProvider.Tidal);
         if (string.IsNullOrWhiteSpace(token) || LooksDemo(token)) return;
+
+        // 실제로 나가기 직전에 기록한다. 실패하더라도 같은 질의를 연달아
+        // 재시도하지 않는 편이 낫다 — 실패의 흔한 원인이 바로 한도다.
+        MarkEnriched(query);
         try
         {
             foreach (var hit in Tidal.Search(token, query, _tidalCountry, 20))
                 UpsertTidalHit(hit);
+
+            if (Tidal.RateLimited) NoteRateLimited();
         }
         catch { /* local search still works */ }
     }

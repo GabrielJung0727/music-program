@@ -456,7 +456,22 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       async search(query) {
         try {
           const res = await client.request({ type: MSG.search, text: query }, MSG.search)
-          return parseBody<CatalogTrack[]>(res) ?? []
+          const hits = parseBody<CatalogTrack[]>(res) ?? []
+          // Core 는 검색 도중 Tidal 에서 곡을 더 끌어와 카탈로그에 넣는다.
+          // 그 결과가 응답에만 있고 전역 카탈로그에 없으면, 화면의 다른 목록들이
+          // 방금 찾은 곡을 모른다. 여기서 합쳐 둔다.
+          if (hits.length > 0) {
+            setCatalog(prev => {
+              const byId = new Map(prev.map(t => [t.id, t]))
+              let changed = false
+              for (const hit of hits) {
+                if (!byId.has(hit.id)) changed = true
+                byId.set(hit.id, hit)
+              }
+              return changed ? [...byId.values()] : prev
+            })
+          }
+          return hits
         } catch {
           return []
         }
