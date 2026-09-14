@@ -22,7 +22,7 @@
   <ItemGroup>
     <!-- 사용자 데이터 위치는 UserPaths 한 곳에서만 정한다. 설치 프로그램이 제 나름의
          경로를 또 들면 앱이 읽는 자리와 어긋난다. -->
-    <ProjectReference Include="..Mono.SharedMono.Shared.csproj" />
+    <ProjectReference Include="..\Mono.Shared\Mono.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="mono-app.ico" />
