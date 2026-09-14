@@ -3,6 +3,6 @@
     <!-- 저장소 전체의 버전은 여기 한 곳에만 둔다. 프로젝트마다 <Version> 을 또 박으면
          그쪽이 이겨서 숫자가 갈라진다(실제로 0.1.0 / 0.1.3 / 0.1.5 로 갈라졌었다).
          릴리스 때는 publish.ps1 이 -p:Version 으로 덮어쓴다. -->
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
   </PropertyGroup>
 </Project>
