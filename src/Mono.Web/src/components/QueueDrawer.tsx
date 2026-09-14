@@ -65,132 +65,84 @@ export default function QueueDrawer({
       {/* Backdrop */}
       {isOpen && (
         <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 49,
-            background: "rgba(24,24,27,0.2)", backdropFilter: "blur(2px)",
-          }}
+          className="queue-drawer-backdrop"
+          style={{ position: "fixed", inset: 0, zIndex: 49 }}
           onClick={onClose}
         />
       )}
 
       {/* Drawer panel */}
       <div
+        className="queue-drawer-panel"
         style={{
-          position: "fixed", right: 0, top: 0, bottom: 0,
+          position: "fixed", right: 0, top: "4rem", bottom: "5rem",
           width: 384, zIndex: 50,
-          background: "var(--surface-card)", backdropFilter: "blur(20px)",
-          borderLeft: "1px solid var(--border-subtle)",
-          boxShadow: "-8px 0 30px rgba(0,0,0,0.12)",
           display: "flex", flexDirection: "column",
           transform: isOpen ? "translateX(0)" : "translateX(100%)",
           transition: "transform 0.3s cubic-bezier(0.32,0,0.67,0)",
         }}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div style={{
-          padding: "18px 20px 14px",
-          borderBottom: "1px solid var(--border-subtle)",
+        <div className="queue-drawer-header" style={{
+          padding: "16px 20px",
           flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.2px" }}>{title}</span>
-              {isGuest && hostName && (
+          {/* Left: title + inline status */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            <span className="queue-drawer-title" style={{ letterSpacing: "-0.2px" }}>{title}</span>
+            {isGuest ? (
+              hostName && (
                 <span style={{
                   fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#71717A",
-                  background: "#F4F4F5", border: "1px solid #E4E4E7",
-                  borderRadius: 4, padding: "2px 7px",
+                  background: "rgba(128,128,128,0.1)", border: "1px solid rgba(128,128,128,0.2)",
+                  borderRadius: 4, padding: "2px 7px", marginLeft: 8,
                 }}>
                   by {hostName}
                 </span>
-              )}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {canControl && (currentTrack !== null || queue.length > 0) && (
-                <button
-                  onClick={onFlushSession}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 5,
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: 11, color: "#71717A",
-                    background: "rgba(244,244,245,0.7)", border: "1px solid rgba(228,228,231,0.8)",
-                    borderRadius: 6, cursor: "pointer", padding: "4px 10px",
-                    transition: "all 0.15s", whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={(e) => {
-                    const b = e.currentTarget as HTMLButtonElement
-                    b.style.color = "#09090B"
-                    b.style.background = "rgba(228,228,231,0.6)"
-                  }}
-                  onMouseLeave={(e) => {
-                    const b = e.currentTarget as HTMLButtonElement
-                    b.style.color = "#71717A"
-                    b.style.background = "rgba(244,244,245,0.7)"
-                  }}
-                  title="Stop playback and clear all queue items"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                  </svg>
-                  Flush Session
-                </button>
-              )}
-              {canControl && queue.length > 0 && (
-                <button
-                  onClick={onClearQueue}
-                  style={{
-                    background: "none", border: "1px solid #E4E4E7",
-                    borderRadius: 6, cursor: "pointer", padding: "4px 10px",
-                    fontSize: 11, fontWeight: 500, color: "#71717A",
-                    fontFamily: "inherit", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#EF4444"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#FECACA" }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#71717A"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#E4E4E7" }}
-                >
-                  Clear
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#A1A1AA", fontSize: 15, lineHeight: 1, padding: 4,
-                  transition: "color 0.15s",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#3F3F46")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#A1A1AA")}
-                aria-label="Close"
-              >
-                <MonoIcon.Close size={15} />
-              </button>
-            </div>
+              )
+            ) : (
+              <span className="queue-status-dot" style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 10,
+                marginLeft: 8, display: "flex", alignItems: "center", gap: 4,
+              }}>
+                <span className="queue-engine-dot" style={{ width: 5, height: 5, borderRadius: "50%", display: "inline-block", flexShrink: 0 }} />
+                Bit-Perfect
+              </span>
+            )}
           </div>
 
-          {/* Status chip */}
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontFamily: "'DM Mono', monospace", fontSize: 11,
-            padding: "3px 9px", borderRadius: 4,
-            background: "#F4F4F5", border: "1px solid #E4E4E7",
-            color: "#71717A",
-          }}>
-            {isGuest ? (
-              <>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          {/* Right: flush + close */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {canControl && (currentTrack !== null || queue.length > 0) && (
+              <button
+                onClick={onFlushSession}
+                className="btn-queue-flush"
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  fontFamily: "'DM Mono', monospace",
+                  cursor: "pointer", whiteSpace: "nowrap",
+                  transition: "all 0.15s",
+                }}
+                title="Stop playback and clear all queue items"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                 </svg>
-                Locked · Host Controlled
-              </>
-            ) : (
-              <>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#3F3F46", display: "inline-block", flexShrink: 0 }} />
-                ASIO Bit-Perfect Engine
-              </>
+                Flush Session
+              </button>
             )}
+            <button
+              onClick={onClose}
+              className="queue-close-btn"
+              style={{ background: "none", border: "none", cursor: "pointer", lineHeight: 1, padding: 4, transition: "color 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}
+              aria-label="Close"
+            >
+              <MonoIcon.Close size={15} />
+            </button>
           </div>
         </div>
 
@@ -199,7 +151,7 @@ export default function QueueDrawer({
 
           {/* Now Playing */}
           {currentTrack && (
-            <div style={{ padding: "16px 16px 10px" }}>
+            <div style={{ padding: "16px 20px 10px" }}>
               <div style={{
                 fontSize: 10, fontWeight: 700, color: "#A1A1AA",
                 fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em",
@@ -208,33 +160,28 @@ export default function QueueDrawer({
                 Now Playing
               </div>
 
-              <div style={{
-                background: "rgba(250,250,250,0.8)", border: "1px solid rgba(228,228,231,0.8)",
+              <div className="queue-now-playing-card" style={{
                 borderRadius: 12, padding: "12px 13px",
                 display: "flex", alignItems: "center", gap: 12,
-                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
               }}>
                 {/* Art */}
                 <div style={{
                   width: 46, height: 46, borderRadius: 8, overflow: "hidden",
-                  background: "#F4F4F5", flexShrink: 0,
-                  border: "1px solid #E4E4E7",
+                  flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)",
                 }}>
                   <img src={currentTrack.art || (currentTrack as any).coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80"} alt={currentTrack.album} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#09090B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
+                  <div className="queue-np-title" style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 }}>
                     {currentTrack.title}
                   </div>
-                  <div style={{ fontSize: 11, color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
+                  <div className="queue-np-artist" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
                     {currentTrack.artist}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{
+                    <span className="queue-np-badge" style={{
                       fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 500,
-                      color: "#3F3F46", background: "#FFFFFF",
-                      border: "1px solid #E4E4E7",
                       borderRadius: 4, padding: "2px 7px",
                     }}>
                       {currentTrack.format}
@@ -434,6 +381,19 @@ export default function QueueDrawer({
             </div>
           )}
 
+          {/* Sparse queue placeholder */}
+          {queue.length === 0 && currentTrack && (
+            <div style={{ padding: "28px 20px 16px", textAlign: "center" }}>
+              <div style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                color: "#52525b", letterSpacing: "0.04em",
+                userSelect: "none",
+              }}>
+                Empty queue · Drag tracks or select from Repertoire
+              </div>
+            </div>
+          )}
+
           {/* Empty / idle state */}
           {queue.length === 0 && !currentTrack && (
             <div style={{ padding: "60px 20px 48px", textAlign: "center" }}>
@@ -462,12 +422,7 @@ export default function QueueDrawer({
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div style={{
-          padding: "14px 16px 18px",
-          borderTop: "1px solid #F4F4F5",
-          background: "rgba(250,250,250,0.5)",
-          flexShrink: 0,
-        }}>
+        <div className="queue-autoplay-footer" style={{ padding: "14px 16px 18px", flexShrink: 0 }}>
           {/* Summary */}
           <div style={{
             fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "#71717A",
@@ -478,29 +433,27 @@ export default function QueueDrawer({
 
           {/* Smart Auto-Play toggle */}
           <label
+            className="queue-autoplay-card"
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: canControl ? "pointer" : "default",
-              padding: "10px 12px",
-              background: "#FFFFFF", border: "1px solid #E4E4E7",
-              borderRadius: 10,
+              padding: "10px 12px", borderRadius: 10,
             }}
           >
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#3F3F46", marginBottom: 2 }}>
+              <div className="queue-ap-title" style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>
                 Smart Master Auto-Play
               </div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#A1A1AA", lineHeight: 1.4 }}>
+              <div className="queue-ap-subtitle" style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, lineHeight: 1.4 }}>
                 {autoPlay ? "Hi-Res matching masters queue on end" : "Stops after last queued track"}
               </div>
             </div>
             {/* Toggle switch */}
             <div
               onClick={() => canControl && setAutoPlay(v => !v)}
+              className={`queue-toggle-track${autoPlay ? " is-active" : ""}`}
               style={{
                 width: 34, height: 19, borderRadius: 10,
-                background: autoPlay ? "#3F3F46" : "#E4E4E7",
-                border: `1px solid ${autoPlay ? "#27272A" : "#D4D4D8"}`,
                 position: "relative", flexShrink: 0, marginLeft: 12,
                 transition: "background 0.2s, border-color 0.2s",
                 cursor: canControl ? "pointer" : "not-allowed",

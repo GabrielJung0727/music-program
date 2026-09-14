@@ -118,13 +118,16 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
             <button
               onClick={() => resolvedTracks[0] && playTrack(resolvedTracks[0])}
               disabled={resolvedTracks.length === 0}
-              className="album-detail-play-btn"
+              className="btn-album-play"
             >
-              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 fill-current" aria-hidden="true"><path d="M3 2.5l10 5.5-10 5.5V2.5z" /></svg>
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3 2.5l10 5.5-10 5.5V2.5z" /></svg>
               Play Album
             </button>
             {selectedAlbum?.wikiUrl && (
-              <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="album-detail-wiki-btn inline-flex items-center gap-1.5">
+              <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="btn-album-secondary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
                 <span>Wikipedia</span>
                 <MonoIcon.ExternalLink size={11} />
               </a>
@@ -138,10 +141,7 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Studio Liner Notes</span>
           {selectedAlbum?.wikiUrl && (
-            <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono transition-colors no-underline hover:opacity-80 inline-flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
-              <span>Open article</span>
-              <MonoIcon.ExternalLink size={10} />
-            </a>
+            <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono transition-colors no-underline hover:opacity-80" style={{ color: "var(--text-muted)" }}>Open article</a>
           )}
         </div>
         <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{linerNotes}</p>
@@ -175,14 +175,14 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
                     key={track.num ?? track.title ?? tIdx}
                     className={`group album-track-row ${isTrackActive(track) ? "album-track-row-active" : ""}`}
                   >
-                    <td className="px-5 py-3.5 w-12">
+                    <td className="px-5 py-3.5 w-12 text-center">
                       {isTrackActive(track) ? (
-                        <span className="flex items-center gap-1.5">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--album-detail-active-accent)" }} />
-                          <MonoIcon.PlayMini size={11} color="var(--album-detail-active-accent)" />
-                        </span>
+                        <MonoIcon.PlayMini size={11} color="var(--album-detail-active-accent)" />
                       ) : (
-                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{tIdx + 1}</span>
+                        <span className="text-xs font-mono group-hover:hidden" style={{ color: "var(--text-muted)" }}>{tIdx + 1}</span>
+                      )}
+                      {!isTrackActive(track) && (
+                        <span className="hidden group-hover:inline"><MonoIcon.PlayMini size={11} color="var(--text-muted)" /></span>
                       )}
                     </td>
                     <td className="px-3 py-3.5">

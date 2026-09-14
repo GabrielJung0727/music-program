@@ -107,6 +107,30 @@ export async function restartOutput() {
   return bridge.output.restart()
 }
 
+/** 업데이트 다운로드 진행률(0–100). 셸이 없으면 구독할 것도 없다. */
+export function onUpdateProgress(fn: (percent: number) => void): () => void {
+  const bridge = shell()
+  if (!bridge) return () => {}
+  return bridge.on("update.progress", (data) => {
+    const percent = (data as { percent?: number } | null)?.percent
+    if (typeof percent === "number") fn(percent)
+  })
+}
+
+/** 업데이트 확인. 셸이 없으면(브라우저) 확인할 방법이 없다. */
+export async function checkForUpdate(): Promise<UpdateStatus | null> {
+  const bridge = shell()
+  if (!bridge) return null
+  return bridge.update.check()
+}
+
+/** 내려받아 적용하고 재시작한다. 성공하면 이 창은 곧 사라진다. */
+export async function applyUpdate(): Promise<void> {
+  const bridge = shell()
+  if (!bridge) throw new Error("데스크톱 앱에서만 업데이트할 수 있습니다.")
+  await bridge.update.apply()
+}
+
 export async function outputStatus(): Promise<OutputStatus | null> {
   const bridge = shell()
   if (!bridge) return null

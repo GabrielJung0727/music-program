@@ -99,9 +99,9 @@ export default function FullscreenPlayer({
         )
       : quickPicks
     return (
-      <div className="fixed inset-x-0 top-16 bottom-24 z-30 flex flex-col overflow-hidden select-none bg-[var(--chassis-bg)] text-[var(--text-primary)]" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+      <div className="studio-console-overlay fixed inset-x-0 top-16 bottom-20 z-40 flex flex-col overflow-hidden select-none">
         {/* Header */}
-        <div className="flex items-center justify-between px-10 py-4 border-b border-[var(--border-subtle)] shrink-0">
+        <div className="flex items-center justify-between px-10 pt-5 pb-4 shrink-0 border-b console-header-border">
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase">Mono Studio Console · Standby</span>
             {isInLoungeSession && (
@@ -134,7 +134,7 @@ export default function FullscreenPlayer({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search repertoire, master recordings, artists, or formats (FLAC, DSD)..."
-              className="w-full bg-white border border-zinc-200/90 rounded-2xl px-5 py-4 text-sm font-sans text-zinc-900 placeholder:text-zinc-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition-all"
+              className="console-search-input w-full rounded-2xl px-5 py-4 text-sm font-sans transition-all"
             />
           </div>
 
@@ -152,23 +152,24 @@ export default function FullscreenPlayer({
                   <button
                     key={i}
                     onClick={() => {
-                      if (onSelectTrack) {
-                        onSelectTrack({
-                          id: `standby-pick-${i}`,
-                          title: pick.title,
-                          artist: pick.artist,
-                          album: pick.album,
-                          duration: "5:00",
-                          format: pick.format,
-                          dr: pick.dr,
-                          art: pick.art,
-                          source: pick.source,
-                        })
-                      }
-                      onClose()
+                      onSelectTrack?.({
+                        id: `standby-pick-${i}`,
+                        title: pick.title,
+                        artist: pick.artist,
+                        album: pick.album,
+                        duration: "5:00",
+                        format: pick.format,
+                        dr: pick.dr,
+                        art: pick.art,
+                        source: pick.source,
+                      })
+                      // Do NOT call onClose() — the Full Player must stay mounted.
+                      // Setting currentTrack via onSelectTrack causes the parent to
+                      // update props, moving this component out of the standby branch
+                      // and into the Now Playing view automatically.
                     }}
-                    className="group flex flex-col items-start gap-3 bg-white border border-zinc-200/80 rounded-2xl p-4 text-left hover:border-zinc-400 hover:shadow-md transition-all cursor-pointer"
-                    style={{ background: "white" }}
+                    className="console-shortcut-card group flex flex-col items-start gap-3 rounded-2xl p-4 text-left transition-all cursor-pointer"
+                    style={{}}
                   >
                     <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-100 shrink-0">
                       <img
@@ -190,8 +191,8 @@ export default function FullscreenPlayer({
         </div>
 
         {/* Telemetry footer */}
-        <div className="shrink-0 border-t border-zinc-200/60 py-4 px-10">
-          <div className="text-[11px] font-mono text-zinc-400 text-center">
+        <div className="shrink-0 console-header-border border-t py-4 px-10">
+          <div className="console-telemetry text-[11px] font-mono text-center">
             Direct Bitstream Engine Active · Holo Audio May DAC (Ready) · Buffer: 64 samples · ASIO/CoreAudio Lock
           </div>
         </div>
@@ -215,7 +216,7 @@ export default function FullscreenPlayer({
           <MonoIcon.Close size={18} />
         </button>
 
-        <div className="max-w-7xl mx-auto w-full gap-12 lg:gap-16 flex-1 flex items-center justify-center">
+        <div className="max-w-5xl mx-auto w-full gap-12 lg:gap-16 flex items-start justify-center">
 
           {/* Left column — album art */}
           <div className="flex flex-col items-center shrink-0 relative">
@@ -290,7 +291,7 @@ export default function FullscreenPlayer({
           </div>
 
           {/* Right column — glass card */}
-          <div className="nowplaying-panel-surface w-full max-w-[540px] h-[480px] lg:h-[520px] rounded-3xl flex flex-col overflow-hidden">
+          <div className="nowplaying-panel-surface w-full max-w-[480px] h-[488px] lg:h-[548px] rounded-3xl flex flex-col overflow-hidden">
             {/* Tab header */}
             <div className="flex items-center gap-2 px-7 py-4 shrink-0" style={{ borderBottom: "1px solid var(--nowplaying-tab-divider)" }}>
               <button

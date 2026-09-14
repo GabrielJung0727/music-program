@@ -349,10 +349,19 @@ public sealed class ShellForm : Form
             }
 
             case "update.apply":
-                await _updater.DownloadAsync();
+            {
+                var lastReported = -1;
+                await _updater.DownloadAsync(new Progress<int>(percent =>
+                {
+                    // 1% 단위로만 올린다. 바이트마다 보내면 브리지가 그 트래픽에 잠긴다.
+                    if (percent == lastReported) return;
+                    lastReported = percent;
+                    BeginInvoke(() => PushEvent("update.progress", new { percent }));
+                }));
                 _quitting = true;
                 _updater.ApplyAndRestart();
                 return true;
+            }
 
             case "app.version":
                 return new { version = _updater.CurrentVersion, installed = _updater.IsInstalled };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useMono, useMonoCommands } from "../../state/MonoProvider"
 import { MSG } from "../../lib/protocol"
+import { applyUpdate, checkForUpdate, hasShell, onUpdateProgress, type UpdateStatus } from "../../lib/shell"
 
 type RamBuffer = "Direct Disk Stream" | "512 MB" | "1 GB (Recommended)" | "2 GB Full Album"
 type SpecBadge = "Minimal" | "Detailed Studio" | "Full Lab Specs"
@@ -935,6 +936,155 @@ function DangerZoneSection({ showToast, onReset }: { showToast: (msg: string) =>
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+
+// ── 소프트웨어 업데이트 ────────────────────────────────────────────────────────
+
+type UpdatePhase = "idle" | "checking" | "current" | "available" | "downloading" | "failed"
+
+/**
+ * Velopack 피드에서 새 버전을 확인하고 적용한다.
+ * 설치본에서만 동작한다 — zip 으로 풀어 쓰는 경우 교체할 대상이 없다.
+ */
+function UpdateSection({ showToast }: { showToast: (msg: string) => void }) {
+  const [phase, setPhase] = useState<UpdatePhase>("idle")
+  const [status, setStatus] = useState<UpdateStatus | null>(null)
+  const [percent, setPercent] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const desktop = hasShell()
+
+  // 창을 열자마자 현재 버전을 보여 준다. "확인"을 눌러야 버전이 보이면 불친절하다.
+  useEffect(() => {
+    if (!desktop) return
+    let alive = true
+    void checkForUpdate()
+      .then((res) => {
+        if (!alive || !res) return
+        setStatus(res)
+        setPhase(res.available ? "available" : "current")
+      })
+      .catch(() => { /* 조용히 둔다 — 사용자가 직접 확인할 수 있다 */ })
+    return () => { alive = false }
+  }, [desktop])
+
+  useEffect(() => onUpdateProgress(setPercent), [])
+
+  async function check() {
+    setPhase("checking")
+    setError(null)
+    try {
+      const res = await checkForUpdate()
+      if (!res) { setError("데스크톱 앱에서만 확인할 수 있습니다."); setPhase("failed"); return }
+      setStatus(res)
+      setPhase(res.available ? "available" : "current")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setPhase("failed")
+    }
+  }
+
+  async function install() {
+    setPhase("downloading")
+    setPercent(0)
+    setError(null)
+    try {
+      // 성공하면 앱이 교체되고 재시작하므로, 이 뒤로는 돌아오지 않는다.
+      await applyUpdate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setPhase("failed")
+      showToast("업데이트를 적용하지 못했습니다.")
+    }
+  }
+
+  const current = status?.current ?? "—"
+
+  return (
+    <Section>
+      <SectionHeader
+        title="소프트웨어 업데이트"
+        subtitle="새 버전을 확인하고 설치합니다. 설치 후 Mono 가 자동으로 다시 시작됩니다."
+      />
+
+      <Row
+        label="설치된 버전"
+        subtitle={status?.installed === false
+          ? "설치 프로그램으로 설치한 경우에만 자동 업데이트를 받을 수 있습니다."
+          : "Mono Control · Core · Output"}
+        control={
+          <span style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600,
+            color: "var(--gs-stat-num)", fontVariantNumeric: "tabular-nums",
+          }}>{current}</span>
+        }
+      />
+
+      <Row
+        label="업데이트 확인"
+        subtitle={
+          phase === "checking" ? "확인 중…"
+          : phase === "available" ? `${status?.version} 을(를) 설치할 수 있습니다.`
+          : phase === "current" ? "최신 버전입니다."
+          : phase === "downloading" ? `내려받는 중 · ${percent}%`
+          : desktop ? "GitHub 릴리스 피드에서 새 버전을 찾습니다."
+          : "브라우저에서는 확인할 수 없습니다. Mono 데스크톱 앱에서 실행하세요."
+        }
+        control={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {phase === "available" && (
+              <Btn variant="solid" onClick={install} disabled={!desktop}>
+                지금 설치
+              </Btn>
+            )}
+            <Btn
+              variant={phase === "available" ? "outline" : "solid"}
+              onClick={check}
+              disabled={!desktop || phase === "checking" || phase === "downloading"}
+            >
+              {phase === "checking" ? "확인 중…" : "업데이트 확인"}
+            </Btn>
+          </div>
+        }
+      />
+
+      {phase === "downloading" && (
+        <div style={{ padding: "14px 0" }}>
+          <div style={{
+            height: 4, borderRadius: 2, overflow: "hidden",
+            background: "var(--settings-divider)",
+          }}>
+            <div style={{
+              width: `${percent}%`, height: "100%",
+              background: "var(--gs-btn-solid-bg)",
+              transition: "width 0.25s ease",
+            }} />
+          </div>
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            color: "var(--settings-row-sub)", marginTop: 8,
+          }}>
+            내려받는 중 {percent}% — 완료되면 Mono 가 자동으로 다시 시작됩니다.
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          marginTop: 14, padding: "10px 14px", borderRadius: 8,
+          background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)",
+          fontFamily: "'DM Mono', monospace", fontSize: 11.5, color: "#DC2626", lineHeight: 1.6,
+        }}>{error}</div>
+      )}
+
+      {status?.message && phase !== "downloading" && (
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 11,
+          color: "var(--settings-row-sub)", marginTop: 12, lineHeight: 1.6,
+        }}>{status.message}</div>
+      )}
+    </Section>
+  )
+}
+
 export default function GeneralSystemSettings({
   onReset,
   theme,
@@ -989,6 +1139,8 @@ export default function GeneralSystemSettings({
           Platform behavior, display preferences, and workspace management.
         </p>
       </div>
+
+      <UpdateSection showToast={setToast} />
 
       {/* Section 1: System & Playback */}
       <Section>

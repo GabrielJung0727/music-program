@@ -379,15 +379,7 @@ export default function TopNav({
                 <div style={{ borderTop: "1px solid var(--border-subtle)", marginTop: 12, marginBottom: 12 }} />
                 <button
                   onClick={() => { onNavigateToAccounts(); setIsServicesOpen(false) }}
-                  style={{
-                    display: "block", width: "100%", fontFamily: "inherit",
-                    fontSize: 12, fontWeight: 500, color: "#475569",
-                    background: "none", border: "none", borderRadius: 8,
-                    padding: "6px 0", cursor: "pointer", textAlign: "center",
-                    transition: "color 0.12s, background 0.12s",
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#0F172A"; (e.currentTarget as HTMLButtonElement).style.background = "#F8FAFC" }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#475569"; (e.currentTarget as HTMLButtonElement).style.background = "none" }}
+                  className="btn-manage-accounts"
                 >
                   Manage Accounts in Settings
                 </button>

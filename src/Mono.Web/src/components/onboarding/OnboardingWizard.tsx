@@ -1,82 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
-import { Sun, Moon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sun, Moon, FolderOpen, Plus, X, Check } from "lucide-react";
 import StreamingAuthModal from "./StreamingAuthModal";
+import SettingsPage from "../SettingsPage";
 import { type ListenerProfile } from "./Step3AudiophileRig";
-import { api } from "../../lib/rest";
-import { outputStatus, startOutput } from "../../lib/shell";
-import { MonoIcon } from "../icons/MonoIcons";
 import { type AudioEngineConfig } from "./Step1AudioEngine";
-import { useMono } from "../../state/MonoProvider";
+import { useMono, useMonoCommands } from "../../state/MonoProvider";
 import { StreamingProvider } from "../../lib/protocol";
+import { hasShell, pickFolder } from "../../lib/shell";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AudioDevice {
-  id: string;
-  name: string;
-  driverType: "ASIO" | "WASAPI_EXCLUSIVE";
-  sampleRates: string[];
-  bitDepth: string;
-  isBitPerfectVerified: boolean;
-  description: string;
+interface StorageConfig {
+  folders: string[];
+  autoWatch: boolean;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Core 가 아는 출력 엔드포인트를 온보딩의 장치 카드 모양으로 옮긴다. */
-function endpointsToDevices(endpoints: EndpointRecord[]): AudioDevice[] {
-  return endpoints.map((e) => ({
-    id: e.peerId,
-    name: e.displayName || e.device || e.peerId,
-    driverType: e.exclusiveMode ? "WASAPI_EXCLUSIVE" : "ASIO",
-    sampleRates: sampleRateLadder(e.maxSampleRate),
-    bitDepth: `${e.maxBitDepth}-bit`,
-    isBitPerfectVerified: e.exclusiveMode,
-    description: [
-      e.device,
-      e.supportsDsd ? "DSD 지원" : null,
-      e.latencyMs ? `보고 지연 ${e.latencyMs}ms` : null,
-      e.online ? "온라인" : "오프라인",
-    ].filter(Boolean).join(" · "),
-  }))
-}
-
-/** 장치가 보고한 최대 레이트까지의 사다리. 화면에 "지원 레이트"로 나간다. */
-function sampleRateLadder(maxRate: number): string[] {
-  const ladder = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000]
-  const supported = ladder.filter((r) => r <= (maxRate || 48000))
-  return (supported.length > 0 ? supported : [44100]).map((r) => `${r / 1000}kHz`)
-}
-
-interface EndpointRecord {
-  peerId: string
-  displayName: string
-  maxSampleRate: number
-  maxBitDepth: number
-  supportsDsd: boolean
-  exclusiveMode: boolean
-  latencyMs: number
-  hardwareVolume: boolean
-  volumePercent: number
-  device?: string | null
-  roomId?: string | null
-  online: boolean
-  lastSeen?: string
-}
-
-const DAC_NAME_MAP: Record<string, string> = {
-  "holo-spring-3": "Holo Audio Spring 3 (ASIO Direct)",
-  "chord-hugo-tt2": "Chord Hugo TT 2 (Kernel Streaming / ASIO)",
-  "system-wasapi": "Default System Output (WASAPI Exclusive)",
-};
-
-const DAC_SPEC_MAP: Record<string, string> = {
-  "holo-spring-3": "32-Bit / DSD512 Ready",
-  "chord-hugo-tt2": "32-Bit / 768kHz Ready",
-  "system-wasapi": "24-Bit / 192kHz Ready",
-};
-
-const BUFFER_SIZES = [64, 128, 256, 512, 1024] as const;
+const DEFAULT_MUSIC_FOLDER = "C:\\Users\\AudioUser\\Music";
 
 const AVATAR_COLORS = [
   { key: "zinc",    bg: "#18181b", text: "#ffffff" },
@@ -88,16 +29,15 @@ const AVATAR_COLORS = [
 ];
 
 const STEPS = [
-  { num: "01", label: "Audio Engine & DAC" },
-  { num: "02", label: "Streaming Master Accounts" },
-  { num: "03", label: "Listener Profile & Gear" },
+  { num: "01", label: "Welcome" },
+  { num: "02", label: "Storage" },
+  { num: "03", label: "Audio Output" },
+  { num: "04", label: "Streaming" },
+  { num: "05", label: "Profile" },
+  { num: "06", label: "Ready" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function calcLatency(bufferSize: number): string {
-  return ((bufferSize / 44100) * 1000).toFixed(1);
-}
 
 function initials(name: string): string {
   return name
@@ -108,595 +48,297 @@ function initials(name: string): string {
     .join("");
 }
 
-function mono(extra?: string) {
-  return { fontFamily: "'DM Mono', monospace", ...(extra ? {} : {}) };
+function mono() {
+  return { fontFamily: "'DM Mono', monospace" } as React.CSSProperties;
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      className="text-[10px] font-semibold tracking-widest text-zinc-400 uppercase mb-3"
-      style={mono()}
-    >
+    <p className="text-[10px] font-semibold tracking-widest text-zinc-400 uppercase mb-3" style={mono()}>
       {children}
     </p>
   );
 }
 
-function GearInput({
-  label,
-  value,
-  placeholder,
-  onChange,
-  prefilled,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-  prefilled?: boolean;
+function GearInput({ label, value, placeholder, onChange }: {
+  label: string; value: string; placeholder: string; onChange: (v: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] tracking-widest text-zinc-400 uppercase font-semibold" style={mono()}>
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="setup-input-field"
-        />
-        {prefilled && (
-          <span
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-emerald-600 font-semibold"
-            style={mono()}
-          >
-            AUTO
-          </span>
-        )}
-      </div>
+      <label className="text-[10px] tracking-widest text-zinc-400 uppercase font-semibold" style={mono()}>{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="setup-input-field"
+      />
     </div>
   );
 }
 
-// ─── Step 1: Audio Engine & Hardware DAC ──────────────────────────────────────
+// ─── Step 1: Welcome & Philosophy ─────────────────────────────────────────────
 
-function Step1({
-  audioConfig,
-  setAudioConfig,
-}: {
-  audioConfig: AudioEngineConfig;
-  setAudioConfig: (c: AudioEngineConfig) => void;
-}) {
-  const [scanning, setScanning] = useState(false);
-  const [scanKey, setScanKey] = useState(0);
-  const [devices, setDevices] = useState<AudioDevice[]>([]);
-  const [note, setNote] = useState<string | null>(null);
+function StepWelcome({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="max-w-2xl w-full text-center flex flex-col items-center">
+      {/* Illuminated wordmark */}
+      <div className="relative select-none mb-4">
+        <div
+          className="absolute inset-0 blur-3xl opacity-30 rounded-full"
+          style={{ background: "radial-gradient(ellipse, #7c3aed 0%, transparent 70%)", transform: "scale(1.6)" }}
+        />
+        <h1
+          className="relative text-6xl font-bold tracking-tight ob-title leading-none"
+          style={{ WebkitTextStroke: "1px rgba(167,139,250,0.2)" }}
+        >
+          Mono
+        </h1>
+      </div>
 
-  // Core 의 엔드포인트 목록을 읽어 온다. 아직 Output 을 띄우지 않았다면 비어 있는 게 정상이다.
-  const loadDevices = useCallback(async () => {
-    try {
-      const rows = (await api.endpoints()) as EndpointRecord[];
-      setDevices(endpointsToDevices(rows));
-    } catch {
-      setNote("Core 에 연결하지 못했습니다. Mono 를 다시 시작해 보세요.");
-    }
-  }, []);
+      {/* Brand motto */}
+      <blockquote
+        className="text-xl mb-6"
+        style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          color: "var(--ob-body)",
+          letterSpacing: "0.01em",
+          lineHeight: 1.5,
+        }}
+      >
+        "Alone or together, the ultimate experience through one sound."
+      </blockquote>
 
-  useEffect(() => { void loadDevices() }, [loadDevices, scanKey]);
+      {/* Subtext */}
+      <p className="text-sm ob-body max-w-lg mb-8 leading-relaxed" style={mono()}>
+        Bit-perfect playback to your hardware DAC. Synchronized collective listening
+        across Live Lounges. Zero transcoding. One signal path.
+      </p>
 
-  const filteredDevices = devices.filter(
-    (d) => d.driverType === audioConfig.driverType
+      {/* Feature pills */}
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+        {[
+          "ASIO / WASAPI Exclusive",
+          "32-Bit / DSD512",
+          "Live Lounge Sync",
+          "Qobuz · TIDAL Max",
+          "Zero Re-encoding",
+        ].map((tag) => (
+          <span key={tag} className="ob-chip text-[10px] px-3 py-1 rounded-full font-medium" style={mono()}>
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <button
+        onClick={onStart}
+        className="setup-btn-continue text-sm font-semibold px-8 py-3.5 rounded-full flex items-center gap-3 shadow-lg"
+        style={{ boxShadow: "0 8px 32px rgba(124,58,237,0.3)" }}
+      >
+        Start Setup
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
   );
-  const selectedDevice = filteredDevices.find((d) => d.id === audioConfig.deviceId) ?? null;
+}
 
-  function handleDriverChange(type: "ASIO" | "WASAPI_EXCLUSIVE") {
-    setAudioConfig({
-      ...audioConfig,
-      driverType: type,
-      deviceId: "",
-      exclusiveMode: type === "WASAPI_EXCLUSIVE",
-    });
+// ─── Step 2: Storage & Source Devices ─────────────────────────────────────────
+
+function StepStorage({
+  storage, setStorage, onSkip,
+}: {
+  storage: StorageConfig; setStorage: (s: StorageConfig) => void; onSkip: () => void;
+}) {
+  const [newFolderInput, setNewFolderInput] = useState("");
+  const [addingFolder, setAddingFolder] = useState(false);
+
+  /**
+   * 데스크톱 앱에서는 경로를 손으로 칠 이유가 없다. 네이티브 폴더 선택창을 띄우고,
+   * 브라우저로 열었을 때만 직접 입력 칸으로 물러난다.
+   */
+  async function browseForFolder() {
+    if (!hasShell()) { setAddingFolder(true); return; }
+    const picked = await pickFolder("음악 폴더 선택");
+    if (!picked || storage.folders.includes(picked)) return;
+    setStorage({ ...storage, folders: [...storage.folders, picked] });
   }
 
-  async function handleRescan() {
-    if (scanning) return;
-    setScanning(true);
-    setNote(null);
-    // 장치를 찾으려면 이 PC 에 Output 워커가 떠 있어야 한다. 없으면 띄운다.
-    const status = await outputStatus();
-    if (status && !status.running) {
-      const backend = audioConfig.driverType === "ASIO" ? "asio" : "exclusive";
-      const res = await startOutput(null, backend);
-      if (!res.ok) setNote(res.error ?? "출력을 시작하지 못했습니다.");
-    } else if (!status) {
-      setNote("데스크톱 앱에서 실행하면 이 PC 의 출력 장치를 자동으로 찾습니다.");
-    }
-    // Output 이 Core 에 자기소개(output_hello)를 넣을 틈을 준다.
-    await new Promise((r) => setTimeout(r, 1200));
-    setScanKey((k) => k + 1);
-    setScanning(false);
+  function addFolder() {
+    const trimmed = newFolderInput.trim();
+    if (!trimmed || storage.folders.includes(trimmed)) return;
+    setStorage({ ...storage, folders: [...storage.folders, trimmed] });
+    setNewFolderInput("");
+    setAddingFolder(false);
   }
 
-  const latencyMs = calcLatency(audioConfig.bufferSize);
-  const stable = audioConfig.bufferSize >= 128;
+  function removeFolder(path: string) {
+    setStorage({ ...storage, folders: storage.folders.filter((f) => f !== path) });
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-      {/* Left column: driver + buffer */}
-      <div className="flex flex-col gap-8">
-        {/* Driver architecture */}
+      {/* Left: folder list */}
+      <div className="flex flex-col gap-6">
         <div>
-          <SectionLabel>Driver Architecture</SectionLabel>
+          <SectionLabel>Local Music Folders</SectionLabel>
           <div className="flex flex-col gap-2">
-            {(
-              [
-                {
-                  type: "ASIO" as const,
-                  title: "ASIO Direct",
-                  badge: "Recommended",
-                  desc: "Direct hardware buffer access. Zero OS mixer latency. Requires ASIO driver installed.",
-                },
-                {
-                  type: "WASAPI_EXCLUSIVE" as const,
-                  title: "WASAPI Exclusive",
-                  badge: null,
-                  desc: "Windows Audio Session API exclusive mode. Bypasses shared audio endpoint.",
-                },
-              ] as const
-            ).map(({ type, title, badge, desc }) => {
-              const active = audioConfig.driverType === type;
-              return (
+            {storage.folders.map((folder) => (
+              <div key={folder} className="onboarding-storage-card flex items-center gap-3 px-4 py-3 rounded-xl border">
+                <FolderOpen size={15} className="flex-shrink-0 text-violet-500" />
+                <span className="flex-1 min-w-0 text-xs ob-title truncate" style={mono()}>{folder}</span>
+                {folder === DEFAULT_MUSIC_FOLDER && (
+                  <span className="ob-chip text-[9px] px-2 py-0.5 rounded font-medium flex-shrink-0" style={mono()}>OS Default</span>
+                )}
                 <button
-                  key={type}
-                  onClick={() => handleDriverChange(type)}
-                  className={[
-                    "w-full text-left px-5 py-4 rounded-xl border transition-all",
-                    active ? "setup-card-selected" : "ob-card",
-                  ].join(" ")}
+                  onClick={() => removeFolder(folder)}
+                  className="flex-shrink-0 w-5 h-5 rounded-md flex items-center justify-center text-zinc-400 hover:text-rose-500 transition-colors"
+                  aria-label="Remove folder"
                 >
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <span
-                      className={["w-1.5 h-1.5 rounded-full flex-shrink-0", !active ? "bg-zinc-300" : "setup-indicator-dot-active"].join(" ")}
-                    />
-                    <span className={["text-sm font-semibold ob-title", active ? "" : "opacity-80"].join(" ")}>{title}</span>
-                    {badge && (
-                      <span
-                        className={[
-                          "text-[9px] px-1.5 py-0.5 rounded-full font-medium border",
-                          active ? "setup-badge-recommended" : "ob-chip border-transparent",
-                        ].join(" ")}
-                        style={mono()}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] leading-relaxed ml-4 ob-body">
-                    {desc}
-                  </p>
+                  <X size={12} />
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Buffer size */}
-        <div>
-          <div className="flex items-baseline gap-2 mb-3">
-            <SectionLabel>Buffer Size &amp; Latency</SectionLabel>
-            <span className="text-[10px] latency-telemetry-text" style={mono()}>
-              (Default: 256 samples)
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mb-4">
-            {BUFFER_SIZES.map((size) => {
-              const active = audioConfig.bufferSize === size;
-              return (
-                <button
-                  key={size}
-                  onClick={() => setAudioConfig({ ...audioConfig, bufferSize: size })}
-                  className={[
-                    "w-14 py-2 rounded-lg text-xs border text-center transition-all",
-                    active ? "setup-pill-active" : "setup-pill-inactive",
-                  ].join(" ")}
-                  style={mono()}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Latency visual bar */}
-          <div className="ob-infobox border rounded-xl p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-400" style={mono()}>
-                CALCULATED LATENCY
-              </span>
-              <span
-                className="text-[10px] font-semibold flex items-center gap-1"
-                style={{ ...mono(), color: stable ? "var(--gauge-text-stable)" : "#f59e0b" }}
-              >
-                {stable ? "● Stable" : <><MonoIcon.AlertTriangle size={11} /><span>Aggressive</span></>}
-              </span>
-            </div>
-            <div className="latency-gauge-track">
-              <div
-                className={stable ? "latency-gauge-fill" : "h-full rounded-full transition-all duration-300 bg-amber-400"}
-                style={{
-                  width: `${Math.min((audioConfig.bufferSize / 1024) * 100, 100)}%`,
-                }}
-              />
-            </div>
-            <p className="text-xs text-zinc-500" style={mono()}>
-              {latencyMs} ms @ 44.1kHz · {audioConfig.bufferSize} samples
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Right column: detected devices */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <SectionLabel>Detected Hardware</SectionLabel>
-          <button
-            onClick={handleRescan}
-            disabled={scanning}
-            className="flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-900 transition-colors disabled:cursor-wait -mt-3"
-            style={mono()}
-          >
-            {scanning ? (
-              <>
-                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" d="M12 3a9 9 0 1 0 9 9" strokeDasharray="4 2" />
-                </svg>
-                Scanning…
-              </>
-            ) : (
-              <>
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0 1 15.46-2M20 15a8 8 0 0 1-15.46 2" />
-                </svg>
-                Rescan
-              </>
+              </div>
+            ))}
+            {storage.folders.length === 0 && (
+              <p className="text-xs ob-body py-6 text-center" style={mono()}>
+                No folders selected — Mono will scan only streamed content.
+              </p>
             )}
+          </div>
+
+          {/* Add folder row */}
+          {addingFolder ? (
+            <div className="mt-3 flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newFolderInput}
+                onChange={(e) => setNewFolderInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addFolder();
+                  if (e.key === "Escape") { setAddingFolder(false); setNewFolderInput(""); }
+                }}
+                placeholder="D:\NAS\FLAC  or  /mnt/music"
+                className="setup-input-field flex-1 text-xs"
+                style={mono()}
+              />
+              <button onClick={addFolder} className="btn-add-folder-confirm px-3 py-2 rounded-lg text-xs font-medium">Add</button>
+              <button onClick={() => { setAddingFolder(false); setNewFolderInput(""); }} className="px-3 py-2 rounded-lg text-xs ob-body hover:ob-title transition-colors">Cancel</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { void browseForFolder() }}
+              className="btn-add-folder mt-3 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed text-xs"
+            >
+              <Plus size={13} />
+              + Add Custom Folder / NAS Path
+            </button>
+          )}
+        </div>
+
+        {/* Skip */}
+        <div className="flex justify-center">
+          <button onClick={onSkip} className="text-[11px] ob-body hover:ob-title underline underline-offset-2 transition-colors" style={mono()}>
+            Skip for Now — I stream via Qobuz / TIDAL only
           </button>
         </div>
-
-        <div key={scanKey} className="flex flex-col gap-3">
-          {filteredDevices.length === 0 && (
-            <div className="py-8 text-center">
-              <p className="text-xs text-zinc-400" style={mono()}>
-                {audioConfig.driverType === "ASIO" ? "ASIO" : "WASAPI"} 장치를 찾지 못했습니다.
-              </p>
-              <p className="text-xs text-zinc-500 mt-2" style={mono()}>
-                아래 &ldquo;Rescan&rdquo; 을 누르면 이 PC 의 출력 엔진을 띄우고 다시 찾습니다.
-              </p>
-            </div>
-          )}
-          {note && (
-            <p className="text-xs py-3 text-center" style={{ ...mono(), color: "#DC2626" }}>{note}</p>
-          )}
-          {filteredDevices.map((device) => {
-            const selected = audioConfig.deviceId === device.id;
-            return (
-              <button
-                key={device.id}
-                onClick={() => setAudioConfig({ ...audioConfig, deviceId: device.id })}
-                className={[
-                  "w-full text-left flex gap-4 px-5 py-4 rounded-xl border",
-                  selected ? "setup-card-selected" : "ob-card",
-                ].join(" ")}
-              >
-                {/* Radio */}
-                <div
-                  className={["mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0", !selected ? "border-zinc-300" : ""].join(" ")}
-                  style={selected ? { borderColor: "var(--accent-solo)" } : {}}
-                >
-                  {selected && <div className="w-2 h-2 rounded-full setup-radio-dot-active" />}
-                </div>
-
-                <div className="flex flex-col gap-2 min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold ob-title leading-tight">
-                        {device.name}
-                      </p>
-                      <p className="text-[10px] ob-body mt-0.5" style={mono()}>
-                        {device.description}
-                      </p>
-                    </div>
-                    <span
-                      className="ob-chip text-[10px] font-semibold px-2 py-1 rounded-lg flex-shrink-0"
-                      style={mono()}
-                    >
-                      {device.bitDepth}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {device.sampleRates.map((tag) => (
-                      <span
-                        key={tag}
-                        className="ob-chip text-[9px] px-2 py-0.5 rounded"
-                        style={mono()}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {device.isBitPerfectVerified && (
-                      <span className="badge-bitperfect-verified" style={mono()}>
-                        <span className="badge-bitperfect-dot" />
-                        Bit-Perfect Link Verified
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {selectedDevice && (
-          <div className="setup-confirmed-banner mt-4">
-            <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <p className="text-[11px] font-medium" style={mono()}>
-              {selectedDevice.name} · {selectedDevice.bitDepth} · Direct Stream Confirmed
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 2: Streaming Services ───────────────────────────────────────────────
-
-function Step2({
-  connectedServices,
-  onConnect,
-  onDisconnect,
-}: {
-  connectedServices: { qobuz: boolean; tidal: boolean };
-  onConnect: (service: "qobuz" | "tidal") => void;
-  onDisconnect: (service: "qobuz" | "tidal") => void;
-}) {
-  return (
-    <div className="flex flex-col gap-8">
-      {/* Side-by-side service cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Qobuz card */}
-        <div className={[
-          "flex flex-col rounded-2xl border overflow-hidden transition-all",
-          connectedServices.qobuz ? "streaming-card-connected" : "ob-card border",
-        ].join(" ")}>
-          {/* Card header */}
-          <div className="px-6 pt-6 pb-5 border-b border-inherit">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: "linear-gradient(135deg, #C9A227 0%, #F5D06B 50%, #B8891A 100%)",
-                  boxShadow: "0 2px 10px rgba(201,162,39,0.3)",
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                }}
-              >
-                <span style={{ fontSize: 16, fontWeight: 900, color: "#0B1120", letterSpacing: "-1px" }}>
-                  Q
-                </span>
-              </div>
-              {connectedServices.qobuz ? (
-                <span className="badge-bitperfect-verified" style={mono()}>
-                  <span className="badge-bitperfect-dot" />
-                  Studio Active
-                </span>
-              ) : null}
-            </div>
-            <h3 className="text-sm font-bold ob-title mb-0.5">Qobuz Studio</h3>
-            <p className="text-[10px] ob-body leading-relaxed" style={mono()}>
-              Direct API · 24-Bit / 192kHz Studio Master
-            </p>
-          </div>
-
-          {/* Card body */}
-          <div className="px-6 py-5 flex flex-col gap-4 flex-1">
-            <div className="flex flex-col gap-2">
-              {[
-                "Lossless 16-Bit / 44.1kHz CD Quality",
-                "Hi-Res 24-Bit / 192kHz Studio Master",
-                "Direct CDN · Zero Transcoding",
-              ].map((feat) => (
-                <div key={feat} className="flex items-center gap-2">
-                  <span className="w-1 h-1 rounded-full bg-zinc-400/50 flex-shrink-0" />
-                  <span className="text-[11px] ob-body">{feat}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-auto pt-2">
-              {connectedServices.qobuz ? (
-                <div className="flex items-center justify-between">
-                  <span className="streaming-telemetry" style={mono()}>
-                    Connected (Studio 24-Bit / 192kHz)
-                  </span>
-                  <button
-                    type="button"
-                    className="streaming-btn-disconnect"
-                    style={mono()}
-                    onClick={() => onDisconnect("qobuz")}
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConnect("qobuz")}
-                  className="setup-btn-connect w-full text-xs py-2.5 rounded-xl"
-                >
-                  Connect Account
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* TIDAL card */}
-        <div className={[
-          "flex flex-col rounded-2xl border overflow-hidden transition-all",
-          connectedServices.tidal ? "streaming-card-connected" : "ob-card border",
-        ].join(" ")}>
-          {/* Card header */}
-          <div className="px-6 pt-6 pb-5 border-b border-inherit">
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-black"
-                style={{ border: "1.5px solid rgba(0,200,220,0.5)", boxShadow: "0 0 14px rgba(0,200,220,0.2)" }}
-              >
-                <svg width="20" height="16" viewBox="0 0 18 14" fill="none">
-                  <path d="M9 0 L12 4 L15 0 L18 4 L15 8 L12 4 L9 8 L6 4 L3 8 L0 4 L3 0 L6 4 Z" fill="#00C8DC" opacity="0.9" />
-                </svg>
-              </div>
-              {connectedServices.tidal ? (
-                <span className="badge-bitperfect-verified" style={mono()}>
-                  <span className="badge-bitperfect-dot" />
-                  Max Active
-                </span>
-              ) : null}
-            </div>
-            <h3 className="text-sm font-bold ob-title mb-0.5">TIDAL Max</h3>
-            <p className="text-[10px] ob-body leading-relaxed" style={mono()}>
-              OAuth 2.0 · HiRes FLAC &amp; Lossless Master
-            </p>
-          </div>
-
-          {/* Card body */}
-          <div className="px-6 py-5 flex flex-col gap-4 flex-1">
-            <div className="flex flex-col gap-2">
-              {[
-                "Lossless FLAC · MQA / HiRes FLAC",
-                "TIDAL Connect · Native Device Sync",
-                "PKCE OAuth 2.0 · Secure Token Auth",
-              ].map((feat) => (
-                <div key={feat} className="flex items-center gap-2">
-                  <span className="w-1 h-1 rounded-full bg-zinc-400/50 flex-shrink-0" />
-                  <span className="text-[11px] ob-body">{feat}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-auto pt-2">
-              {connectedServices.tidal ? (
-                <div className="flex items-center justify-between">
-                  <span className="streaming-telemetry" style={mono()}>
-                    Connected (Max HiRes FLAC)
-                  </span>
-                  <button
-                    type="button"
-                    className="streaming-btn-disconnect"
-                    style={mono()}
-                    onClick={() => onDisconnect("tidal")}
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onConnect("tidal")}
-                  className="setup-btn-connect w-full text-xs py-2.5 rounded-xl"
-                >
-                  Connect Account
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Bottom callout */}
-      <div className="ob-infobox border rounded-2xl p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          {
-            icon: (
-              <svg className="w-4 h-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            ),
-            title: "Zero Transcoding",
-            desc: "Mono routes audio directly from provider CDNs. No intermediary re-encoding, ever.",
-          },
-          {
-            icon: (
-              <svg className="w-4 h-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            ),
-            title: "Token Licensing",
-            desc: "Your credentials are stored locally and encrypted. Mono never proxies authentication.",
-          },
-          {
-            icon: (
-              <svg className="w-4 h-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-              </svg>
-            ),
-            title: "Real-Time Sync",
-            desc: "Synchronized playback across Lounge sessions preserves bit-perfect integrity.",
-          },
-        ].map(({ icon, title, desc }) => (
-          <div key={title} className="flex gap-3">
-            <div className="flex-shrink-0 mt-0.5 ob-body">{icon}</div>
-            <div>
+      {/* Right: options + info */}
+      <div className="flex flex-col gap-6">
+        <div>
+          <SectionLabel>Folder Monitoring</SectionLabel>
+          <div className="onboarding-storage-card flex items-start gap-4 px-5 py-4 rounded-xl border">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold ob-title mb-1">Auto-watch folders for library updates</p>
+              <p className="text-[11px] ob-body leading-relaxed">
+                Mono monitors folders in real time and imports new FLAC, WAV, DSD, and AIFF files as they appear.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={storage.autoWatch}
+              onClick={() => setStorage({ ...storage, autoWatch: !storage.autoWatch })}
+              className={["relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200", storage.autoWatch ? "ob-toggle-active" : "ob-toggle-inactive"].join(" ")}
+            >
+              <span className={["inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200", storage.autoWatch ? "translate-x-5" : "translate-x-0"].join(" ")} />
+            </button>
+          </div>
+        </div>
+
+        <div className="ob-infobox border rounded-2xl p-5 flex flex-col gap-4">
+          {[
+            { title: "Supported Formats", desc: "FLAC · WAV · AIFF · DSD (DSF/DFF) · ALAC · MP3 · AAC" },
+            { title: "NAS & Network Drives", desc: "Map UNC paths or mount points. Mono reads directly without re-encoding." },
+            { title: "Local Only", desc: "File paths never leave your machine. Metadata is indexed locally." },
+          ].map(({ title, desc }) => (
+            <div key={title}>
               <p className="text-xs font-semibold ob-title mb-0.5">{title}</p>
               <p className="text-[11px] ob-body leading-relaxed">{desc}</p>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Step 3: Listener Profile & Gear ─────────────────────────────────────────
+// ─── Step 3: Audio Output — SettingsPage (audio tab) ─────────────────────────
 
-function Step3({
-  profile,
-  setProfile,
-  detectedDacName,
+function StepAudioOutput() {
+  return (
+    <div className="ob-settings-embed rounded-2xl overflow-hidden border" style={{ borderColor: "var(--ob-card-border)" }}>
+      <SettingsPage initialTab="audio" />
+    </div>
+  );
+}
+
+// ─── Step 4: Streaming Accounts — SettingsPage (accounts tab) ────────────────
+
+function StepStreamingAccounts({
+  services,
+  onToggleService,
 }: {
-  profile: ListenerProfile;
-  setProfile: (p: ListenerProfile) => void;
-  detectedDacName: string;
+  services: { qobuz: boolean; tidal: boolean };
+  onToggleService: (service: "qobuz" | "tidal") => void;
+}) {
+  return (
+    <div className="ob-settings-embed rounded-2xl overflow-hidden border" style={{ borderColor: "var(--ob-card-border)" }}>
+      <SettingsPage
+        initialTab="accounts"
+        connectedServices={services}
+        onToggleService={onToggleService}
+      />
+    </div>
+  );
+}
+
+// ─── Step 5: Listener Profile ─────────────────────────────────────────────────
+
+function StepProfile({
+  profile, setProfile,
+}: {
+  profile: ListenerProfile; setProfile: (p: ListenerProfile) => void;
 }) {
   const colorDef = AVATAR_COLORS.find((c) => c.key === profile.avatarColor) ?? AVATAR_COLORS[0];
   const initStr = initials(profile.displayName) || "AL";
-  const loungeDac = profile.gear.dac.trim() || "Unknown DAC";
-  const loungeHp = profile.gear.headphonesOrSpeakers.trim();
 
-  function patch(partial: Partial<ListenerProfile>) {
-    setProfile({ ...profile, ...partial });
-  }
+  function patch(partial: Partial<ListenerProfile>) { setProfile({ ...profile, ...partial }); }
   function patchGear(partial: Partial<ListenerProfile["gear"]>) {
     setProfile({ ...profile, gear: { ...profile.gear, ...partial } });
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-      {/* Left: Public persona */}
+      {/* Left: persona */}
       <div className="flex flex-col gap-7">
         <div>
           <SectionLabel>Public Persona</SectionLabel>
-
-          {/* Avatar + name */}
           <div className="flex items-center gap-5 mb-5">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 transition-colors duration-200 select-none"
@@ -718,11 +360,8 @@ function Step3({
             </div>
           </div>
 
-          {/* Avatar color swatches */}
           <div>
-            <p className="text-[10px] tracking-widest text-zinc-400 uppercase font-semibold mb-2.5" style={mono()}>
-              Avatar Color
-            </p>
+            <p className="text-[10px] tracking-widest text-zinc-400 uppercase font-semibold mb-2.5" style={mono()}>Avatar Color</p>
             <div className="flex items-center gap-2.5">
               {AVATAR_COLORS.map((c) => (
                 <button
@@ -742,11 +381,10 @@ function Step3({
           </div>
         </div>
 
-        {/* Live lounge badge preview */}
+        {/* Badge preview */}
         <div>
           <SectionLabel>Live Lounge Badge Preview</SectionLabel>
           <div className="ob-preview border border-dashed rounded-2xl p-5 flex flex-col gap-4">
-            {/* Host card preview */}
             <div className="flex items-center gap-3">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 select-none"
@@ -755,23 +393,15 @@ function Step3({
                 {initStr}
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold ob-title truncate leading-tight">
-                  {profile.displayName.trim() || "Audiophile Listener"}
-                </p>
-                <p className="text-[10px] ob-body truncate" style={mono()}>
-                  {loungeDac}
-                  {loungeHp ? ` · ${loungeHp}` : ""}
-                  {" · "}
+                <p className="text-xs font-semibold ob-title truncate">{profile.displayName.trim() || "Audiophile Listener"}</p>
+                <p className="text-[10px] ob-body" style={mono()}>
+                  {profile.gear.dac.trim() || "DAC pending"} ·{" "}
                   <span style={{ color: "var(--badge-verified-text)" }}>Bit-Perfect Stream</span>
                 </p>
               </div>
             </div>
-            {/* On-air host badge */}
             <div className="flex items-center gap-2">
-              <span
-                className="ob-chip inline-flex items-center gap-1.5 text-[9px] font-semibold border px-2.5 py-1 rounded-full"
-                style={mono()}
-              >
+              <span className="ob-chip inline-flex items-center gap-1.5 text-[9px] font-semibold border px-2.5 py-1 rounded-full" style={mono()}>
                 <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
                 SESSION HOST
               </span>
@@ -784,7 +414,7 @@ function Step3({
         </div>
       </div>
 
-      {/* Right: Hardware rack */}
+      {/* Right: hardware rack */}
       <div className="flex flex-col gap-6">
         <div>
           <SectionLabel>Hardware Rack</SectionLabel>
@@ -792,37 +422,18 @@ function Step3({
             Displayed in session gear lists · optional
           </p>
           <div className="flex flex-col gap-4">
-            <GearInput
-              label="Headphones / Monitors"
-              value={profile.gear.headphonesOrSpeakers}
-              placeholder="e.g., Sennheiser HD800S / Genelec 8351B"
-              onChange={(v) => patchGear({ headphonesOrSpeakers: v })}
-            />
-            <GearInput
-              label="Amplifier / Preamp"
-              value={profile.gear.amplifier}
-              placeholder="e.g., Ferrum OOR / Benchmark HPA4"
-              onChange={(v) => patchGear({ amplifier: v })}
-            />
-            <GearInput
-              label="Primary DAC"
-              value={profile.gear.dac}
-              placeholder="e.g., Holo Audio Spring 3"
-              onChange={(v) => patchGear({ dac: v })}
-              prefilled={!!detectedDacName}
-            />
+            <GearInput label="Headphones / Monitors" value={profile.gear.headphonesOrSpeakers} placeholder="e.g., Sennheiser HD800S / Genelec 8351B" onChange={(v) => patchGear({ headphonesOrSpeakers: v })} />
+            <GearInput label="Amplifier / Preamp" value={profile.gear.amplifier} placeholder="e.g., Ferrum OOR / Benchmark HPA4" onChange={(v) => patchGear({ amplifier: v })} />
+            <GearInput label="Primary DAC" value={profile.gear.dac} placeholder="e.g., Holo May L3" onChange={(v) => patchGear({ dac: v })} />
           </div>
         </div>
 
-        {/* Rack visual */}
         <div className="setup-signal-chain-panel">
-          <p className="text-[9px] tracking-widest uppercase font-semibold chain-label" style={mono()}>
-            Signal Chain
-          </p>
+          <p className="text-[9px] tracking-widest uppercase font-semibold chain-label" style={mono()}>Signal Chain</p>
           {[
-            { label: "SOURCE", value: "Mono Audio Engine · Bit-Perfect ASIO" },
-            { label: "DAC", value: profile.gear.dac.trim() || "—" },
-            { label: "AMP", value: profile.gear.amplifier.trim() || "—" },
+            { label: "SOURCE", value: "Mono Audio Engine · Bit-Perfect" },
+            { label: "DAC",    value: profile.gear.dac.trim() || "—" },
+            { label: "AMP",    value: profile.gear.amplifier.trim() || "—" },
             { label: "OUTPUT", value: profile.gear.headphonesOrSpeakers.trim() || "—" },
           ].map(({ label, value }, i) => (
             <div key={label} className="flex items-center gap-3">
@@ -843,6 +454,108 @@ function Step3({
   );
 }
 
+// ─── Step 6: Finish & Launch ──────────────────────────────────────────────────
+
+function StepReady({
+  profile,
+  storage,
+  onLaunch,
+}: {
+  profile: ListenerProfile;
+  storage: StorageConfig;
+  onLaunch: () => void;
+}) {
+  const colorDef = AVATAR_COLORS.find((c) => c.key === profile.avatarColor) ?? AVATAR_COLORS[0];
+  const initStr = initials(profile.displayName) || "AL";
+
+  // Read streaming state from localStorage (SettingsPage writes there on connect)
+  const [liveServices, setLiveServices] = useState({ qobuz: false, tidal: false });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("mono_streaming_services");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { qobuz?: { connected?: boolean }; tidal?: { connected?: boolean } };
+        setLiveServices({
+          qobuz: parsed.qobuz?.connected === true,
+          tidal: parsed.tidal?.connected === true,
+        });
+      }
+    } catch {}
+  }, []);
+
+  const [activeDevice] = useState(() => {
+    // SettingsPage keeps device in its own state; surface the label from localStorage if written,
+    // otherwise fall back to "Living Room · Holo May L3" (the default selected device)
+    return localStorage.getItem("mono_output_device") ?? "Living Room · Holo May L3";
+  });
+
+  const connectedCount = [liveServices.qobuz, liveServices.tidal].filter(Boolean).length;
+  const serviceLabel = connectedCount === 0 ? "Local library only" : [liveServices.qobuz && "Qobuz Studio", liveServices.tidal && "TIDAL Max"].filter(Boolean).join(" · ");
+
+  const rows = [
+    { label: "Source",   value: storage.folders.length > 0 ? `${storage.folders.length} local folder${storage.folders.length > 1 ? "s" : ""} indexed` : "Streaming only" },
+    { label: "Output",   value: activeDevice },
+    { label: "Streaming", value: serviceLabel },
+    { label: "Profile",  value: profile.displayName.trim() || "Audiophile Listener" },
+  ];
+
+  return (
+    <div className="flex flex-col items-center gap-12 py-4">
+      {/* Avatar */}
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center text-xl font-bold select-none"
+            style={{ background: colorDef.bg, color: colorDef.text, boxShadow: "0 0 0 3px var(--ob-card-border-active), 0 0 24px rgba(124,58,237,0.25)" }}
+          >
+            {initStr}
+          </div>
+          <span
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+            style={{ background: "#10b981", boxShadow: "0 0 0 2px var(--ob-surface)" }}
+          >
+            <Check size={12} color="#fff" strokeWidth={3} />
+          </span>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-semibold ob-title">{profile.displayName.trim() || "Audiophile Listener"}</p>
+          <p className="text-[11px] ob-body mt-0.5" style={mono()}>All Set for Bit-Perfect Listening</p>
+        </div>
+      </div>
+
+      {/* Summary recap */}
+      <div className="w-full max-w-md flex flex-col gap-2">
+        {rows.map(({ label, value }) => (
+          <div key={label} className="onboarding-storage-card flex items-center gap-3 px-4 py-3 rounded-xl border">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" style={{ boxShadow: "0 0 5px rgba(16,185,129,0.5)" }} />
+            <span className="text-[10px] text-zinc-400 uppercase font-semibold w-20 flex-shrink-0" style={mono()}>{label}</span>
+            <span className="text-xs ob-title truncate flex-1" style={mono()}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Subtext */}
+      <p className="text-[11px] ob-body text-center max-w-sm leading-relaxed" style={mono()}>
+        All settings can be changed anytime in{" "}
+        <span style={{ color: "var(--accent-solo)" }}>Settings → Audio</span>.
+        Your hardware stream is verified and ready.
+      </p>
+
+      {/* Primary CTA */}
+      <button
+        onClick={onLaunch}
+        className="setup-btn-continue text-sm font-semibold px-12 py-4 rounded-2xl flex items-center gap-3"
+        style={{ minWidth: 280 }}
+      >
+        Launch Mono &amp; Enter Live Lounges
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // ─── Wizard shell ─────────────────────────────────────────────────────────────
 
 interface WizardProps {
@@ -853,134 +566,133 @@ interface WizardProps {
   onServiceChange?: (service: "qobuz" | "tidal", connected: boolean) => void;
 }
 
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
+
 export default function OnboardingWizard({
-  onComplete,
-  onExit,
-  isDark,
-  onToggleTheme,
-  onServiceChange,
+  onComplete, onExit, isDark, onToggleTheme, onServiceChange,
 }: WizardProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  // 연동 여부는 Core 가 안다. 마법사가 로컬 사본을 따로 들면 설정 화면과 어긋난다.
-  const { streamingAccounts } = useMono();
+  const [step, setStep] = useState<Step>(1);
+
+  // 연동 여부는 Core 가 안다. 마법사가 로컬 사본을 따로 들면 설정 화면과 어긋나고,
+  // Core 에 토큰이 남아 있어도 "연결 안 됨"으로 보인다.
+  const { streamingAccounts, folders: coreFolders } = useMono();
+  const cmd = useMonoCommands();
   const services = {
     qobuz: streamingAccounts.some((a) => a.provider === StreamingProvider.Qobuz && a.connected),
     tidal: streamingAccounts.some((a) => a.provider === StreamingProvider.Tidal && a.connected),
   };
+
   const [authService, setAuthService] = useState<"qobuz" | "tidal" | null>(null);
 
-  function persistServiceKey(service: "qobuz" | "tidal", connected: boolean) {
-    // 실제 상태는 Core 의 link_streaming 푸시로 들어온다. 상위에는 알림만 올린다.
-    onServiceChange?.(service, connected);
-  }
-
-  function handleConnect(service: "qobuz" | "tidal") {
-    setAuthService(service);
-  }
-
-  function handleDisconnect(service: "qobuz" | "tidal") {
-    persistServiceKey(service, false);
-  }
-
-  function handleAuthSuccess(service: "qobuz" | "tidal") {
-    persistServiceKey(service, true);
-    setAuthService(null);
-  }
-
-  const [audioConfig, setAudioConfig] = useState<AudioEngineConfig>({
-    driverType: "ASIO",
-    deviceId: "",
-    bufferSize: 256,
-    exclusiveMode: false,
+  const [storage, setStorage] = useState<StorageConfig>({
+    folders: [DEFAULT_MUSIC_FOLDER],
+    autoWatch: true,
   });
+
+  // Core 가 이미 감시 중인 폴더가 있으면 그걸 보여 준다 — 자리표시자 경로보다 진실에 가깝다.
+  useEffect(() => {
+    const real = coreFolders.map((f) => f.path).filter(Boolean);
+    if (real.length > 0) setStorage((prev) => ({ ...prev, folders: real }));
+  }, [coreFolders]);
 
   const [profile, setProfile] = useState<ListenerProfile>({
     displayName: "Audiophile Listener",
     avatarColor: "zinc",
-    gear: {
-      headphonesOrSpeakers: "",
-      amplifier: "",
-      dac: "",
-    },
+    gear: { headphonesOrSpeakers: "", amplifier: "", dac: "" },
   });
 
-  // When step 1 is done and user advances, pre-fill DAC name in profile
-  function advanceFromStep1() {
-    if (!audioConfig.deviceId) return;
-    const dacName = DAC_NAME_MAP[audioConfig.deviceId] ?? "Bit-Perfect ASIO DAC";
-    if (!profile.gear.dac) {
-      setProfile((p) => ({ ...p, gear: { ...p.gear, dac: dacName } }));
+  // 연동/해제는 Core 가 수행한다. 마법사는 요청만 보내고, 결과는 streamingAccounts 로 돌아온다.
+  function handleToggleService(service: "qobuz" | "tidal") {
+    const provider = service === "qobuz" ? StreamingProvider.Qobuz : StreamingProvider.Tidal;
+    if (services[service]) {
+      void cmd.unlinkStreaming(provider);
+      onServiceChange?.(service, false);
+      return;
     }
-    setStep(2);
+    setAuthService(service);
+  }
+
+  // StreamingAuthModal wired to wizard's own connect flow (for steps outside SettingsPage)
+  function handleAuthSuccess(service: "qobuz" | "tidal") {
+    cmd.refreshStreamingAccounts();
+    onServiceChange?.(service, true);
+    setAuthService(null);
   }
 
   function handleComplete() {
     localStorage.setItem("mono_onboarding_completed", "true");
-    onComplete({
-      ...profile,
-      displayName: profile.displayName.trim() || "Audiophile Listener",
-    });
+    const name = profile.displayName.trim() || "Audiophile Listener";
+    // 이름은 룸 멤버 목록·아카이브 참가자에 그대로 쓰인다.
+    cmd.setDisplayName(name);
+    // 고른 폴더를 실제로 읽어 들인다. 마법사를 끝냈는데 라이브러리가 비어 있으면
+    // 사용자는 무엇을 고른 건지 알 수 없다.
+    const known = new Set(coreFolders.map((f) => f.path));
+    for (const folder of storage.folders) {
+      if (folder && folder !== DEFAULT_MUSIC_FOLDER && !known.has(folder)) {
+        void cmd.scanLibrary(folder);
+      }
+    }
+    onComplete({ ...profile, displayName: name });
   }
 
-  const selectedDacId = audioConfig.deviceId;
-  const statusReadout = selectedDacId
-    ? `Output: ${DAC_NAME_MAP[selectedDacId] ?? "—"} · ${DAC_SPEC_MAP[selectedDacId] ?? "—"}`
-    : "No output device selected";
+  function advance() {
+    setStep((s) => Math.min(s + 1, 6) as Step);
+  }
 
-  const canAdvanceStep1 = !!audioConfig.deviceId;
+  function back() {
+    setStep((s) => Math.max(s - 1, 1) as Step);
+  }
 
-  const stepTitles = [
-    "Audio Engine & Hardware Output",
-    "Hi-Res Streaming Integration",
-    "Listener Profile & Signature Rig",
-  ];
+  const stepTitles: Record<Step, string> = {
+    1: "Welcome to Mono",
+    2: "Where is your music stored?",
+    3: "Audio Output Device",
+    4: "Streaming Accounts",
+    5: "Listener Profile & Signature Rig",
+    6: "All Set for Bit-Perfect Listening",
+  };
 
-  const stepSubtitles = [
-    "Select your primary playback interface. Mono establishes a direct, bit-perfect hardware stream.",
-    "Link your active subscriptions to enable 24-bit streaming and Live Lounge synchronization.",
-    "Configure your public identity and hardware rack for community listening sessions.",
-  ];
+  const stepSubtitles: Record<Step, string> = {
+    1: "",
+    2: "Select local drives, music folders, or NAS partitions hosting your audio library.",
+    3: "Select your primary playback interface. Mono establishes a direct, bit-perfect hardware stream.",
+    4: "Link your active subscriptions to enable 24-bit streaming and Live Lounge synchronization.",
+    5: "Configure your public identity and hardware rack for community listening sessions.",
+    6: "Your Mono environment is configured and ready to launch.",
+  };
+
+  const isWelcomeStep = step === 1;
+  const isLastStep = step === 6;
 
   return (
-    <div className="ob-surface fixed inset-0 z-50 flex flex-col overflow-y-auto select-none">
-      {/* ── Top Studio Header ───────────────────────────────────────────────── */}
+    <div className="ob-surface fixed inset-0 z-50 flex flex-col h-screen max-h-screen overflow-hidden select-none">
+
+      {/* ── Sticky header with 6-step breadcrumb ────────────────────────────── */}
       <header className="ob-header w-full border-b backdrop-blur-md sticky top-0 z-30 px-8 py-4 flex items-center justify-between gap-6">
         {/* Wordmark */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-base font-bold tracking-tight ob-title">Mono</span>
-          <span
-            className="text-[9px] font-semibold tracking-widest text-zinc-400 uppercase"
-            style={mono()}
-          >
-            Studio Setup
-          </span>
+          <span className="text-[9px] font-semibold tracking-widest text-zinc-400 uppercase" style={mono()}>Studio Setup</span>
         </div>
 
-        {/* Stepper */}
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        {/* 6-step progress breadcrumb */}
+        <nav className="flex items-center gap-0.5 overflow-x-auto">
           {STEPS.map(({ num, label }, i) => {
-            const stepNum = (i + 1) as 1 | 2 | 3;
+            const stepNum = (i + 1) as Step;
             const isActive = step === stepNum;
             const isComplete = step > stepNum;
             return (
               <button
                 key={num}
-                onClick={() => {
-                  if (stepNum < step) setStep(stepNum);
-                }}
+                onClick={() => { if (stepNum < step) setStep(stepNum); }}
                 disabled={stepNum >= step}
                 className={[
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap",
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap",
                   isActive ? "setup-accent-text" : isComplete ? "text-zinc-500 hover:text-zinc-700 cursor-pointer" : "text-zinc-400 cursor-default",
                 ].join(" ")}
               >
                 <span
-                  className={[
-                    "text-[10px] font-semibold",
-                    isActive
-                      ? "border-b-2 setup-accent-underline pb-0.5"
-                      : "",
-                  ].join(" ")}
+                  className={["text-[10px] font-semibold", isActive ? "border-b-2 setup-accent-underline pb-0.5" : ""].join(" ")}
                   style={mono()}
                 >
                   {num} · {label}
@@ -998,146 +710,134 @@ export default function OnboardingWizard({
         {/* Right controls */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {onToggleTheme && (
-            <button
-              onClick={onToggleTheme}
-              className="onboarding-theme-toggle"
-              aria-label="Toggle theme"
-            >
+            <button onClick={onToggleTheme} className="onboarding-theme-toggle" aria-label="Toggle theme">
               {isDark ? <Sun size={15} /> : <Moon size={15} />}
             </button>
           )}
-          <button
-            onClick={onExit}
-            className="text-[10px] text-zinc-400 hover:text-zinc-800 transition-colors"
-            style={mono()}
-          >
+          <button onClick={onExit} className="text-[10px] text-zinc-400 hover:text-zinc-800 transition-colors" style={mono()}>
             Exit Setup
           </button>
         </div>
       </header>
 
-      {/* ── Canvas ──────────────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-10">
-        {/* Step header */}
-        <div className="mb-10">
-          <p
-            className="text-[10px] tracking-widest uppercase mb-2"
-            style={mono()}
-          >
-            <span className="setup-accent-text">Step {step === 1 ? "01" : step === 2 ? "02" : "03"} / 03</span>
-          </p>
-          <h1 className="text-2xl font-semibold ob-title tracking-tight leading-tight mb-2">
-            {stepTitles[step - 1]}
-          </h1>
-          <p className="text-sm ob-body leading-relaxed max-w-xl">
-            {stepSubtitles[step - 1]}
-          </p>
-        </div>
+      {/* ── Canvas ───────────────────────────────────────────────────────────── */}
+      <main className={isWelcomeStep
+        ? "flex-1 flex flex-col items-center justify-center overflow-hidden px-6 -translate-y-4"
+        : "flex-1 overflow-y-auto px-6 py-10"}
+      >
+        {/* Step header (hidden on welcome — welcome renders its own) */}
+        {!isWelcomeStep && (
+          <div className="max-w-5xl w-full mx-auto">
+            <div className="mb-10">
+              <p className="text-[10px] tracking-widest uppercase mb-2" style={mono()}>
+                <span className="setup-accent-text">Step {String(step).padStart(2, "0")} / 06</span>
+              </p>
+              <h1 className="text-2xl font-semibold ob-title tracking-tight leading-tight mb-2">
+                {stepTitles[step]}
+              </h1>
+              {stepSubtitles[step] && (
+                <p className="text-sm ob-body leading-relaxed max-w-xl">{stepSubtitles[step]}</p>
+              )}
+            </div>
 
-        {/* Step content */}
-        {step === 1 && (
-          <Step1 audioConfig={audioConfig} setAudioConfig={setAudioConfig} />
+            {/* Step content */}
+            {step === 2 && (
+              <StepStorage storage={storage} setStorage={setStorage} onSkip={advance} />
+            )}
+            {step === 3 && <StepAudioOutput />}
+            {step === 4 && (
+              <StepStreamingAccounts services={services} onToggleService={handleToggleService} />
+            )}
+            {step === 5 && <StepProfile profile={profile} setProfile={setProfile} />}
+            {step === 6 && (
+              <StepReady profile={profile} storage={storage} onLaunch={handleComplete} />
+            )}
+          </div>
         )}
-        {step === 2 && (
-          <Step2
-            connectedServices={services}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-          />
-        )}
-        {step === 3 && (
-          <Step3
-            profile={profile}
-            setProfile={setProfile}
-            detectedDacName={DAC_NAME_MAP[audioConfig.deviceId] ?? ""}
-          />
-        )}
+
+        {step === 1 && <StepWelcome onStart={advance} />}
       </main>
 
-      {/* ── Bottom Console Bar ───────────────────────────────────────────────── */}
-      <footer className="ob-header ob-divider border-t backdrop-blur-md py-4 px-8 sticky bottom-0 z-30">
-        <div className="max-w-5xl w-full mx-auto flex items-center justify-between gap-6">
-          {/* Left */}
-          <div className="flex items-center gap-4">
-            {step > 1 ? (
+      {/* ── Sticky footer navigation (hidden on welcome & done) ──────────────── */}
+      {!isWelcomeStep && !isLastStep && (
+        <footer className="ob-header ob-divider border-t backdrop-blur-md py-4 px-8 sticky bottom-0 z-30">
+          <div className="max-w-5xl w-full mx-auto flex items-center justify-between gap-6">
+            {/* Left */}
+            <div className="flex items-center gap-4">
               <button
-                onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)}
+                onClick={back}
                 className="text-xs text-zinc-500 hover:text-zinc-900 font-medium transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
-                Previous Step
+                Back
               </button>
-            ) : (
-              <span className="text-xs text-zinc-300" style={mono()}>
-                Configure advanced DSP later in Settings
-              </span>
-            )}
+              {step === 2 && (
+                <button
+                  onClick={advance}
+                  className="text-[10px] text-zinc-400 hover:text-zinc-600 underline underline-offset-2 transition-colors"
+                  style={mono()}
+                >
+                  Skip for Now
+                </button>
+              )}
+              {step === 4 && (
+                <button
+                  onClick={advance}
+                  className="text-[10px] text-zinc-400 hover:text-zinc-600 underline underline-offset-2 transition-colors"
+                  style={mono()}
+                >
+                  Skip (Local Only)
+                </button>
+              )}
+            </div>
+
+            {/* Right: primary CTA */}
             {step === 2 && (
-              <button
-                onClick={() => setStep(3)}
-                className="text-[10px] text-zinc-400 hover:text-zinc-600 underline underline-offset-2 transition-colors"
-                style={mono()}
-              >
-                Skip (Local Only)
+              <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
+                Continue to Output Device
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            )}
+            {step === 3 && (
+              <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
+                Next: Streaming Services
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            )}
+            {step === 4 && (
+              <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
+                Next: Listener Profile
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            )}
+            {step === 5 && (
+              <button onClick={advance} className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0">
+                Next: Finish Setup
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             )}
           </div>
+        </footer>
+      )}
 
-          {/* Center: hardware status */}
-          <div className="hidden md:flex items-center gap-2 flex-1 justify-center">
-            {audioConfig.deviceId ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                <span className="text-[10px] text-zinc-500 truncate" style={mono()}>
-                  {statusReadout}
-                </span>
-              </>
-            ) : (
-              <span className="text-[10px] text-zinc-300" style={mono()}>
-                No output device configured
-              </span>
-            )}
+      {/* Step 6 has its own CTA inside StepReady — no footer needed */}
+      {isLastStep && (
+        <footer className="ob-header ob-divider border-t backdrop-blur-md py-4 px-8 sticky bottom-0 z-30">
+          <div className="max-w-5xl w-full mx-auto flex items-center gap-4">
+            <button
+              onClick={back}
+              className="text-xs text-zinc-500 hover:text-zinc-900 font-medium transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Back
+            </button>
           </div>
-
-          {/* Right: primary action */}
-          {step === 1 && (
-            <button
-              onClick={advanceFromStep1}
-              disabled={!canAdvanceStep1}
-              className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-            >
-              Continue to Streaming
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          )}
-          {step === 2 && (
-            <button
-              onClick={() => setStep(3)}
-              className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0"
-            >
-              Continue to Profile
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          )}
-          {step === 3 && (
-            <button
-              onClick={handleComplete}
-              className="setup-btn-continue text-xs font-medium px-8 py-3 rounded-xl flex items-center gap-2 flex-shrink-0"
-            >
-              Complete &amp; Launch Mono
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </footer>
+        </footer>
+      )}
 
       <StreamingAuthModal
         isOpen={authService !== null}

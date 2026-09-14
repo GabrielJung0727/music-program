@@ -1,3 +1,4 @@
+import { useState } from "react"
 import type { PlayerMode } from "../PlayerBar"
 import { MonoIcon } from "../icons/MonoIcons"
 
@@ -23,7 +24,11 @@ const COLLABORATIONS = [
   { art: "https://images.unsplash.com/photo-1736882178500-f99bbe22d77d?w=80&h=80&fit=crop&auto=format", albumTitle: "The Complete Savoy Sessions", albumArtist: "Charlie Parker", year: "1945", role: "Trumpet" },
 ]
 
+const FALLBACK_BIO = "Miles Dewey Davis III was an American trumpeter, bandleader, and composer. Widely considered one of the most influential and acclaimed figures in the history of jazz and 20th-century music, Davis adopted a variety of musical directions in a five-decade career that kept him at the forefront of major stylistic developments in jazz."
+
 export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, playerMode, onReturnToLounge, onBack, onSelectSomethinElse, onSelectAlbum }: Props) {
+  const [avatarError, setAvatarError] = useState(false)
+
   const handleAlbumClick = (title: string) => {
     if (onSelectAlbum) {
       onSelectAlbum(title)
@@ -31,6 +36,24 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
       onSelectSomethinElse()
     }
   }
+
+  const initials = (selectedArtist.name ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase() || "?"
+
+  const metaLine = (() => {
+    const parts: string[] = []
+    if (selectedArtist.born && selectedArtist.died) parts.push(`${selectedArtist.born} – ${selectedArtist.died}`)
+    else if (selectedArtist.born) parts.push(`b. ${selectedArtist.born}`)
+    const genres: string[] = selectedArtist.genres ?? []
+    if (genres.length) parts.push(genres.slice(0, 3).join(", "))
+    if (selectedArtist.role) parts.push(selectedArtist.role)
+    return parts.join(" • ") || null
+  })()
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
@@ -58,21 +81,30 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
       </div>
 
       {/* Hero header */}
-      <div className="flex items-start gap-10">
-        <img
-          src={selectedArtist.avatarUrl}
-          alt={selectedArtist.name}
-          className="w-48 h-48 rounded-2xl shadow-xl object-cover shrink-0"
-          style={{ border: "1px solid var(--artist-art-border)" }}
-        />
+      <div className="flex items-center gap-6 mb-2">
+        {/* Avatar */}
+        <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden shrink-0 shadow-2xl" style={{ border: "2px solid rgba(255,255,255,0.1)", background: "var(--surface-elevated)" }}>
+          {!avatarError && selectedArtist.avatarUrl ? (
+            <img
+              src={selectedArtist.avatarUrl}
+              alt={selectedArtist.name}
+              className="w-full h-full object-cover object-center"
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-2xl font-semibold" style={{ color: "var(--accent-violet)", background: "var(--surface-elevated)" }}>
+              {initials}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col min-w-0">
           <h1 className="artist-hero-name">{selectedArtist.name}</h1>
-          <p className="text-xs font-mono uppercase tracking-wider mt-1.5" style={{ color: "var(--text-secondary)" }}>
-            {selectedArtist.role} · {selectedArtist.era}
-          </p>
-          <p className="text-xs font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>
-            b. {selectedArtist.born} · {selectedArtist.labels}
-          </p>
+          {metaLine && (
+            <p className="text-sm font-medium mt-1.5" style={{ color: "var(--text-secondary)" }}>
+              {metaLine}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2 pt-3">
             {(selectedArtist.genres ?? []).map((g: string) => (
               <span key={g} className="artist-genre-pill">{g}</span>
@@ -122,7 +154,7 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
           )}
         </div>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-          {selectedArtist.wikiSummary}
+          {selectedArtist.wikiSummary || FALLBACK_BIO}
         </p>
       </div>
 
