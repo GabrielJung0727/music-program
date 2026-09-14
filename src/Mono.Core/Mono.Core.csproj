@@ -19,4 +19,7 @@
     <ProjectReference Include="..\Mono.Protocol\Mono.Protocol.csproj" />
     <ProjectReference Include="..\Mono.Shared\Mono.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mono.Tests" />
+  </ItemGroup>
 </Project>

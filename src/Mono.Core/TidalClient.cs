@@ -131,19 +131,25 @@ internal sealed class TidalClient
 
     public string? FetchPlaybackUrl(string accessToken, string trackId, string country)
     {
-        foreach (var quality in new[] { "HI_RES_LOSSLESS", "LOSSLESS", "HI_RES", "HIGH" })
+        foreach (var cc in Countries(country))
         {
-            var v2 = GetJson(
-                $"https://openapi.tidal.com/v2/trackManifests/{Uri.EscapeDataString(trackId)}?countryCode={Uri.EscapeDataString(country)}&audioQuality={quality}",
-                accessToken);
-            var url = ExtractUrl(v2);
-            if (url is not null) return url;
+            foreach (var quality in new[] { "HI_RES_LOSSLESS", "LOSSLESS", "HI_RES", "HIGH" })
+            {
+                var v2 = GetJson(
+                    $"https://openapi.tidal.com/v2/trackManifests/{Uri.EscapeDataString(trackId)}?countryCode={cc}&audioQuality={quality}",
+                    accessToken);
+                var url = ExtractUrl(v2);
+                if (url is not null) return url;
+            }
 
-            var v1 = GetJson(
-                $"https://api.tidal.com/v1/tracks/{Uri.EscapeDataString(trackId)}/playbackinfopostpaywall?playbackmode=STREAM&assetpresentation=FULL&audioquality={quality}&countryCode={Uri.EscapeDataString(country)}",
-                accessToken);
-            url = ExtractUrl(v1);
-            if (url is not null) return url;
+            foreach (var quality in new[] { "HI_RES", "LOSSLESS", "HIGH" })
+            {
+                var v1 = GetJson(
+                    $"https://api.tidal.com/v1/tracks/{Uri.EscapeDataString(trackId)}/playbackinfopostpaywall?playbackmode=STREAM&assetpresentation=FULL&audioquality={quality}&countryCode={cc}",
+                    accessToken);
+                var url = ExtractUrl(v1);
+                if (url is not null) return url;
+            }
         }
 
         return null;
@@ -345,33 +351,77 @@ internal sealed class TidalClient
 
     private static string? UrlFromElement(JsonElement el)
     {
-        if (el.TryGetProperty("urls", out var urls) && urls.ValueKind == JsonValueKind.Array && urls.GetArrayLength() > 0)
-        {
-            var u = urls[0].GetString();
-            if (!string.IsNullOrWhiteSpace(u) && u.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                return u;
-        }
-
-        foreach (var name in new[] { "url", "uri", "manifestUrl" })
-        {
-            var u = Str(el, name);
-            if (!string.IsNullOrWhiteSpace(u) && u.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                return u;
-        }
-
         var raw = Str(el, "manifest");
-        if (string.IsNullOrWhiteSpace(raw)) return null;
-        if (raw.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return raw;
-        try
+        if (!string.IsNullOrWhiteSpace(raw))
         {
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(raw));
-            using var decoded = JsonDocument.Parse(json);
-            return UrlFromElement(decoded.RootElement);
+            if (raw.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return ScoreStreamUrl(raw) > -500 ? raw : null;
+            try
+            {
+                var json = Encoding.UTF8.GetString(Convert.FromBase64String(raw));
+                using var decoded = JsonDocument.Parse(json);
+                var fromManifest = PickBestHttpUrl(decoded.RootElement);
+                if (fromManifest is not null) return fromManifest;
+            }
+            catch { /* fall through */ }
         }
-        catch
+
+        var fromTree = PickBestHttpUrl(el);
+        return fromTree;
+    }
+
+    /// <summary>NAudio는 HLS(m3u8)보다 progressive FLAC/MP4 URL을 재생할 수 있다.</summary>
+    internal static string? PickBestHttpUrl(JsonElement root)
+    {
+        var candidates = new List<string>();
+        CollectHttpUrls(root, candidates);
+        if (candidates.Count == 0) return null;
+
+        string? best = null;
+        var bestScore = int.MinValue;
+        foreach (var url in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            return null;
+            var score = ScoreStreamUrl(url);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = url;
+            }
         }
+
+        return bestScore > -500 ? best : null;
+    }
+
+    private static void CollectHttpUrls(JsonElement el, List<string> sink)
+    {
+        switch (el.ValueKind)
+        {
+            case JsonValueKind.String:
+                var s = el.GetString();
+                if (!string.IsNullOrWhiteSpace(s) && s.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    sink.Add(s);
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in el.EnumerateArray())
+                    CollectHttpUrls(item, sink);
+                break;
+            case JsonValueKind.Object:
+                foreach (var prop in el.EnumerateObject())
+                    CollectHttpUrls(prop.Value, sink);
+                break;
+        }
+    }
+
+    internal static int ScoreStreamUrl(string url)
+    {
+        var u = url.ToLowerInvariant();
+        var score = 0;
+        if (u.Contains(".flac", StringComparison.Ordinal)) score += 120;
+        if (u.Contains(".mp4", StringComparison.Ordinal) && !u.Contains(".m3u8", StringComparison.Ordinal)) score += 80;
+        if (u.Contains("audio", StringComparison.Ordinal)) score += 20;
+        if (u.Contains(".m3u8", StringComparison.Ordinal) || u.Contains("mpegurl", StringComparison.Ordinal)) score -= 200;
+        if (u.Contains("/master.", StringComparison.Ordinal) || u.Contains("/playlist.", StringComparison.Ordinal)) score -= 150;
+        return score;
     }
 
     private static long DurationMs(JsonElement el)

@@ -307,7 +307,7 @@ void RenderLoop(CancellationToken ct)
                     else if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(10))
                     {
                         lastLog = DateTimeOffset.UtcNow;
-                        Console.WriteLine("clock-sync: 로컬 파일이 없습니다 — 각자의 스트리밍 앱에서 같은 트랙을 여세요 (타임라인만 동기화).");
+                        Console.WriteLine("clock-sync: 재생 소스를 열 수 없습니다 — Tidal이면 Core 프록시(7702)와 출력 연결을 확인하세요.");
                     }
                 }
 

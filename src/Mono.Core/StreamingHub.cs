@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Mono.Shared;
 
 namespace Mono.Core;
@@ -19,13 +21,15 @@ public sealed class StreamingHub
     private readonly Dictionary<string, string> _streamUrlCache = new(StringComparer.Ordinal);
     private readonly CatalogStore _catalog;
     private readonly string? _storePath;
+    private readonly string _streamBaseUrl;
     private readonly object _gate = new();
     private string _tidalCountry = "US";
 
-    public StreamingHub(CatalogStore catalog, string? storePath = null)
+    public StreamingHub(CatalogStore catalog, string? storePath = null, string? streamBaseUrl = null)
     {
         _catalog = catalog;
         _storePath = storePath;
+        _streamBaseUrl = (streamBaseUrl ?? "http://127.0.0.1:7702").TrimEnd('/');
         Load();
     }
 
@@ -289,7 +293,65 @@ public sealed class StreamingHub
     }
 
     public string? ResolvePlayablePath(Track track)
-        => track.LocalPath ?? ResolveStreamUrl(track);
+    {
+        if (!string.IsNullOrWhiteSpace(track.LocalPath))
+            return track.LocalPath;
+
+        if (track.Source == StreamingProvider.Tidal
+            && HasLiveCredentials(StreamingProvider.Tidal)
+            && IsConnected(StreamingProvider.Tidal))
+        {
+            var sid = track.StreamingId
+                      ?? track.Id.Replace("tr-tidal-", "", StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrWhiteSpace(sid)
+                && !string.Equals(sid, "take-five-demo", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{_streamBaseUrl}/api/stream/tidal/{Uri.EscapeDataString(sid)}";
+            }
+        }
+
+        return ResolveStreamUrl(track);
+    }
+
+    /// <summary>Tidal CDN URL에 Bearer를 붙여 Output이 Range로 읽을 수 있게 중계한다.</summary>
+    public async Task ProxyTidalStreamAsync(HttpContext http, string trackId, CancellationToken ct = default)
+    {
+        if (!IsConnected(StreamingProvider.Tidal) || !EnsureFreshTidalToken())
+        {
+            http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var token = GetToken(StreamingProvider.Tidal);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            http.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var upstream = Tidal.FetchPlaybackUrl(token, trackId, _tidalCountry);
+        if (string.IsNullOrWhiteSpace(upstream))
+        {
+            http.Response.StatusCode = StatusCodes.Status404NotFound;
+            await http.Response.WriteAsync(Tidal.LastError ?? "playback url unavailable", ct).ConfigureAwait(false);
+            return;
+        }
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, upstream);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (http.Request.Headers.TryGetValue("Range", out var range))
+            req.Headers.TryAddWithoutValidation("Range", range.ToString());
+
+        using var res = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        http.Response.StatusCode = (int)res.StatusCode;
+        if (res.Content.Headers.ContentType is not null)
+            http.Response.ContentType = res.Content.Headers.ContentType.ToString();
+        if (res.Content.Headers.ContentLength is not null)
+            http.Response.ContentLength = res.Content.Headers.ContentLength;
+        if (res.Content.Headers.ContentRange is not null)
+            http.Response.Headers.ContentRange = res.Content.Headers.ContentRange.ToString();
+        await res.Content.CopyToAsync(http.Response.Body, ct).ConfigureAwait(false);
+    }
 
     private string? FetchTidalUrl(Track track)
     {

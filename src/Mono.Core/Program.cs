@@ -29,9 +29,11 @@ wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi
 builder.Services.AddSingleton(new WikipediaService(wikiHttp, Path.Combine(data, "wiki")));
 builder.Services.AddSingleton(new ArtworkService(art));
 builder.Services.AddSingleton<LibraryScanner>();
+var controlUrl = builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702";
 builder.Services.AddSingleton(sp => new StreamingHub(
     sp.GetRequiredService<CatalogStore>(),
-    Path.Combine(data, "streaming.json")));
+    Path.Combine(data, "streaming.json"),
+    controlUrl));
 builder.Services.AddSingleton<PairingService>();
 builder.Services.AddSingleton(sp => new RoomManager(
     sp.GetRequiredService<CatalogStore>(),
@@ -64,6 +66,9 @@ builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanSc
 var app = builder.Build();
 // 레거시 wwwroot SPA 제거 — Control은 Avalonia exe. HTTP는 art/REST API만.
 app.MapHub<LoungeHub>("/hub");
+
+app.MapGet("/api/stream/tidal/{trackId}", async (HttpContext http, string trackId, StreamingHub hub, CancellationToken ct) =>
+    await hub.ProxyTidalStreamAsync(http, trackId, ct));
 
 app.MapGet("/oauth/callback", (string? code, string? state, string? error, StreamingHub streaming, CatalogStore catalog, RoomBroadcaster bus) =>
 {

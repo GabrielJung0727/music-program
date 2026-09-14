@@ -188,13 +188,13 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 /// <summary>FLAC/MP3 등 Media Foundation 구간 디코드 (Clock-sync 로컬). 전량 RAM 적재 없음.</summary>
 file sealed class MfStreamingLocalRenderer : ILocalChunkSource
 {
-    private readonly AudioFileReader _reader;
+    private readonly WaveStream _reader;
     private readonly object _gate = new();
     private readonly int _rate;
     private readonly int _channels;
     private long _cursorMs = -1;
 
-    private MfStreamingLocalRenderer(AudioFileReader reader)
+    private MfStreamingLocalRenderer(WaveStream reader)
     {
         _reader = reader;
         _rate = reader.WaveFormat.SampleRate;
@@ -204,7 +204,11 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
     public static MfStreamingLocalRenderer? TryOpen(string path)
     {
         try { return new MfStreamingLocalRenderer(new AudioFileReader(path)); }
-        catch { return null; }
+        catch
+        {
+            try { return new MfStreamingLocalRenderer(new MediaFoundationReader(path)); }
+            catch { return null; }
+        }
     }
 
     public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
@@ -222,12 +226,19 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
             var frames = Math.Max(1, durationMs * _rate / 1000);
             var samplesNeeded = frames * _channels;
             var floatBuf = new float[samplesNeeded];
-            var n = _reader.Read(floatBuf, 0, samplesNeeded);
+            var n = ReadFloatSamples(floatBuf, samplesNeeded);
             _cursorMs = target + durationMs;
             if (n <= 0) return [];
             if (n < samplesNeeded) Array.Resize(ref floatBuf, n);
             return FloatToPcm24(floatBuf);
         }
+    }
+
+    private int ReadFloatSamples(float[] floatBuf, int samplesNeeded)
+    {
+        if (_reader is AudioFileReader afr)
+            return afr.Read(floatBuf, 0, samplesNeeded);
+        return _reader.ToSampleProvider().Read(floatBuf, 0, samplesNeeded);
     }
 
     private static byte[] FloatToPcm24(float[] samples)
