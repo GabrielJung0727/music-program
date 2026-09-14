@@ -1,22 +1,106 @@
+using System.Collections.Generic;
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Mono.Control.Services;
 using Mono.Control.ViewModels;
+using Mono.Control.Views.Pages;
 
 namespace Mono.Control.Views;
 
 public partial class MainWindow : Window
 {
     private bool _forceClose;
+    private ContentControl? _pageHost;
+    private MainViewModel? _vm;
+    private readonly Dictionary<string, Avalonia.Controls.Control> _pages = new();
 
     public MainWindow()
     {
         InitializeComponent();
+        Opened += (_, _) => WirePageHost();
+        DataContextChanged += (_, _) => WirePageHost();
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
+
+    private void WirePageHost()
+    {
+        _pageHost ??= this.FindControl<ContentControl>("PageHost");
+        if (DataContext is not MainViewModel vm || _pageHost is null) return;
+        if (!ReferenceEquals(_vm, vm))
+        {
+            if (_vm is not null)
+                _vm.PropertyChanged -= OnVmPropertyChanged;
+            _vm = vm;
+            _vm.PropertyChanged += OnVmPropertyChanged;
+        }
+
+        ShowPage(_vm.SelectedNav?.Id ?? "home");
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainViewModel.SelectedNav) or nameof(MainViewModel.IsLibraryGrid))
+            ShowPage(_vm?.SelectedNav?.Id ?? "home");
+    }
+
+    /// <summary>
+    /// 한 번에 한 페이지만 트리에 올린다. IsVisible 로 숨긴 채 HomeRails 를 건드리면
+    /// Avalonia/Skia 가 네이티브로 죽는 경우가 있다 (Settings→Home).
+    /// </summary>
+    private void ShowPage(string id)
+    {
+        if (_pageHost is null || _vm is null) return;
+
+        var pageId = id switch
+        {
+            "genres" or "composers" or "compositions" or "folders" or "history" or "playlists"
+                or "lounge" or "devices" or "settings" or "home" => id,
+            _ when _vm.IsLibraryGrid => "library",
+            _ => "home"
+        };
+
+        if (!_pages.TryGetValue(pageId, out var page))
+        {
+            page = CreatePage(pageId);
+            _pages[pageId] = page;
+        }
+
+        ApplyPageContext(pageId, page);
+        if (!ReferenceEquals(_pageHost.Content, page))
+            _pageHost.Content = page;
+    }
+
+    private static Avalonia.Controls.Control CreatePage(string pageId) => pageId switch
+    {
+        "home" => new HomePage(),
+        "genres" => new GenresPage(),
+        "composers" => new ComposersPage(),
+        "compositions" => new CompositionsPage(),
+        "folders" => new FoldersPage(),
+        "history" => new HistoryPage(),
+        "playlists" => new PlaylistsPage(),
+        "library" => new LibraryPage(),
+        "lounge" => new LoungePage(),
+        "devices" => new AudioPage(),
+        "settings" => new SettingsPage(),
+        _ => new HomePage()
+    };
+
+    private void ApplyPageContext(string pageId, Avalonia.Controls.Control page)
+    {
+        if (_vm is null) return;
+        page.DataContext = pageId switch
+        {
+            "genres" or "composers" or "compositions" or "folders" or "history" or "playlists" => _vm.Library,
+            "lounge" => _vm.Lounge,
+            "devices" => _vm.Audio,
+            _ => _vm
+        };
+    }
 
     private void OnSeeked(object? sender, double mediaTimeMs)
     {

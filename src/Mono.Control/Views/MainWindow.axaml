@@ -78,37 +78,7 @@
           <TextBox Grid.Row="1" x:Name="SearchBox" Watermark="트랙 · 앨범 · 아티스트 검색 (다국어 별칭)"
                    Text="{Binding SearchText}" Margin="0,12,0,16" MaxWidth="480" HorizontalAlignment="Left"/>
 
-          <Grid Grid.Row="2">
-            <pages:HomePage IsVisible="{Binding IsHomePage}"/>
-
-            <pages:GenresPage DataContext="{Binding Library}"
-                              IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsGenresPage}"/>
-
-            <pages:ComposersPage DataContext="{Binding Library}"
-                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsComposersPage}"/>
-
-            <pages:CompositionsPage DataContext="{Binding Library}"
-                                    IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsCompositionsPage}"/>
-
-            <pages:FoldersPage DataContext="{Binding Library}"
-                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsFoldersPage}"/>
-
-            <pages:HistoryPage DataContext="{Binding Library}"
-                               IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsHistoryPage}"/>
-
-            <pages:PlaylistsPage DataContext="{Binding Library}"
-                                 IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsPlaylistsPage}"/>
-
-            <pages:LibraryPage IsVisible="{Binding IsLibraryGrid}"/>
-
-            <pages:LoungePage DataContext="{Binding Lounge}"
-                          IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsLoungePage}"/>
-
-            <pages:AudioPage DataContext="{Binding Audio}"
-                          IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsDevicesPage}"/>
-
-            <pages:SettingsPage IsVisible="{Binding IsSettingsPage}"/>
-          </Grid>
+          <ContentControl x:Name="PageHost" Grid.Row="2"/>
         </Grid>
       </Grid>
 

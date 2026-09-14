@@ -93,7 +93,7 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<NavItem> NavItems { get; }
     public ObservableCollection<CatalogTrack> Tracks { get; } = new();
     public ObservableCollection<CatalogTrack> FilteredTracks { get; } = new();
-    public ObservableCollection<HomeRail> HomeRails { get; } = new();
+    [ObservableProperty] private ObservableCollection<HomeRail> _homeRails = new();
     public ObservableCollection<OutputDevice> Outputs { get; } = new();
     public ObservableCollection<ZoneItem> Zones { get; } = new();
     public ObservableCollection<CatalogTrack> AutoplayChoices { get; } = new();
@@ -676,41 +676,33 @@ public partial class MainViewModel : ObservableObject
         var list = src.Take(500).ToList();
         foreach (var t in list) FilteredTracks.Add(t);
 
-        RebuildHomeRails();
+        // HomeRails 는 여기서 건드리지 않는다. Settings↔Home 전환마다 Clear 하면
+        // 숨겨진 HomePage ItemsControl 이 Skia 네이티브로 죽는다.
     }
 
 
     private void RebuildHomeRails()
     {
-        // Clear+Add 를 바인딩 중에 하면 Avalonia/Skia 가 네이티브로 죽는 경우가 있다.
-        // 새 목록을 만든 뒤 한 번에 교체하고, 홈이 보일 때는 레이아웃 뒤로 미룬다.
-        void Apply()
+        try
         {
-            try
+            var rails = new ObservableCollection<HomeRail>();
+            if (Tracks.Count > 0)
             {
-                var rails = new List<HomeRail>();
-                if (Tracks.Count > 0)
-                {
-                    rails.Add(new HomeRail("Recently added", Tracks.Take(12)));
-                    rails.Add(new HomeRail("Albums", Tracks.GroupBy(t => t.AlbumId ?? t.Album ?? t.Id).Select(g => g.First()).Take(12)));
-                    rails.Add(new HomeRail("Hi-Res & DSD", Tracks.Where(t => t.IsDsd || t.SampleRate >= 96000).Take(12)));
-                    rails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
-                }
+                rails.Add(new HomeRail("Recently added", Tracks.Take(12)));
+                rails.Add(new HomeRail("Albums",
+                    Tracks.GroupBy(t => t.AlbumId ?? t.Album ?? t.Id).Select(g => g.First()).Take(12)));
+                rails.Add(new HomeRail("Hi-Res & DSD",
+                    Tracks.Where(t => t.IsDsd || t.SampleRate >= 96000).Take(12)));
+                rails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
+            }
 
-                HomeRails.Clear();
-                foreach (var rail in rails)
-                    HomeRails.Add(rail);
-            }
-            catch (Exception ex)
-            {
-                Program.LogDiagnostic("home-rails", ex);
-            }
+            // Clear+Add 대신 컬렉션 통째 교체 — 바인딩이 한 번에 끊긴다.
+            HomeRails = rails;
         }
-
-        if (IsHomePage)
-            Dispatcher.UIThread.Post(Apply, DispatcherPriority.Background);
-        else
-            Apply();
+        catch (Exception ex)
+        {
+            Program.LogDiagnostic("home-rails", ex);
+        }
     }
 
     /// <summary>슬라이더를 놓을 때만 보낸다 — 드래그 중 매 픽셀마다 명령을 쏘지 않는다.</summary>

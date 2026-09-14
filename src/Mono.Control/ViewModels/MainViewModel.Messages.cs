@@ -124,7 +124,11 @@ public partial class MainViewModel
         }
         catch { /* ignore malformed */ }
         ApplyFilter();
-        if (isFullCatalog) Library.Rebuild(Tracks);
+        if (isFullCatalog)
+        {
+            Library.Rebuild(Tracks);
+            RebuildHomeRails();
+        }
         PageSubtitle = isFullCatalog ? $"{Tracks.Count} tracks" : $"검색 결과 {Tracks.Count}곡";
         _ = PrefetchArtAsync();
     }
