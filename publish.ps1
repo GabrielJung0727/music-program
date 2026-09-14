@@ -1,11 +1,11 @@
 ## mono – Self-Contained + Velopack 릴리스
 ## 대상: Windows 11 x64
 ##
-##   .\publish.ps1 -Version 0.2.0
-##   .\publish.ps1 -Version 0.2.0 -SkipZip -GitHubRelease
+##   .\publish.ps1 -Version 0.2.1
+##   .\publish.ps1 -Version 0.2.1 -SkipZip -GitHubRelease
 
 param(
-    [string]$Version = "0.2.0",
+    [string]$Version = "0.2.1",
     [switch]$GitHubRelease,
     [switch]$SkipZip,
     ## CI용. 자체 서명 인증서를 만들지 않는다 — 릴리스마다 다른, 신뢰받지 못하는 인증서가
