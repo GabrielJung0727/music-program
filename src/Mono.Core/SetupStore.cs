@@ -58,6 +58,49 @@ public sealed class SetupStore
         }
     }
 
+    /// <summary>
+    /// 마법사가 적어 둔 폴더 경로의 앞부분을 새 자리로 바꾼다. data 가 통째로 옮겨졌을 때,
+    /// 기본 음악 폴더는 그 안에 있었으므로 경로만 옛 자리를 가리킨 채 남는다 — 그러면
+    /// 라이브러리가 비어 보이고, 사용자는 자기 음악이 사라진 줄 안다.
+    /// </summary>
+    public bool RebaseFolders(string oldRoot, string newRoot)
+    {
+        if (string.IsNullOrWhiteSpace(oldRoot) || string.IsNullOrWhiteSpace(newRoot)) return false;
+
+        var from = oldRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var to = newRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return false;
+
+        lock (_gate)
+        {
+            var current = Read();
+            if (current["folders"] is not JsonArray folders || folders.Count == 0) return false;
+
+            var rewritten = new JsonArray();
+            var changed = false;
+            foreach (var entry in folders)
+            {
+                var path = entry?.GetValue<string>();
+                // JsonValue.Create 로 만들어야 한다. JsonArray.Add(string) 은 제네릭 오버로드라
+                // 직렬화할 때 TypeInfoResolver 를 요구하며 터진다.
+                if (path is not null && path.StartsWith(from, StringComparison.OrdinalIgnoreCase))
+                {
+                    rewritten.Add(JsonValue.Create(to + path[from.Length..]));
+                    changed = true;
+                }
+                else
+                {
+                    rewritten.Add(path is null ? null : JsonValue.Create(path));
+                }
+            }
+
+            if (!changed) return false;
+            current["folders"] = rewritten;
+            File.WriteAllText(_path, current.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            return true;
+        }
+    }
+
     /// <summary>마법사를 처음부터 다시 보고 싶을 때. Settings 의 초기화가 부른다.</summary>
     public void Clear()
     {

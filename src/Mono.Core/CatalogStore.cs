@@ -371,6 +371,52 @@ public sealed class CatalogStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// 데이터 폴더가 통째로 옮겨졌을 때, 저장해 둔 절대 경로의 앞부분을 새 자리로 바꾼다.
+    ///
+    /// 파일은 폴더와 함께 따라왔지만 catalog.db 안의 경로는 옛 자리를 가리킨 채로 남는다.
+    /// 그대로 두면 라이브러리가 통째로 "파일을 찾을 수 없음"이 되고, 다시 스캔해도
+    /// 옛 경로의 행이 남아 같은 곡이 두 번 보인다.
+    ///
+    /// 바뀐 행 수를 돌려준다. 옮길 것이 없으면 0 이고, 그때는 아무것도 건드리지 않는다.
+    /// </summary>
+    public int RebaseStoredPaths(string oldRoot, string newRoot)
+    {
+        if (string.IsNullOrWhiteSpace(oldRoot) || string.IsNullOrWhiteSpace(newRoot)) return 0;
+
+        // 경계를 붙여 비교한다. 이게 없으면 ...\Mono 가 ...\MonoData 까지 집어삼킨다.
+        var from = oldRoot.TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
+        var to = newRoot.TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return 0;
+
+        lock (_gate)
+        {
+            using var con = Open();
+            var changed = 0;
+            foreach (var (table, column) in new[]
+                     {
+                         ("tracks", "local_path"),
+                         ("tracks", "art"),
+                         ("albums", "art"),
+                     })
+            {
+                using var cmd = con.CreateCommand();
+                // LIKE 는 쓰지 않는다 — 경로에 흔한 _ 가 와일드카드라 엉뚱한 행까지 잡고,
+                // SQLite 의 LIKE 에는 역슬래시 이스케이프가 없다. 앞부분을 그대로 견준다.
+                cmd.CommandText =
+                    $"UPDATE {table} SET {column} = $to || substr({column}, $len + 1) " +
+                    $"WHERE {column} IS NOT NULL AND substr({column}, 1, $len) = $from";
+                cmd.Parameters.AddWithValue("$to", to);
+                cmd.Parameters.AddWithValue("$from", from);
+                cmd.Parameters.AddWithValue("$len", from.Length);
+                changed += cmd.ExecuteNonQuery();
+            }
+
+            if (changed > 0) Load(con);
+            return changed;
+        }
+    }
+
     private void Load(SqliteConnection con)
     {
         _artists.Clear();

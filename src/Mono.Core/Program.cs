@@ -72,6 +72,19 @@ builder.Services.AddSingleton<ControlSession>();
 
 var app = builder.Build();
 
+// data 가 설치 루트 밖으로 옮겨졌다면(0.4.2 이전에서 올라온 경우) 저장해 둔 절대 경로도
+// 함께 옮겨야 한다. 파일은 따라왔지만 경로는 옛 자리를 가리키고 있어, 그대로 두면
+// 라이브러리가 통째로 "파일 없음"이 된다. 되짚을 것이 없으면 아무 일도 하지 않는다.
+{
+    var moved = app.Services.GetRequiredService<CatalogStore>()
+        .RebaseStoredPaths(UserPaths.LegacyDataRoot, data);
+    var folders = app.Services.GetRequiredService<SetupStore>()
+        .RebaseFolders(UserPaths.LegacyDataRoot, data);
+    if (moved > 0 || folders)
+        Console.WriteLine($"데이터 폴더 이동에 맞춰 경로를 고쳤습니다 — 트랙/아트 {moved}건" +
+                          (folders ? ", 라이브러리 폴더 포함" : ""));
+}
+
 // Control UI(React, src/Mono.Web)는 wwwroot 에서 정적 서빙한다.
 // WebView2 셸과 브라우저가 같은 번들을 본다.
 var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");

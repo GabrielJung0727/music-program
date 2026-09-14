@@ -26,6 +26,15 @@ public static class UserPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonoData");
 
     /// <summary>
+    /// 0.4.2 이전에 data 가 있던 자리. 저장된 절대 경로가 이 밑을 가리키고 있으면
+    /// 파일은 따라왔어도 경로는 옛 자리를 가리킨 채라, 새 자리로 되짚어야 한다.
+    /// </summary>
+    public static string LegacyDataRoot { get; } = Path.Combine(InstallRoot, "data");
+
+    /// <summary>지금 data 가 있는 자리.</summary>
+    public static string DataRoot => Resolve("data");
+
+    /// <summary>
     /// 설치 루트에 있던 것들. 파일인지 폴더인지는 옮길 때 보고 판단한다.
     /// 여기 없는 것(current·packages·Update.exe)은 설치가 다시 만드는 것들이다.
     /// </summary>
