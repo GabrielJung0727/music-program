@@ -1,17 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import type { ShareData } from "../ShareModal"
 import { type LoungeRoom } from "../../data/types"
+import { MonoIcon } from "../icons/MonoIcons"
 
 
 // ── Live Lounge Page ─────────────────────────────────────────────────────────
 // ── Host Modal ───────────────────────────────────────────────────────────────
 export interface HostLaunchOpts { visibility: "public" | "unlisted"; secretKey?: string; title?: string; note?: string }
 
-function HostModal({ onClose, onLaunch }: { onClose: () => void; onLaunch: (opts: HostLaunchOpts) => void }) {
-  const [silentSession, setSilentSession] = useState(true)
-  const [privacy, setPrivacy] = useState<"public" | "unlisted">("public")
+interface HostModalProps {
+  onClose: () => void
+  onLaunch: (opts: HostLaunchOpts) => void
+}
+
+function HostModal({ onClose, onLaunch }: HostModalProps) {
   const [title, setTitle] = useState("")
   const [note, setNote] = useState("")
+  const [privacy, setPrivacy] = useState<"public" | "unlisted">("public")
+  const [silentSession, setSilentSession] = useState(false)
 
   return (
     <div
@@ -24,7 +30,9 @@ function HostModal({ onClose, onLaunch }: { onClose: () => void; onLaunch: (opts
             <div className="modal-host-title">Host a Mono Session</div>
             <div className="modal-host-subtitle">Broadcast bit-perfect stream across Qobuz &amp; TIDAL</div>
           </div>
-          <button onClick={onClose} className="modal-host-close">✕</button>
+          <button onClick={onClose} className="modal-host-close" aria-label="Close">
+            <MonoIcon.Close size={16} />
+          </button>
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -79,7 +87,9 @@ function HostModal({ onClose, onLaunch }: { onClose: () => void; onLaunch: (opts
                     color: isSelected ? selectedText : "var(--modal-host-option-idle-text)",
                   }}
                 >
-                  <span style={{ fontSize: 14, lineHeight: 1.2, flexShrink: 0 }}>{opt === "public" ? "🌐" : "🔒"}</span>
+                  <span style={{ display: "flex", alignItems: "center", lineHeight: 1.2, flexShrink: 0 }}>
+                    {opt === "public" ? <MonoIcon.Globe size={15} /> : <MonoIcon.Lock size={15} />}
+                  </span>
                   <div>
                     <div style={{ fontWeight: isSelected ? 600 : 500, marginBottom: 1 }}>{opt === "public" ? "Public Session" : "Invite Only"}</div>
                     <div style={{ fontSize: 10.5, fontWeight: 400, color: "var(--modal-host-option-desc)", lineHeight: 1.4 }}>{opt === "public" ? "Listed on Live Lounges explore feed." : "Unlisted. Only accessible via secret link."}</div>
@@ -118,15 +128,16 @@ function HostModal({ onClose, onLaunch }: { onClose: () => void; onLaunch: (opts
 function DiscoveryBadge({ badge }: { badge: LoungeRoom["badge"] }) {
   if (!badge) return null
   const configs = {
-    trending: { label: "🔥 Hot Session", color: "#FCA5A5", bg: "rgba(127,29,29,0.5)", border: "rgba(185,28,28,0.5)" },
-    debut:    { label: "🌱 Debut Host",  color: "#6EE7B7", bg: "rgba(6,78,59,0.5)",   border: "rgba(5,150,105,0.5)" },
-    indie:    { label: "🔍 Deep Indie",  color: "#D8B4FE", bg: "rgba(59,7,100,0.5)",  border: "rgba(126,34,206,0.5)" },
-    cozy:     { label: "☕ Cozy Space",  color: "#FCD34D", bg: "rgba(120,53,15,0.5)", border: "rgba(180,83,9,0.5)" },
+    trending: { label: "Hot Session", icon: <MonoIcon.Flame size={12} />, color: "#FCA5A5", bg: "rgba(127,29,29,0.5)", border: "rgba(185,28,28,0.5)" },
+    debut:    { label: "Debut Host",  icon: <MonoIcon.Sprout size={12} />, color: "#6EE7B7", bg: "rgba(6,78,59,0.5)",   border: "rgba(5,150,105,0.5)" },
+    indie:    { label: "Deep Indie",  icon: <MonoIcon.Guitar size={12} />, color: "#D8B4FE", bg: "rgba(59,7,100,0.5)",  border: "rgba(126,34,206,0.5)" },
+    cozy:     { label: "Cozy Space",  icon: <MonoIcon.Cup size={12} />, color: "#FCD34D", bg: "rgba(120,53,15,0.5)", border: "rgba(180,83,9,0.5)" },
   } as const
   const c = configs[badge]
   return (
-    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, fontWeight: 600, color: c.color, background: c.bg, border: `1px solid ${c.border}`, borderRadius: 5, padding: "2px 7px", letterSpacing: "0.04em", display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
-      {c.label}
+    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, fontWeight: 600, color: c.color, background: c.bg, border: `1px solid ${c.border}`, borderRadius: 5, padding: "2px 7px", letterSpacing: "0.04em", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+      {c.icon}
+      <span>{c.label}</span>
     </span>
   )
 }
@@ -134,7 +145,6 @@ function DiscoveryBadge({ badge }: { badge: LoungeRoom["badge"] }) {
 // ── Lounge Grid Card ──────────────────────────────────────────────────────────
 function LoungeGridCard({ room, onJoin, onShare }: { room: LoungeRoom; onJoin: () => void; onShare: (room: LoungeRoom) => void }) {
   const isIntimate = room.listenerCount <= 5
-  const listenerLabel = isIntimate ? `☕ ${room.listenerCount} listening` : `● ${room.listenerCount} live`
   const listenerColor = isIntimate ? "#D97706" : "#60a5fa"
 
   return (
@@ -142,8 +152,9 @@ function LoungeGridCard({ room, onJoin, onShare }: { room: LoungeRoom; onJoin: (
       <div style={{ height: 76, background: "#0F172A", position: "relative", overflow: "hidden", flexShrink: 0 }}>
         <img src={room.art} alt={room.title} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.35 }} />
         <div style={{ position: "absolute", top: 9, left: 10, right: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 600, color: listenerColor, background: "rgba(0,0,0,0.55)", borderRadius: 20, padding: "3px 9px", display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {listenerLabel}
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 600, color: listenerColor, background: "rgba(0,0,0,0.55)", borderRadius: 20, padding: "3px 9px", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {isIntimate ? <MonoIcon.Cup size={11} /> : <span style={{ fontSize: 8 }}>●</span>}
+            <span>{room.listenerCount} {isIntimate ? "listening" : "live"}</span>
           </span>
           {room.badge && <DiscoveryBadge badge={room.badge} />}
         </div>
@@ -426,12 +437,12 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
       <div className="flex items-center gap-2 mb-6 flex-wrap">
         {(
           [
-            { id: "all",     label: "All Lounges",  icon: null,   accent: null },
-            { id: "popular", label: "Trending",     icon: "🔥",   accent: "text-orange-500" },
-            { id: "debut",   label: "Debut Host",   icon: "🌱",   accent: "text-emerald-600" },
-            { id: "indie",   label: "Deep Indie",   icon: "🎸",   accent: "text-violet-600" },
-            { id: "cozy",    label: "Cozy (1–5)",   icon: "☕",   accent: "text-amber-600" },
-          ] as { id: typeof selectedCategory; label: string; icon: string | null; accent: string | null }[]
+            { id: "all",     label: "All Lounges",  icon: null },
+            { id: "popular", label: "Trending",     icon: <MonoIcon.Flame size={14} className="text-orange-500" /> },
+            { id: "debut",   label: "Debut Host",   icon: <MonoIcon.Sprout size={14} className="text-emerald-500" /> },
+            { id: "indie",   label: "Deep Indie",   icon: <MonoIcon.Guitar size={14} className="text-violet-400" /> },
+            { id: "cozy",    label: "Cozy (1–5)",   icon: <MonoIcon.Cup size={14} className="text-amber-500" /> },
+          ] as { id: typeof selectedCategory; label: string; icon: React.ReactNode | null }[]
         ).map(({ id, label, icon }) => {
           const active = selectedCategory === id
           return (
@@ -440,8 +451,8 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
               onClick={() => setSelectedCategory(id)}
               className={["lounge-filter-pill", active ? "lounge-filter-pill-active" : ""].join(" ")}
             >
-              {icon && <span>{icon}</span>}
-              {label}
+              {icon && <span className="flex items-center">{icon}</span>}
+              <span>{label}</span>
             </button>
           )
         })}
@@ -476,7 +487,10 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
       {/* Hall of Fame + Most Played */}
       <div className="grid grid-cols-12 gap-8 mb-12">
         <div className="col-span-7">
-          <h2 className="lounge-section-title mb-4">🏆 Hall of Fame Sessions</h2>
+          <h2 className="lounge-section-title mb-4 flex items-center gap-2">
+            <MonoIcon.Trophy size={18} className="text-amber-400" />
+            <span>Hall of Fame Sessions</span>
+          </h2>
           <div className="flex flex-col gap-3">
             {archives.map((s) => (
               <div key={s.id} className="lounge-row p-4 flex items-center gap-4">
@@ -495,7 +509,10 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
         </div>
 
         <div className="col-span-5">
-          <h2 className="lounge-section-title mb-4">🔥 Lounge Most Played</h2>
+          <h2 className="lounge-section-title mb-4 flex items-center gap-2">
+            <MonoIcon.Flame size={18} className="text-orange-400" />
+            <span>Lounge Most Played</span>
+          </h2>
           <div className="flex flex-col gap-2">
             {mostPlayed.map((item) => (
               <div key={item.rank} className="lounge-row flex items-center gap-3" style={{ padding: "11px 14px" }}>
@@ -507,7 +524,9 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="lounge-spec-badge" style={{ color: "#34d399" }}>{item.dr}</span>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "var(--lounge-text-faint)" }}>{item.plays} plays</span>
-                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--lounge-text-faint)", fontSize: 14, padding: "0 2px", lineHeight: 1 }} title="Preview">▷</button>
+                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--lounge-text-faint)", padding: "0 2px", display: "flex", alignItems: "center" }} title="Preview">
+                    <MonoIcon.PlayMini size={12} />
+                  </button>
                 </div>
               </div>
             ))}

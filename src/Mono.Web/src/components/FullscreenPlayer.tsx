@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock } from "../state/MonoProvider"
 import { useLiveSession } from "../state/useLiveSession"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export interface FullscreenPlayerProps {
   isOpen: boolean
@@ -79,6 +80,11 @@ export default function FullscreenPlayer({
     return () => window.removeEventListener("keydown", handler)
   }, [isOpen, onClose])
 
+  const handleClose = () => {
+    if (isInLoungeSession && onReturnToLounge) onReturnToLounge()
+    else onClose()
+  }
+
   if (!isOpen) return null
 
   /* ── Standby view ─────────────────────────────────────────────────────── */
@@ -92,16 +98,10 @@ export default function FullscreenPlayer({
             p.format.toLowerCase().includes(searchQuery.toLowerCase())
         )
       : quickPicks
-
-    const handleClose = () => {
-      onClose()
-      if (isInLoungeSession && onReturnToLounge) onReturnToLounge()
-    }
-
     return (
-      <div className="fixed inset-x-0 top-16 bottom-24 z-30 bg-zinc-50 flex flex-col overflow-hidden select-none" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+      <div className="fixed inset-x-0 top-16 bottom-24 z-30 flex flex-col overflow-hidden select-none bg-[var(--chassis-bg)] text-[var(--text-primary)]" style={{ borderTop: "1px solid var(--border-subtle)" }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-10 pt-5 pb-4 shrink-0 border-b border-zinc-200/60">
+        <div className="flex items-center justify-between px-10 py-4 border-b border-[var(--border-subtle)] shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase">Mono Studio Console · Standby</span>
             {isInLoungeSession && (
@@ -110,16 +110,18 @@ export default function FullscreenPlayer({
                 className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-full cursor-pointer transition-colors"
                 style={{ background: undefined, border: undefined }}
               >
-                ← Return to Live Lounge
+                <MonoIcon.ArrowLeft size={11} />
+                <span>Return to Live Lounge</span>
               </button>
             )}
           </div>
           <button
             onClick={handleClose}
-            className="text-zinc-400 hover:text-zinc-900 cursor-pointer transition-colors text-sm leading-none"
-            style={{ background: "none", border: "none", fontFamily: "inherit", padding: "4px 6px" }}
+            className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer transition-colors p-1 flex items-center justify-center"
+            style={{ background: "none", border: "none" }}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={15} />
           </button>
         </div>
 
@@ -205,11 +207,12 @@ export default function FullscreenPlayer({
         {/* ✕ dismiss — floats top-right inside the stage */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-8 text-base text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer transition z-10"
-          style={{ background: "none", border: "none", fontFamily: "inherit", padding: "4px 6px", lineHeight: 1 }}
+          className="absolute top-4 right-8 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer transition z-10 p-1 flex items-center justify-center"
+          style={{ background: "none", border: "none" }}
           title="Close Now Playing"
+          aria-label="Close Now Playing"
         >
-          ✕
+          <MonoIcon.Close size={18} />
         </button>
 
         <div className="max-w-7xl mx-auto w-full gap-12 lg:gap-16 flex-1 flex items-center justify-center">
@@ -276,10 +279,11 @@ export default function FullscreenPlayer({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onNavigateToLensSettings(); }}
-                  className="text-xs font-mono px-3 py-1 rounded-full cursor-pointer transition"
+                  className="text-xs font-mono px-3 py-1 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
                   style={{ background: "none", border: "1px solid var(--nowplaying-tab-idle-border)", color: "var(--nowplaying-meta-pill-text)" }}
                 >
-                  ✦ LENS DSP
+                  <MonoIcon.Sparkle size={12} />
+                  <span>LENS DSP</span>
                 </button>
               </div>
             </div>
@@ -291,21 +295,23 @@ export default function FullscreenPlayer({
             <div className="flex items-center gap-2 px-7 py-4 shrink-0" style={{ borderBottom: "1px solid var(--nowplaying-tab-divider)" }}>
               <button
                 onClick={() => setSideTab("lyrics")}
-                className="text-xs font-mono px-3.5 py-1.5 rounded-full cursor-pointer transition"
+                className="text-xs font-mono px-3.5 py-1.5 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
                 style={sideTab !== "credits"
                   ? { background: "var(--nowplaying-tab-active-bg)", border: "1px solid var(--nowplaying-tab-active-border)", color: "var(--nowplaying-tab-active-text)" }
                   : { background: "none", border: "1px solid var(--nowplaying-tab-idle-border)", color: "var(--nowplaying-tab-idle-text)" }}
               >
-                ♫ Synced Lyrics
+                <MonoIcon.Lyrics size={13} />
+                <span>Synced Lyrics</span>
               </button>
               <button
                 onClick={() => setSideTab("credits")}
-                className="text-xs font-mono px-3.5 py-1.5 rounded-full cursor-pointer transition"
+                className="text-xs font-mono px-3.5 py-1.5 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
                 style={sideTab === "credits"
                   ? { background: "var(--nowplaying-tab-active-bg)", border: "1px solid var(--nowplaying-tab-active-border)", color: "var(--nowplaying-tab-active-text)" }
                   : { background: "none", border: "1px solid var(--nowplaying-tab-idle-border)", color: "var(--nowplaying-tab-idle-text)" }}
               >
-                ℹ Track Credits
+                <MonoIcon.Clipboard size={12} />
+                <span>Track Credits</span>
               </button>
               {sideTab !== "credits" && (
                 <span className="ml-auto text-[10px] font-mono" style={{ color: "var(--nowplaying-credits-role)" }}>{lyrics.length > 0 ? "Synced from .lrc" : "No synced lyrics"}</span>
@@ -338,7 +344,10 @@ export default function FullscreenPlayer({
                   })
                 ) : (
                   <div className="flex flex-col items-center justify-center h-48 text-center space-y-2">
-                    <span className="text-xs font-mono uppercase tracking-widest" style={{ color: "var(--nowplaying-credits-role)" }}>♪ Studio Master Recording</span>
+                    <span className="text-xs font-mono uppercase tracking-widest inline-flex items-center gap-1.5" style={{ color: "var(--nowplaying-credits-role)" }}>
+                      <MonoIcon.MasterRecording size={13} />
+                      <span>Studio Master Recording</span>
+                    </span>
                     <p className="text-sm font-serif italic" style={{ color: "var(--text-secondary)" }}>Instrumental performance · No vocal lyrics for this track</p>
                     <span className="text-[10px] font-mono" style={{ color: "var(--nowplaying-credits-role)" }}>{currentTrack?.format || "Hi-Res Audio"} · Bit-Perfect Stream</span>
                   </div>

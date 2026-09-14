@@ -4,6 +4,7 @@ import { useLiveSession } from "../state/useLiveSession"
 import { libPlaylists } from "../lib/libraryData"
 import { formatDuration } from "../lib/adapters"
 import TrackActionMenu, { type TrackActionTarget } from "./TrackActionMenu"
+import { MonoIcon } from "./icons/MonoIcons"
 
 function IconChevron({ size = 12 }: { size?: number }) {
   return (
@@ -55,7 +56,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
       .slice(0, 5)
       .map((a) => ({
         art: a.coverUrl,
-        badge: `★ ${a.dr}`,
+        badge: a.dr,
         title: a.title,
         artist: a.artist,
         trackIds: a.trackIds,
@@ -360,8 +361,9 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {/* Daily Discovery card */}
               <div className="aspect-square rounded-xl p-4 flex flex-col justify-between cursor-pointer" style={{ background: "linear-gradient(135deg, #020617, #1e1b4b)" }}>
                 <div>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 700, color: "#67E8F9", letterSpacing: "0.05em", background: "rgba(103,232,249,0.12)", border: "1px solid rgba(103,232,249,0.25)", borderRadius: 4, padding: "2px 7px", display: "inline-block" }}>
-                    ✦ Daily Discovery
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 700, color: "#67E8F9", letterSpacing: "0.05em", background: "rgba(103,232,249,0.12)", border: "1px solid rgba(103,232,249,0.25)", borderRadius: 4, padding: "2px 7px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <MonoIcon.Sparkle size={11} />
+                    <span>Daily Discovery</span>
                   </span>
                 </div>
                 <div className="flex justify-center">
@@ -500,7 +502,10 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
                       onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                     />
                     <div style={{ position: "absolute", bottom: 8, left: 8 }}>
-                      <span className="badge-award-hallmark">{item.badge}</span>
+                      <span className="badge-award-hallmark flex items-center gap-1">
+                        <MonoIcon.Star size={10} />
+                        <span>{item.badge}</span>
+                      </span>
                     </div>
                   </AlbumArtFrame>
                   <div className="explore-album-title">{item.title}</div>

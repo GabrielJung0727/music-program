@@ -6,6 +6,7 @@ import {
   INITIAL_PROFILES,
   PROFILE_COLORS,
 } from "../data/types"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export type CurrentTab = "home" | "lounges" | "library" | "explore" | "settings"
 
@@ -212,12 +213,12 @@ export default function TopNav({
                 onClick={() => { setSearchQuery(""); setIsSearchActive(false); setShowQuickPreview(false) }}
                 style={{
                   position: "absolute", right: 9, background: "none", border: "none",
-                  cursor: "pointer", color: "#9CA3AF", fontSize: 13, lineHeight: 1,
+                  cursor: "pointer", color: "#9CA3AF",
                   display: "flex", alignItems: "center", padding: 2, zIndex: 1,
                 }}
                 aria-label="Clear search"
               >
-                ✕
+                <MonoIcon.Close size={13} />
               </button>
             )}
           </div>
@@ -259,7 +260,7 @@ export default function TopNav({
                       className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition ${track.isCurrent ? "bg-blue-50/40 hover:bg-blue-50/60" : "hover:bg-slate-50"}`}
                     >
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${track.isCurrent ? "bg-blue-100" : "bg-slate-100"}`}>
-                        <span className={`text-xs font-bold ${track.isCurrent ? "text-blue-600" : "text-slate-400"}`}>▶</span>
+                        <MonoIcon.PlayMini size={12} className={track.isCurrent ? "text-blue-600" : "text-slate-400"} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-serif font-semibold truncate ${track.isCurrent ? "text-blue-700" : "text-slate-900"}`}>{track.title}</p>
@@ -286,7 +287,11 @@ export default function TopNav({
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
                       <p className="text-xs font-serif font-semibold text-white truncate">{room.title}</p>
                     </div>
-                    <p className="text-[10px] font-mono text-slate-400 mt-0.5">Host: {room.hostName} 👑 · {room.listenerCount} listening</p>
+                    <p className="text-[10px] font-mono text-slate-400 mt-0.5 flex items-center gap-1">
+                      <span>Host: {room.hostName}</span>
+                      <MonoIcon.Crown size={11} className="text-amber-400 inline" />
+                      <span>· {room.listenerCount} listening</span>
+                    </p>
                   </div>
                   <span className="text-[10px] font-mono bg-blue-600 text-white px-2.5 py-1 rounded-full shrink-0 group-hover:bg-blue-500 transition">Join →</span>
                 </div>
@@ -507,7 +512,9 @@ export default function TopNav({
                       <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.gearPreset}</div>
                     </div>
                     {p.id === activeProfileId && (
-                      <span style={{ fontSize: 14, color: PROFILE_COLORS[p.id] ?? "#6D28D9", flexShrink: 0 }}>✓</span>
+                      <span style={{ color: PROFILE_COLORS[p.id] ?? "#6D28D9", flexShrink: 0, display: "flex", alignItems: "center" }}>
+                        <MonoIcon.Check size={14} strokeWidth={2.5} />
+                      </span>
                     )}
                   </button>
                 ))}
@@ -532,9 +539,11 @@ export default function TopNav({
                     flex: 1, fontSize: 12, fontWeight: 500, color: "var(--accent-violet)",
                     background: "var(--accent-glow)", border: "1px solid var(--border-strong)", borderRadius: 8,
                     padding: "8px 0", cursor: "pointer", fontFamily: "inherit", transition: "all 0.12s",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                   }}
                 >
-                  ⚙ Profile Settings
+                  <MonoIcon.Settings size={13} />
+                  <span>Profile Settings</span>
                 </button>
               </div>
             </div>

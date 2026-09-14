@@ -3,6 +3,7 @@ import { Lock } from "lucide-react"
 import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock, useMonoCommands } from "../state/MonoProvider"
 import { startOutput, stopOutput } from "../lib/shell"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export type PlayerMode = "solo" | "host" | "guest"
 
@@ -179,7 +180,8 @@ export default function PlayerBar({
       o.supportsDsd ? "DSD" : null,
       o.badge,
     ].filter(Boolean).join(" • "),
-    icon: o.supportsDsd ? "🎧" : "🔈",
+    supportsDsd: o.supportsDsd,
+    icon: o.supportsDsd ? <MonoIcon.Headphones size={13} className="inline mr-1" /> : <MonoIcon.Speaker size={13} className="inline mr-1" />,
     active: !o.spectator && o.volumePercent > 0,
     // 디자인은 dB 로 보여 준다. Core 는 0~100% 를 안다.
     volume: percentToDb(o.volumePercent),
@@ -580,11 +582,12 @@ export default function PlayerBar({
             </div>
             <button
               onClick={() => setIsSignalPathOpen(false)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 14, lineHeight: 1, padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s" }}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
               onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#334155")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
+              aria-label="Close"
             >
-              ✕
+              <MonoIcon.Close size={14} />
             </button>
           </div>
 
@@ -681,15 +684,26 @@ export default function PlayerBar({
           <div style={{ borderTop: "1px solid #F1F5F9", margin: "16px 0 12px" }} />
           <div className="flex items-center justify-between">
             <span style={{ fontSize: 11, fontWeight: 500, color: isDspBypassed ? "#7C3AED" : "#2563EB" }}>
-              {isDspBypassed ? "🟣 Bit-Perfect Path" : "🔵 Studio DSP Active"}
+              {isDspBypassed ? (
+                <span className="flex items-center gap-1.5">
+                  <MonoIcon.BitPerfect size={15} />
+                  <span>Bit-Perfect Path</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <MonoIcon.DspActive size={15} />
+                  <span>Studio DSP Active</span>
+                </span>
+              )}
             </span>
             <button
               onClick={onNavigateToLens}
-              style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color 0.15s" }}
+              style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color 0.15s", display: "flex", alignItems: "center", gap: 3 }}
               onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#0F172A")}
               onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
             >
-              LENS ↗
+              <span>LENS</span>
+              <MonoIcon.ExternalLink size={10} />
             </button>
           </div>
           <a
@@ -699,7 +713,7 @@ export default function PlayerBar({
             onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "none")}
             onClick={(e) => e.preventDefault()}
           >
-            Configure Audio Engine & EQ in Settings ➔
+            Configure Audio Engine & EQ in Settings →
           </a>
         </div>
       )}
@@ -751,10 +765,13 @@ export default function PlayerBar({
               <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Audio Outputs</span>
               <button
                 onClick={() => setIsDevicePopoverOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 14, lineHeight: 1, padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s" }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#334155")}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
-              >✕</button>
+                aria-label="Close"
+              >
+                <MonoIcon.Close size={14} />
+              </button>
             </div>
 
             {activeDevs.length >= 2 && (
@@ -823,12 +840,12 @@ export default function PlayerBar({
                       cursor: "pointer", transition: "all 0.15s", color: "#fff", fontSize: 11, fontWeight: 700,
                     }}
                   >
-                    {dev.active && "✓"}
+                    {dev.active && <MonoIcon.Check size={12} strokeWidth={2.5} />}
                   </button>
 
                   <div style={{ flex: 1, minWidth: 0 }} onClick={() => selectSolo(dev.id)}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: dev.active ? "#0F172A" : "#374151", marginBottom: 1 }}>
-                      {dev.icon} {dev.name}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: dev.active ? "#0F172A" : "#374151", marginBottom: 1, display: "flex", alignItems: "center" }}>
+                      {dev.icon} <span>{dev.name}</span>
                     </div>
                     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", marginBottom: dev.active ? 8 : 0 }}>
                       {dev.spec}
@@ -860,13 +877,14 @@ export default function PlayerBar({
                     onClick={(e) => { e.stopPropagation(); hideDevice(dev.id) }}
                     style={{
                       background: "none", border: "none", cursor: "pointer", padding: "2px 4px",
-                      fontSize: 11, color: "#CBD5E1", transition: "color 0.15s", flexShrink: 0, lineHeight: 1, marginTop: 2,
+                      color: "#CBD5E1", transition: "color 0.15s", flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center",
                     }}
                     title="Hide device"
+                    aria-label="Hide device"
                     onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#F43F5E")}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1")}
                   >
-                    ✕
+                    <MonoIcon.Close size={12} />
                   </button>
                 </div>
               ))}
@@ -885,7 +903,7 @@ export default function PlayerBar({
                   onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#475569")}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
                 >
-                  <span style={{ fontSize: 10, display: "inline-block", transform: showHiddenDevices ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }}>▾</span>
+                  <MonoIcon.ChevronDown size={12} style={{ transform: showHiddenDevices ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
                   {hiddenDevs.length} Hidden & System Device{hiddenDevs.length !== 1 ? "s" : ""}
                 </button>
                 {showHiddenDevices && (

@@ -3,6 +3,7 @@ import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { pickFolder, startOutput, restartOutput, outputStatus, hasShell } from "../lib/shell"
 import StreamingLoginModal from "./StreamingLoginModal"
 import GeneralSystemSettings from "./settings/GeneralSystemSettings"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export default function SettingsPage({
   initialTab = "audio",
@@ -27,11 +28,11 @@ export default function SettingsPage({
   const [memoryPlayback, setMemoryPlayback] = useState<boolean>(true)
   const [dsdStrategy, setDsdStrategy] = useState<"native" | "dop" | "pcm">("dop")
   const [bufferSize, setBufferSize] = useState<number>(256)
-  type DeviceEntry = { id: string; icon: string; name: string; driver: string; telemetry: string; isHidden?: boolean }
+  type DeviceEntry = { id: string; icon: React.ReactNode; name: string; driver: string; telemetry: string; isHidden?: boolean }
   // 룸에 붙은 실제 Output 엔드포인트. 드라이버·클럭 수치는 Output 이 보고한 값이다.
   const DEVICES: DeviceEntry[] = (room?.outputs ?? []).map((o, i) => ({
     id: o.peerId,
-    icon: o.supportsDsd ? "🎧" : "🔈",
+    icon: o.supportsDsd ? <MonoIcon.Headphones size={15} /> : <MonoIcon.Speaker size={15} />,
     name: o.displayName ?? o.device ?? `출력 ${i + 1}`,
     driver: [
       o.exclusiveMode ? "Exclusive" : "Shared",
@@ -46,7 +47,7 @@ export default function SettingsPage({
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false)
   const [showHiddenDevices, setShowHiddenDevices] = useState(false)
   const activeDevice = DEVICES.find((d) => d.id === activeDeviceId) ?? DEVICES[0] ?? {
-    id: "", icon: "—", name: "연결된 출력 없음", driver: "Mono Output 을 연결하세요", telemetry: "",
+    id: "", icon: <MonoIcon.Speaker size={15} />, name: "연결된 출력 없음", driver: "Mono Output 을 연결하세요", telemetry: "",
   }
 
   const [lensMasterBypass, setLensMasterBypass] = useState<boolean>(true)
@@ -245,11 +246,11 @@ export default function SettingsPage({
                       {/* Hidden / System devices accordion */}
                       <div className="device-select-hidden-header">
                         <button
-                          className="device-select-hidden-toggle"
+                          className="device-select-hidden-toggle flex items-center gap-1"
                           onClick={() => setShowHiddenDevices((v) => !v)}
                         >
-                          <span style={{ display: "inline-block", transform: showHiddenDevices ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s", fontSize: 10 }}>▾</span>
-                          &nbsp;{DEVICES.filter((d) => d.isHidden).length} Hidden &amp; System Devices
+                          <MonoIcon.ChevronDown size={11} style={{ transform: showHiddenDevices ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                          <span>{DEVICES.filter((d) => d.isHidden).length} Hidden &amp; System Devices</span>
                         </button>
                       </div>
                       {showHiddenDevices && DEVICES.filter((d) => d.isHidden).map((dev) => (

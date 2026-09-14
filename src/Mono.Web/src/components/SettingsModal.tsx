@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { type Profile, PROFILE_COLORS } from "../data/types"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export type SettingsTab = "profiles" | "engine" | "lens"
 
@@ -72,11 +73,12 @@ export default function SettingsModal({
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: "4px 8px", transition: "color 0.15s" }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 18, lineHeight: 1, padding: "4px 8px", transition: "color 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#334155" }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#94A3B8" }}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={16} />
           </button>
         </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useMono, useMonoCommands } from "../../state/MonoProvider";
 import { StreamingProvider } from "../../lib/protocol";
 import { openExternal } from "../../lib/shell";
+import { MonoIcon } from "../icons/MonoIcons";
 
 interface Props {
   isOpen: boolean;
@@ -65,7 +66,9 @@ function QobuzLoginPanel({ onClose, onSuccess }: QobuzLoginProps) {
             </p>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="modal-close-btn">✕</button>
+        <button type="button" onClick={onClose} className="modal-close-btn flex items-center justify-center" aria-label="Close">
+          <MonoIcon.Close size={15} />
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -225,7 +228,9 @@ function TidalOAuthPanel({ onClose, onSuccess }: TidalOAuthProps) {
           </div>
         </div>
 
-        <button type="button" onClick={onClose} className="modal-close-btn">✕</button>
+        <button type="button" onClick={onClose} className="modal-close-btn flex items-center justify-center" aria-label="Close">
+          <MonoIcon.Close size={15} />
+        </button>
       </div>
 
       {/* OAuth badge */}

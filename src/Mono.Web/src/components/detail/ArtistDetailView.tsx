@@ -1,4 +1,5 @@
 import type { PlayerMode } from "../PlayerBar"
+import { MonoIcon } from "../icons/MonoIcons"
 
 interface Props {
   selectedArtist: any
@@ -43,7 +44,8 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
             style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}
           >
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-solo)", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite", flexShrink: 0 }} />
-            ← Return to Live Lounge (ON AIR)
+            <MonoIcon.ArrowLeft size={12} />
+            <span>Return to Live Lounge (ON AIR)</span>
           </button>
         ) : (
           <button onClick={onBack} className="album-back-btn" style={{ background: "none", border: "none", padding: 0 }}>
@@ -82,9 +84,10 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
               Play Artist Radio
             </button>
             {selectedArtist.wikiUrl && (
-              <a href={selectedArtist.wikiUrl} target="_blank" rel="noopener noreferrer" className="artist-wiki-btn">
+              <a href={selectedArtist.wikiUrl} target="_blank" rel="noopener noreferrer" className="artist-wiki-btn inline-flex items-center gap-1.5">
                 <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 13, lineHeight: 1 }}>W</span>
-                Wikipedia Biography ↗
+                <span>Wikipedia Biography</span>
+                <MonoIcon.ExternalLink size={11} />
               </a>
             )}
           </div>
@@ -108,12 +111,13 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
               href={selectedArtist.wikiUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-mono no-underline shrink-0 transition-colors"
+              className="text-[10px] font-mono no-underline shrink-0 transition-colors inline-flex items-center gap-1"
               style={{ color: "var(--text-muted)" }}
               onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-solo)")}
               onMouseLeave={e => (e.currentTarget.style.color = "var(--text-muted)")}
             >
-              Open full Wikipedia entry ↗
+              <span>Open full Wikipedia entry</span>
+              <MonoIcon.ExternalLink size={10} />
             </a>
           )}
         </div>

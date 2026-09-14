@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import type { QueueTrack } from "../data/types"
+import { MonoIcon } from "./icons/MonoIcons"
 
 interface Props {
   isOpen: boolean
@@ -158,11 +159,13 @@ export default function QueueDrawer({
                   background: "none", border: "none", cursor: "pointer",
                   color: "#A1A1AA", fontSize: 15, lineHeight: 1, padding: 4,
                   transition: "color 0.15s",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}
                 onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#3F3F46")}
                 onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#A1A1AA")}
+                aria-label="Close"
               >
-                ✕
+                <MonoIcon.Close size={15} />
               </button>
             </div>
           </div>

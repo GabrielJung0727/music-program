@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { MonoIcon } from "./icons/MonoIcons"
 
 export interface ShareData {
   type: "lounge" | "playlist" | "track" | "album"
@@ -104,11 +105,12 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 16, lineHeight: 1, padding: 4, transition: "color 0.15s" }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 4, transition: "color 0.15s", display: "flex", alignItems: "center" }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#334155")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={16} />
           </button>
         </div>
 
@@ -140,7 +142,9 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
               {shareData.coverUrl ? (
                 <img src={shareData.coverUrl} alt={shareData.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📡</div>
+                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#60A5FA" }}>
+                  <MonoIcon.Broadcast size={24} />
+                </div>
               )}
             </div>
 
@@ -156,7 +160,8 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
                     borderRadius: 4, padding: "2px 7px", letterSpacing: "0.1em",
                     display: "inline-flex", alignItems: "center", gap: 4,
                   }}>
-                    ♪ MONO CURATED PLAYLIST
+                    <MonoIcon.Playlist size={11} />
+                    <span>MONO CURATED PLAYLIST</span>
                   </span>
                 ) : (
                   <span style={{
@@ -216,7 +221,9 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
               borderRadius: 10, padding: "10px 14px",
               display: "flex", alignItems: "flex-start", gap: 10,
             }}>
-              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔒</span>
+              <span style={{ color: "#7C3AED", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center" }}>
+                <MonoIcon.Lock size={14} />
+              </span>
               <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#5B21B6", lineHeight: 1.55 }}>
                 <span style={{ fontWeight: 700 }}>Invite-Only Session</span>
                 {" · "}Anyone with this secret link can join this bit-perfect session. It will not appear on the public feed.
@@ -224,7 +231,9 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
             </div>
           ) : (
             <div className="share-modal-notice">
-              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>🔒</span>
+              <span style={{ color: "#64748B", flexShrink: 0, marginTop: 1, display: "flex", alignItems: "center" }}>
+                <MonoIcon.Lock size={14} />
+              </span>
               <div className="share-modal-notice-text">
                 <span style={{ fontWeight: 700 }}>Mono Client Required</span>
                 {" · "}Bit-Perfect ASIO session streams are only accessible via the Mono Desktop Player.
@@ -266,9 +275,15 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
                   background: copied ? "#059669" : "#0F172A",
                   color: "#FFFFFF", border: "none",
                   transition: "background 0.2s", whiteSpace: "nowrap",
+                  display: "inline-flex", alignItems: "center", gap: 6,
                 }}
               >
-                {copied ? "✓ Copied to Clipboard!" : isPlaylist ? "Copy ISRC Crate Link" : isUnlisted ? "Copy Secret Link" : "Copy Lounge Link"}
+                {copied ? (
+                  <>
+                    <MonoIcon.Check size={13} strokeWidth={2.5} />
+                    <span>Copied to Clipboard!</span>
+                  </>
+                ) : isPlaylist ? "Copy ISRC Crate Link" : isUnlisted ? "Copy Secret Link" : "Copy Lounge Link"}
               </button>
             </div>
           </div>
@@ -291,9 +306,19 @@ export default function ShareModal({ isOpen, onClose, shareData }: Props) {
             <button
               onClick={handleCopySpecs}
               className="share-modal-btn-secondary"
-              style={specsCopied ? { background: "#ECFDF5", borderColor: "#A7F3D0", color: "#059669" } : undefined}
+              style={specsCopied ? { background: "#ECFDF5", borderColor: "#A7F3D0", color: "#059669", display: "inline-flex", alignItems: "center", gap: 6 } : { display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              {specsCopied ? "✓ Copied" : "📋 Copy Audio Specs"}
+              {specsCopied ? (
+                <>
+                  <MonoIcon.Check size={13} strokeWidth={2.5} />
+                  <span>Copied</span>
+                </>
+              ) : (
+                <>
+                  <MonoIcon.Clipboard size={13} />
+                  <span>Copy Audio Specs</span>
+                </>
+              )}
             </button>
           </div>
         </div>

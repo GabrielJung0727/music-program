@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useMonoCommands } from "../state/MonoProvider"
 import { StreamingProvider } from "../lib/protocol"
 import { openExternal } from "../lib/shell"
+import { MonoIcon } from "./icons/MonoIcons"
 
 type Service = "qobuz" | "tidal"
 
@@ -82,11 +83,12 @@ function QobuzFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modal-auth-close)", fontSize: 18, lineHeight: 1, padding: 4, transition: "color 0.15s" }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modal-auth-close)", padding: 4, transition: "color 0.15s", display: "flex", alignItems: "center" }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "var(--modal-auth-close-hover)")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "var(--modal-auth-close)")}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={16} />
           </button>
         </div>
       </div>
@@ -266,11 +268,12 @@ function TidalFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
           </div>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modal-auth-close)", fontSize: 18, lineHeight: 1, padding: 4, transition: "color 0.15s" }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--modal-auth-close)", padding: 4, transition: "color 0.15s", display: "flex", alignItems: "center" }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "var(--modal-auth-close-hover)")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "var(--modal-auth-close)")}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={16} />
           </button>
         </div>
       </div>
@@ -344,7 +347,8 @@ function TidalFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
                 b.style.boxShadow = "none"
               }}
             >
-              Open TIDAL.com to Authorize ↗
+              <span>Open TIDAL.com to Authorize</span>
+              <MonoIcon.ExternalLink size={12} />
             </button>
           </div>
         )}
@@ -397,16 +401,16 @@ function TidalFlow({ onClose, onSuccess }: { onClose: () => void; onSuccess: () 
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {[
-                      { icon: "▶", label: "Stream Lossless Audio" },
-                      { icon: "♪", label: "Read Playlists" },
-                      { icon: "◈", label: "Access My Collection" },
+                      { icon: <MonoIcon.PlayMini size={10} />, label: "Stream Lossless Audio" },
+                      { icon: <MonoIcon.Playlist size={11} />, label: "Read Playlists" },
+                      { icon: <MonoIcon.Collection size={11} />, label: "Access My Collection" },
                     ].map((scope) => (
                       <div key={scope.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{
                           width: 22, height: 22, borderRadius: 6,
                           background: "rgba(0,200,220,0.1)", border: "1px solid rgba(0,200,220,0.2)",
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                          fontSize: 10, color: "#00C8DC",
+                          color: "#00C8DC",
                         }}>
                           {scope.icon}
                         </div>

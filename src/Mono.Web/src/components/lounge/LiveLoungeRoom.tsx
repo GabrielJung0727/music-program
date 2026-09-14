@@ -4,6 +4,20 @@ import type { PlayerMode } from "../PlayerBar"
 import { useMono, useMonoCommands } from "../../state/MonoProvider"
 import { useLiveSession } from "../../state/useLiveSession"
 import { initials as initialsOf } from "../../lib/adapters"
+import { MonoIcon } from "../icons/MonoIcons"
+
+/**
+ * 리액션 한 벌. key 는 Core 로 나가는 값이라 이모지 문자 그대로 두고(룸 전체가 이 값으로
+ * 합의한다), 화면에 그리는 건 아이콘 쪽이다. 팝오버와 떠오르는 잔상이 같은 목록을 봐야
+ * 버튼과 실제로 날아가는 그림이 어긋나지 않는다.
+ */
+const REACTIONS = [
+  { key: "🔥", title: "Fire",       Icon: MonoIcon.Flame,      tone: "text-orange-500" },
+  { key: "🎧", title: "Headphones", Icon: MonoIcon.Headphones, tone: "text-sky-500" },
+  { key: "🎷", title: "Jazz",       Icon: MonoIcon.Saxophone,  tone: "text-amber-500" },
+  { key: "🍷", title: "Lounge",     Icon: MonoIcon.Wine,       tone: "text-rose-500" },
+  { key: "👏", title: "Clap",       Icon: MonoIcon.Clap,       tone: "text-violet-400" },
+] as const
 
 interface FloatingReaction {
   id: number
@@ -104,10 +118,11 @@ export default function LiveLoungeRoom({
         <div className="flex items-center">
           <button
             onClick={onExitAttempt}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-2 text-xs transition-colors border border-[var(--border-subtle)] px-3.5 py-1.5 rounded-full cursor-pointer mr-4"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1.5 text-xs transition-colors border border-[var(--border-subtle)] px-3.5 py-1.5 rounded-full cursor-pointer mr-4"
             style={{ background: "none" }}
           >
-            ← Leave Lounge
+            <MonoIcon.ArrowLeft size={13} />
+            <span>Leave Lounge</span>
           </button>
           <span className="text-xs font-semibold text-[var(--text-primary)] tracking-wide mr-3">
             {currentTrack
@@ -126,7 +141,8 @@ export default function LiveLoungeRoom({
             <>
               {isUnlistedSession && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-zinc-800 text-violet-300 border border-violet-500/30 ml-2">
-                  🔒 Invite-Only Session
+                  <MonoIcon.Lock size={12} />
+                  <span>Invite-Only Session</span>
                 </span>
               )}
               <button
@@ -308,11 +324,12 @@ export default function LiveLoungeRoom({
               Live Chat
             </span>
             <button
-              className="text-[11px] font-mono text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer transition"
+              className="text-[11px] font-mono text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer transition flex items-center gap-1.5"
               style={{ background: "none", border: "none" }}
               onClick={() => setIsGearWallExpanded(!isGearWallExpanded)}
             >
-              🎧 Gear List ({snapshot?.outputs.length ?? 0})
+              <MonoIcon.Headphones size={13} />
+              <span>Gear List ({snapshot?.outputs.length ?? 0})</span>
             </button>
           </div>
 
@@ -345,10 +362,13 @@ export default function LiveLoungeRoom({
               return (
                 <div key={`${m.peerId}-${m.at}-${i}`} className="flex items-start gap-2 border-b border-white/5 last:border-0 pb-3 last:pb-0">
                   <div className={`w-6 h-6 rounded-full ${isHostLine ? "bg-amber-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300"} text-[10px] font-bold flex items-center justify-center shrink-0`}>
-                    {isHostLine ? "👑" : initialsOf(name)}
+                    {isHostLine ? <MonoIcon.Crown size={12} /> : initialsOf(name)}
                   </div>
                   <div>
-                    <span className={`text-xs font-bold ${isHostLine ? "text-amber-400" : "text-[var(--text-primary)] dark:text-zinc-200"}`}>{name}</span>
+                    <span className={`text-xs font-bold ${isHostLine ? "text-amber-400 flex items-center gap-1" : "text-[var(--text-primary)] dark:text-zinc-200"}`}>
+                      <span>{name}</span>
+                      {isHostLine && <MonoIcon.Crown size={11} className="inline text-amber-400" />}
+                    </span>
                     <span className="text-[10px] text-[var(--text-muted)] ml-1.5">
                       {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
@@ -372,7 +392,10 @@ export default function LiveLoungeRoom({
                 className="absolute animate-float-fade text-2xl select-none"
                 style={{ left: `${r.left}%`, bottom: "0px", transform: `rotate(${r.rotate}deg)`, ["--start-scale" as string]: r.scale } as Record<string, unknown>}
               >
-                {r.emoji}
+                {(() => {
+                  const hit = REACTIONS.find((x) => x.key === r.emoji)
+                  return hit ? <hit.Icon size={26} className={hit.tone} /> : r.emoji
+                })()}
               </span>
             ))}
           </div>
@@ -380,23 +403,25 @@ export default function LiveLoungeRoom({
           {/* Chat input row */}
           <div className="p-3 border-t border-[var(--border-subtle)] dark:border-white/10 bg-[var(--chassis-bg)] dark:bg-[#18191f] flex items-center gap-2 shrink-0 relative">
             {showReactions && (
-              <div className="absolute right-3 bottom-14 bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-xl rounded-full px-3 py-1.5 flex items-center gap-1.5 z-20">
-                {["🔥", "🎧", "🎷", "🍷", "👏"].map((emoji) => (
+              <div className="absolute right-3 bottom-14 bg-[var(--surface-card)] border border-[var(--border-subtle)] shadow-xl rounded-full px-2.5 py-1.5 flex items-center gap-1 z-20">
+                {REACTIONS.map((item) => (
                   <button
-                    key={emoji}
-                    onClick={() => { triggerReaction(emoji); cmd.react(emoji) }}
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-base active:scale-125 transition-transform duration-75 cursor-pointer select-none hover:bg-slate-50"
+                    key={item.key}
+                    onClick={() => { triggerReaction(item.key); cmd.react(item.key) }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center active:scale-125 transition-all duration-75 cursor-pointer select-none hover:bg-black/5 dark:hover:bg-white/10"
                     style={{ background: "none", border: "none" }}
+                    title={item.title}
                   >
-                    {emoji}
+                    <item.Icon size={16} className={item.tone} />
                   </button>
                 ))}
                 <button
                   onClick={() => setShowReactions(false)}
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer ml-0.5"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer ml-1"
                   style={{ background: "none", border: "none" }}
+                  aria-label="Close reactions"
                 >
-                  ✕
+                  <MonoIcon.Close size={11} />
                 </button>
               </div>
             )}
@@ -410,11 +435,12 @@ export default function LiveLoungeRoom({
             />
             <button
               onClick={() => setShowReactions(!showReactions)}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-base hover:bg-slate-100 transition cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer shrink-0"
               style={{ background: "none", border: "none" }}
               title="Reactions"
+              aria-label="Reactions"
             >
-              😊
+              <MonoIcon.Smile size={18} />
             </button>
             <button
               onClick={() => { cmd.chat(chatInput); setChatInput("") }}

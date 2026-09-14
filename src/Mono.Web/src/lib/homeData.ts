@@ -100,7 +100,7 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
       value: hiResRatio,
       sub: `24-Bit / 96k+ · ${hiRes.toLocaleString()}곡`,
       valueColor: "#059669",
-      icon: "📈",
+      icon: "trend-up",
       dot: null,
     },
     {
@@ -108,7 +108,7 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
       value: avgDr,
       sub: drValues.length > 0 ? `${drValues.length.toLocaleString()}곡 측정됨` : "측정된 곡이 없습니다",
       valueColor: "var(--text-primary)",
-      icon: "〰️",
+      icon: "wave",
       dot: null,
     },
     {
@@ -124,7 +124,7 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
       value: topLabel?.[0] ?? "—",
       sub: topLabel ? `${topLabel[1].toLocaleString()}곡 · 이번 주 ${recentPlays}회 재생` : "레이블 정보 없음",
       valueColor: "var(--text-primary)",
-      icon: "🏷️",
+      icon: "tag",
       dot: null,
     },
   ]

@@ -3,6 +3,7 @@ import type { TrackActionTarget } from "../TrackActionMenu"
 import type { PlayerMode } from "../PlayerBar"
 import type { QueueTrack } from "../../data/types"
 import { useLiveSession } from "../../state/useLiveSession"
+import { MonoIcon } from "../icons/MonoIcons"
 
 interface Props {
   selectedAlbum: any
@@ -63,7 +64,8 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
             style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}
           >
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-solo)", display: "inline-block", animation: "pulse 1.5s ease-in-out infinite", flexShrink: 0 }} />
-            ← Return to Live Lounge (ON AIR)
+            <MonoIcon.ArrowLeft size={12} />
+            <span>Return to Live Lounge (ON AIR)</span>
           </button>
         ) : (
           <button
@@ -122,8 +124,9 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
               Play Album
             </button>
             {selectedAlbum?.wikiUrl && (
-              <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="album-detail-wiki-btn">
-                Wikipedia ↗
+              <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="album-detail-wiki-btn inline-flex items-center gap-1.5">
+                <span>Wikipedia</span>
+                <MonoIcon.ExternalLink size={11} />
               </a>
             )}
           </div>
@@ -135,7 +138,10 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
         <div className="flex items-center justify-between mb-3">
           <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Studio Liner Notes</span>
           {selectedAlbum?.wikiUrl && (
-            <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono transition-colors no-underline hover:opacity-80" style={{ color: "var(--text-muted)" }}>Open article ↗</a>
+            <a href={selectedAlbum.wikiUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-mono transition-colors no-underline hover:opacity-80 inline-flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
+              <span>Open article</span>
+              <MonoIcon.ExternalLink size={10} />
+            </a>
           )}
         </div>
         <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{linerNotes}</p>
@@ -171,9 +177,9 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
                   >
                     <td className="px-5 py-3.5 w-12">
                       {isTrackActive(track) ? (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1.5">
                           <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--album-detail-active-accent)" }} />
-                          <span className="text-xs font-mono font-medium" style={{ color: "var(--album-detail-active-accent)" }}>▶</span>
+                          <MonoIcon.PlayMini size={11} color="var(--album-detail-active-accent)" />
                         </span>
                       ) : (
                         <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{tIdx + 1}</span>

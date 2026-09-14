@@ -4,6 +4,7 @@ import { useLiveSession } from "../state/useLiveSession"
 import { libAlbums, libArtists, libComposers, libPlaylists, libTracks, type LibTrack } from "../lib/libraryData"
 import TrackActionMenu, { type TrackActionTarget } from "./TrackActionMenu"
 import type { ShareData } from "./ShareModal"
+import { MonoIcon } from "./icons/MonoIcons"
 
 function getAudioFidelityRank(formatStr: string = ""): number {
   if (!formatStr) return 0
@@ -161,7 +162,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
         }}
       >
         <div className="library-track-num">
-          {hovered ? <span className="library-track-play">▶</span> : idx + 1}
+          {hovered ? <span className="library-track-play flex items-center justify-center"><MonoIcon.PlayMini size={10} /></span> : idx + 1}
         </div>
         {/* Title — clicking navigates to album; row click plays */}
         <div
@@ -480,7 +481,9 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", marginBottom: 2 }}>New Playlist</div>
                     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "#94A3B8" }}>Audiophile Master Curation</div>
                   </div>
-                  <button onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle(""); setNewDesc("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", fontSize: 16, padding: 4 }}>✕</button>
+                  <button onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle(""); setNewDesc("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 4, display: "flex", alignItems: "center" }} aria-label="Close">
+                    <MonoIcon.Close size={16} />
+                  </button>
                 </div>
                 <div style={{ padding: "20px 24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>

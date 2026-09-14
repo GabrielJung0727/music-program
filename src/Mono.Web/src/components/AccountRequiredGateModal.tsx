@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { MonoIcon } from "./icons/MonoIcons"
 
 interface Props {
   isOpen: boolean
@@ -73,11 +74,13 @@ export default function AccountRequiredGateModal({ isOpen, onClose, onConnectSer
               background: "none", border: "none", cursor: "pointer",
               color: "#475569", fontSize: 16, lineHeight: 1,
               padding: "2px 4px", transition: "color 0.15s", flexShrink: 0, marginTop: 2,
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
             onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
             onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#475569")}
+            aria-label="Close"
           >
-            ✕
+            <MonoIcon.Close size={14} />
           </button>
         </div>
 
@@ -91,7 +94,7 @@ export default function AccountRequiredGateModal({ isOpen, onClose, onConnectSer
             borderRadius: 10, padding: "10px 14px",
             display: "flex", alignItems: "center", gap: 10,
           }}>
-            <span style={{ fontSize: 13, flexShrink: 0 }}>🔒</span>
+            <MonoIcon.Lock size={13} color="#A78BFA" className="shrink-0" />
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#A78BFA", lineHeight: 1.5 }}>
               <span style={{ fontWeight: 700 }}>Invite-Only Session</span>
               {" · "}Bit-perfect ASIO streams require a verified Hi-Res subscription to enter.
@@ -121,12 +124,12 @@ export default function AccountRequiredGateModal({ isOpen, onClose, onConnectSer
               {/* Qobuz icon */}
               <div style={{
                 width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+                background: "linear-gradient(135deg, #C9A227 0%, #B8891A 100%)",
                 border: "1px solid rgba(255,255,255,0.1)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 18,
+                fontFamily: "Georgia, serif",
               }}>
-                🎵
+                <span style={{ fontSize: 16, fontWeight: 900, color: "#0B1120", letterSpacing: "-1px" }}>Q</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "#E2E8F0", marginBottom: 3 }}>
@@ -165,11 +168,12 @@ export default function AccountRequiredGateModal({ isOpen, onClose, onConnectSer
               <div style={{
                 width: 40, height: 40, borderRadius: 10, flexShrink: 0,
                 background: "linear-gradient(135deg, #000000 0%, #111111 100%)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                border: "1px solid rgba(0,200,220,0.3)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 18,
               }}>
-                🌊
+                <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
+                  <path d="M9 0 L12 4 L15 0 L18 4 L15 8 L12 4 L9 8 L6 4 L3 8 L0 4 L3 0 L6 4 Z" fill="#00C8DC" opacity="0.9" />
+                </svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "#E2E8F0", marginBottom: 3 }}>

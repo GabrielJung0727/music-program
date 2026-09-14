@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import type { HomeAlbum, InsightCard, LabelTile, LoungeCard as LoungeCardData } from "../../lib/homeData"
+import { MonoIcon } from "../icons/MonoIcons"
 
 // ── Lounge Card ──────────────────────────────────────────────────────────────
 function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoined: boolean; onToggle: (id: string, e: React.MouseEvent) => void }) {
@@ -54,7 +55,15 @@ function LoungeCard({ card, isJoined, onToggle }: { card: LoungeCardData; isJoin
             transition: "all 0.15s ease", fontFamily: "inherit",
           }}
         >
-          {isJoined ? (btnHovered ? "✕ Leave" : "✓ Joined") : "Join Lounge"}
+          {isJoined ? (
+            btnHovered ? (
+              <span className="inline-flex items-center gap-1"><MonoIcon.Close size={11} /><span>Leave</span></span>
+            ) : (
+              <span className="inline-flex items-center gap-1"><MonoIcon.Check size={11} strokeWidth={2.5} /><span>Joined</span></span>
+            )
+          ) : (
+            "Join Lounge"
+          )}
         </button>
       </div>
     </div>
@@ -88,7 +97,8 @@ function SocialLoungesSection({ joinedLoungeId, onToggleJoin, cards, archiveCoun
           onClick={() => setActiveSessionTab("hof")}
           style={{ fontSize: 12, fontWeight: activeSessionTab === "hof" ? 600 : 500, color: activeSessionTab === "hof" ? "var(--home-session-tab-hof-text)" : "var(--text-secondary)", background: activeSessionTab === "hof" ? "var(--home-session-tab-hof-bg)" : "transparent", border: activeSessionTab === "hof" ? "1px solid var(--home-session-tab-hof-border)" : "1px solid transparent", borderRadius: 20, padding: "5px 13px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "none", transition: "all 0.15s", fontFamily: "inherit" }}
         >
-          🏆 Hall of Fame
+          <MonoIcon.Trophy size={13} className="text-amber-400" />
+          <span>Hall of Fame</span>
         </button>
       </div>
 
@@ -308,6 +318,12 @@ function ListeningInsightsSection({ cards }: { cards: InsightCard[] }) {
               <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>{card.title}</span>
               {card.dot ? (
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: card.dot, display: "inline-block", boxShadow: `0 0 0 3px ${card.dot}22` }} />
+              ) : card.icon === "trend-up" ? (
+                <MonoIcon.TrendUp size={16} color="#059669" />
+              ) : card.icon === "wave" ? (
+                <MonoIcon.Wave size={16} color="var(--text-secondary)" />
+              ) : card.icon === "tag" ? (
+                <MonoIcon.Tag size={16} color="var(--text-secondary)" />
               ) : (
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{card.icon}</span>
               )}

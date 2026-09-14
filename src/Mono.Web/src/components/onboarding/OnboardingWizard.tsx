@@ -4,6 +4,7 @@ import StreamingAuthModal from "./StreamingAuthModal";
 import { type ListenerProfile } from "./Step3AudiophileRig";
 import { api } from "../../lib/rest";
 import { outputStatus, startOutput } from "../../lib/shell";
+import { MonoIcon } from "../icons/MonoIcons";
 import { type AudioEngineConfig } from "./Step1AudioEngine";
 import { useMono } from "../../state/MonoProvider";
 import { StreamingProvider } from "../../lib/protocol";
@@ -319,10 +320,10 @@ function Step1({
                 CALCULATED LATENCY
               </span>
               <span
-                className="text-[10px] font-semibold"
+                className="text-[10px] font-semibold flex items-center gap-1"
                 style={{ ...mono(), color: stable ? "var(--gauge-text-stable)" : "#f59e0b" }}
               >
-                {stable ? "● Stable" : "⚠ Aggressive"}
+                {stable ? "● Stable" : <><MonoIcon.AlertTriangle size={11} /><span>Aggressive</span></>}
               </span>
             </div>
             <div className="latency-gauge-track">

@@ -18,6 +18,7 @@ import MyLibraryPage from "./components/MyLibraryPage"
 import ExplorePage from "./components/ExplorePage"
 import TopNav, { type CurrentTab } from "./components/TopNav"
 import PlayerBar, { type PlayerMode } from "./components/PlayerBar"
+import { MonoIcon } from "./components/icons/MonoIcons"
 import {
   type Profile,
   type SearchTrack,
@@ -656,10 +657,11 @@ export default function App() {
               </div>
               <button
                 onClick={() => { setSearchQuery(""); setIsSearchActive(false) }}
-                className="text-xs font-mono text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 px-3.5 py-1.5 rounded-full cursor-pointer transition"
+                className="text-xs font-mono text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 px-3.5 py-1.5 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
                 style={{ background: "none" }}
               >
-                ✕ Clear & Close
+                <MonoIcon.Close size={12} />
+                <span>Clear &amp; Close</span>
               </button>
             </div>
 
@@ -719,7 +721,7 @@ export default function App() {
                             {track.isCurrent ? (
                               <span className="flex items-center gap-1 text-blue-600">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse inline-block" />
-                                <span className="text-xs font-mono font-bold">▶</span>
+                                <MonoIcon.PlayMini size={10} color="#2563eb" />
                               </span>
                             ) : (
                               <span className="text-xs font-mono text-slate-400">{String(i + 1).padStart(2, "0")}</span>
@@ -1117,7 +1119,7 @@ export default function App() {
             animation: "gate-fade-in 0.2s ease",
           }}
         >
-          <span style={{ fontSize: 14 }}>✓</span>
+          <MonoIcon.Check size={14} color="#10B981" />
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#E2E8F0", whiteSpace: "nowrap" }}>
             {toastMessage}
           </span>
