@@ -189,6 +189,7 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 file sealed class MfStreamingLocalRenderer : ILocalChunkSource
 {
     private readonly WaveStream _reader;
+    private readonly ISampleProvider _samples;
     private readonly object _gate = new();
     private readonly int _rate;
     private readonly int _channels;
@@ -197,6 +198,7 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
     private MfStreamingLocalRenderer(WaveStream reader)
     {
         _reader = reader;
+        _samples = reader is AudioFileReader afr ? afr : reader.ToSampleProvider();
         _rate = reader.WaveFormat.SampleRate;
         _channels = Math.Max(reader.WaveFormat.Channels, 1);
     }
@@ -226,19 +228,12 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
             var frames = Math.Max(1, durationMs * _rate / 1000);
             var samplesNeeded = frames * _channels;
             var floatBuf = new float[samplesNeeded];
-            var n = ReadFloatSamples(floatBuf, samplesNeeded);
+            var n = _samples.Read(floatBuf, 0, samplesNeeded);
             _cursorMs = target + durationMs;
             if (n <= 0) return [];
             if (n < samplesNeeded) Array.Resize(ref floatBuf, n);
             return FloatToPcm24(floatBuf);
         }
-    }
-
-    private int ReadFloatSamples(float[] floatBuf, int samplesNeeded)
-    {
-        if (_reader is AudioFileReader afr)
-            return afr.Read(floatBuf, 0, samplesNeeded);
-        return _reader.ToSampleProvider().Read(floatBuf, 0, samplesNeeded);
     }
 
     private static byte[] FloatToPcm24(float[] samples)

@@ -38,7 +38,7 @@
           <Button Classes="ghost" Content="Qobuz 연동" Command="{Binding LinkQobuzCommand}"/>
         </StackPanel>
         <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
-                   Text="토큰은 Core 만 보관합니다. 파트너 키가 없으면 데모 카탈로그로 연결됩니다."/>
+                   Text="토큰은 Core 만 보관합니다. Tidal은 앱에 포함된 QA Client ID로 실 로그인을 시도합니다. Qobuz는 MONO_QOBUZ_APP_ID 가 있을 때만 실연동됩니다."/>
       </StackPanel>
 
       <StackPanel Spacing="6">

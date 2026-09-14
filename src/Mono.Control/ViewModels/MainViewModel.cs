@@ -332,7 +332,15 @@ public partial class MainViewModel : ObservableObject
         };
         PageSubtitle = value.Section;
         if (value.Id != "genres") _genreFilter = null;
-        ApplyFilter();
+        try
+        {
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            Program.LogDiagnostic("nav-filter", ex);
+            StatusText = "화면 전환 중 오류 — " + ex.GetType().Name;
+        }
         if (value.Id is "lounge") _ = Safe(() => _session.ListRoomsAsync());
         if (value.Id is "history") _ = Safe(() => _session.HistoryAsync());
         if (value.Id is "folders") _ = Safe(() => _session.FoldersAsync());
@@ -673,12 +681,35 @@ public partial class MainViewModel : ObservableObject
 
     private void RebuildHomeRails()
     {
-        HomeRails.Clear();
-        if (Tracks.Count == 0) return;
-        HomeRails.Add(new HomeRail("Recently added", Tracks.Take(12)));
-        HomeRails.Add(new HomeRail("Albums", Tracks.GroupBy(t => t.AlbumId ?? t.Album).Select(g => g.First()).Take(12)));
-        HomeRails.Add(new HomeRail("Hi-Res & DSD", Tracks.Where(t => t.IsDsd || t.SampleRate >= 96000).Take(12)));
-        HomeRails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
+        // Clear+Add 를 바인딩 중에 하면 Avalonia/Skia 가 네이티브로 죽는 경우가 있다.
+        // 새 목록을 만든 뒤 한 번에 교체하고, 홈이 보일 때는 레이아웃 뒤로 미룬다.
+        void Apply()
+        {
+            try
+            {
+                var rails = new List<HomeRail>();
+                if (Tracks.Count > 0)
+                {
+                    rails.Add(new HomeRail("Recently added", Tracks.Take(12)));
+                    rails.Add(new HomeRail("Albums", Tracks.GroupBy(t => t.AlbumId ?? t.Album ?? t.Id).Select(g => g.First()).Take(12)));
+                    rails.Add(new HomeRail("Hi-Res & DSD", Tracks.Where(t => t.IsDsd || t.SampleRate >= 96000).Take(12)));
+                    rails.Add(new HomeRail("Streaming", Tracks.Where(t => t.Source is 1 or 2).Take(12)));
+                }
+
+                HomeRails.Clear();
+                foreach (var rail in rails)
+                    HomeRails.Add(rail);
+            }
+            catch (Exception ex)
+            {
+                Program.LogDiagnostic("home-rails", ex);
+            }
+        }
+
+        if (IsHomePage)
+            Dispatcher.UIThread.Post(Apply, DispatcherPriority.Background);
+        else
+            Apply();
     }
 
     /// <summary>슬라이더를 놓을 때만 보낸다 — 드래그 중 매 픽셀마다 명령을 쏘지 않는다.</summary>

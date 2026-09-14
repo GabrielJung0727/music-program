@@ -43,10 +43,15 @@ public partial class MainViewModel
                     Lounge.ChatLines.Add($"{msg.DisplayName ?? msg.PeerId}: {msg.Text}");
                 break;
             case MessageTypes.LinkStreaming:
+                if (!string.IsNullOrWhiteSpace(msg.Error))
+                {
+                    StatusText = msg.Error!;
+                    break;
+                }
                 StatusText = (msg.Ok ?? false) ? "스트리밍 연동 응답" : (msg.Error ?? "스트리밍");
                 if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"already\":true", StringComparison.OrdinalIgnoreCase))
                     StatusText = "Tidal이 이미 연동되어 있습니다.";
-                else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("\"demo\":true", StringComparison.OrdinalIgnoreCase))
+                else if (IsDemoLinkBody(msg.Body))
                     StatusText = "파트너 키 없음 — 데모 토큰으로 연동했습니다.";
                 else if (!string.IsNullOrWhiteSpace(msg.Body) && msg.Body.Contains("authUrl", StringComparison.OrdinalIgnoreCase)
                          && msg.Body.Contains("\"connected\":false", StringComparison.OrdinalIgnoreCase))
@@ -352,6 +357,22 @@ public partial class MainViewModel
         Lounge.ApplySnapshot(snap);
         Audio.ApplyOutputs(Outputs);
         Audio.ApplySnapshot(snap);
+    }
+
+    /// <summary>본문에 demo:true 가 실제로 켜져 있는지. "demo":false 문자열에 속지 않는다.</summary>
+    private static bool IsDemoLinkBody(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body) || body[0] is not '{' and not '[') return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("demo", out var demo)
+                && demo.ValueKind is JsonValueKind.True)
+                return true;
+        }
+        catch { /* ignore */ }
+        return false;
     }
 
 }

@@ -166,7 +166,7 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 _buffer = new BufferedWaveProvider(
                     WaveFormat.CreateIeeeFloatWaveFormat(config.SampleRate, config.Channels))
                 {
-                    DiscardOnBufferOverflow = true,
+                    DiscardOnBufferOverflow = false,
                     BufferDuration = TimeSpan.FromMilliseconds(CapacityMs)
                 };
 
@@ -233,7 +233,14 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
             if (aligned.Length == 0) return true;
 
             var floats = ToFloatBytes(aligned, bits);
-            _buffer!.AddSamples(floats, 0, floats.Length);
+            try
+            {
+                _buffer!.AddSamples(floats, 0, floats.Length);
+            }
+            catch (InvalidOperationException)
+            {
+                return true;
+            }
 
             // 빈 버퍼로 시작하면 첫 순간부터 언더런이다. 목표 깊이를 채운 뒤에 연다.
             if (_asio is not null

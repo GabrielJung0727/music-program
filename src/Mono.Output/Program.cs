@@ -290,18 +290,25 @@ void RenderLoop(CancellationToken ct)
             if (timeline.ClockSyncMode)
             {
                 // Clock-sync: Core는 파일을 보내지 않는다. 같은 트랙을 내 소스로 열어 같은 시각에 재생한다.
+                renderer.PrimeMs = clock.TargetBufferMs;
                 if (timeline.Playing && timeline.LocalPath is not null)
                 {
                     local ??= LocalFileRenderer.TryOpen(timeline.LocalPath);
                     if (local is not null)
                     {
-                        var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
-                        var chunk = local.Read(mediaNow, 40, out var fmt);
-                        if (chunk.Length > 0)
+                        // 40ms를 20ms마다 밀어 넣으면 버퍼가 계속 불어 DiscardOnOverflow 로 지직거린다.
+                        var ceiling = Math.Max(clock.TargetBufferMs + 60, 100);
+                        if (!renderer.Playing || renderer.BufferedMs < ceiling)
                         {
-                            renderer.PushSamples(
-                                new AudioBuffer(chunk, 0, chunk.Length, fmt.rate, fmt.depth, fmt.channels, false),
-                                volumePercent);
+                            var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
+                            var wantMs = Math.Clamp((int)Math.Ceiling(ceiling - renderer.BufferedMs), 10, 30);
+                            var chunk = local.Read(mediaNow, wantMs, out var fmt);
+                            if (chunk.Length > 0)
+                            {
+                                renderer.PushSamples(
+                                    new AudioBuffer(chunk, 0, chunk.Length, fmt.rate, fmt.depth, fmt.channels, false),
+                                    volumePercent);
+                            }
                         }
                     }
                     else if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(10))
@@ -311,7 +318,7 @@ void RenderLoop(CancellationToken ct)
                     }
                 }
 
-                Thread.Sleep(20);
+                Thread.Sleep(15);
                 continue;
             }
 

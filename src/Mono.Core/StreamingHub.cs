@@ -35,7 +35,8 @@ public sealed class StreamingHub
 
     public bool HasLiveCredentials(StreamingProvider provider) => provider switch
     {
-        StreamingProvider.Tidal => !TidalClient.DemoForced && !string.IsNullOrWhiteSpace(TidalClient.ClientId),
+        // Tidal QA Client ID는 바이너리에 포함. 데모는 MONO_TIDAL_DEMO=1 일 때만.
+        StreamingProvider.Tidal => !TidalClient.DemoForced,
         StreamingProvider.Qobuz => !string.IsNullOrWhiteSpace(Env("MONO_QOBUZ_APP_ID")),
         StreamingProvider.Local => false,
         _ => throw Unexpected(provider)

@@ -8,7 +8,11 @@ using Mono.Shared;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702");
 
-var data = Path.Combine(AppContext.BaseDirectory, "data");
+// Velopack 이 current/ 를 갈아엎어도 토큰·카탈로그가 남도록 AppData 에 둔다.
+var data = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "Mono", "data");
+MigrateLegacyData(Path.Combine(AppContext.BaseDirectory, "data"), data);
 var library = builder.Configuration["Mono:LibraryRoot"] ?? Path.Combine(data, "library");
 // Mono:LibraryRoots 배열이 우선. 없으면 기존 단수 Mono:LibraryRoot 를 그대로 쓴다.
 var configuredRoots = builder.Configuration.GetSection("Mono:LibraryRoots").Get<string[]>() ?? [];
@@ -204,6 +208,29 @@ app.MapGet("/api/session/{archiveId}", (string archiveId, HistoryStore history, 
 });
 
 app.Run();
+
+static void MigrateLegacyData(string legacy, string dest)
+{
+    try
+    {
+        if (!Directory.Exists(legacy) || string.Equals(
+                Path.GetFullPath(legacy), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
+            return;
+        Directory.CreateDirectory(dest);
+        foreach (var file in Directory.EnumerateFiles(legacy, "*", SearchOption.AllDirectories))
+        {
+            var rel = Path.GetRelativePath(legacy, file);
+            var target = Path.Combine(dest, rel);
+            if (File.Exists(target)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+    }
+    catch
+    {
+        // 마이그레이션 실패해도 새 경로로 계속한다.
+    }
+}
 
 static string OAuthPage(string title, string? detail)
 {

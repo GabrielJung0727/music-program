@@ -177,7 +177,8 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             _aligner.Reset();
             _buffer = new BufferedWaveProvider(BuildFormat(config.SampleRate, config.BitDepth, config.Channels))
             {
-                DiscardOnBufferOverflow = true,
+                // overflow 시 샘플을 버리면 파형 불연속(지직)이 난다. 상위에서 백프레셔로 막는다.
+                DiscardOnBufferOverflow = false,
                 BufferDuration = TimeSpan.FromMilliseconds(CapacityMs)
             };
 
@@ -292,7 +293,15 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             var aligned = _aligner.Take(payload, _buffer!.WaveFormat.BlockAlign);
             if (aligned.Length == 0) return true;
 
-            _buffer.AddSamples(aligned, 0, aligned.Length);
+            try
+            {
+                _buffer.AddSamples(aligned, 0, aligned.Length);
+            }
+            catch (InvalidOperationException)
+            {
+                // 버퍼가 가득 참 — 이번 청크는 건너뛰고 다음 루프에서 다시 맞춘다.
+                return true;
+            }
 
             // 빈 버퍼로 재생을 시작하면 첫 순간부터 언더런이다. 목표 깊이를 채운 뒤에 연다.
             if (_out is not null

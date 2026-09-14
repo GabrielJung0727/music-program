@@ -218,6 +218,9 @@ public sealed class ProcessSupervisor
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        // Control이 오래된 환경으로 떠 있어도 User 범위 MONO_* 는 Core/Output에 다시 실어 준다.
+        InjectUserEnv(psi, "MONO_TIDAL_CLIENT_ID", "MONO_TIDAL_CLIENT_SECRET", "MONO_OAUTH_REDIRECT",
+            "MONO_QOBUZ_APP_ID", "MONO_QOBUZ_APP_SECRET", "MONO_TIDAL_DEMO");
         var p = Process.Start(psi) ?? throw new InvalidOperationException("프로세스 기동 실패: " + exePath);
 
         // 파이프를 반드시 비워 준다. 읽지 않으면 4KB 버퍼가 차는 순간 자식이 Console.WriteLine 에서 멈춘다.
@@ -228,6 +231,18 @@ public sealed class ProcessSupervisor
         p.BeginErrorReadLine();
         AppLog.Write("control", $"started {tag} {args}".TrimEnd());
         return p;
+    }
+
+    private static void InjectUserEnv(ProcessStartInfo psi, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var value = Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.User)
+                        ?? Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.Machine)
+                        ?? Environment.GetEnvironmentVariable(key);
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            psi.Environment[key] = value.Trim();
+        }
     }
 
     private string? FindExe(string fileName, string folderName)
