@@ -20,6 +20,11 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
+    <!-- 사용자 데이터 위치는 UserPaths 한 곳에서만 정한다. 설치 프로그램이 제 나름의
+         경로를 또 들면 앱이 읽는 자리와 어긋난다. -->
+    <ProjectReference Include="..Mono.SharedMono.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="mono-app.ico" />
     <EmbeddedResource Include="Assets\logo.png" LogicalName="logo.png" Condition="Exists('Assets\logo.png')" />
     <EmbeddedResource Include="Assets\backgrounds\*.jpg" LogicalName="%(Filename)%(Extension)" />

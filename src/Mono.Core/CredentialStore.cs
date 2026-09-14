@@ -1,3 +1,5 @@
+using Mono.Shared;
+
 namespace Mono.Core;
 
 /// <summary>
@@ -62,7 +64,5 @@ internal static class CredentialStore
         }
     }
 
-    private static string Path() => System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Mono", "credentials.env");
+    private static string Path() => UserPaths.Resolve("credentials.env");
 }

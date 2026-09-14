@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Mono.Shared;
 
 namespace Mono.Control;
 
@@ -110,9 +111,8 @@ public sealed class ShellForm : Form
 
     private async Task InitWebViewAsync()
     {
-        // 사용자 데이터는 AppData 로. Program Files 밑에 쓰려다 권한으로 죽는 일을 막는다.
-        var userData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono", "webview");
+        // 설치 루트 밖이다. 안에 두면 재설치가 localStorage 까지 지운다.
+        var userData = UserPaths.Resolve("webview");
         Directory.CreateDirectory(userData);
 
         CoreWebView2Environment env;

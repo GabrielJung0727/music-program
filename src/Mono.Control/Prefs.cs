@@ -1,10 +1,11 @@
+using Mono.Shared;
+
 namespace Mono.Control;
 
 public static class Prefs
 {
-    private static string Dir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mono");
-    private static string FilePath => Path.Combine(Dir, "prefs.ini");
+    private static string Dir => UserPaths.Root;
+    private static string FilePath => UserPaths.Resolve("prefs.ini");
 
     private static Dictionary<string, string> Load()
     {

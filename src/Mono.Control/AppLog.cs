@@ -1,3 +1,5 @@
+using Mono.Shared;
+
 namespace Mono.Control;
 
 /// <summary>
@@ -13,9 +15,7 @@ public static class AppLog
     private const long MaxBytes = 5 * 1024 * 1024;
     private static readonly object Gate = new();
 
-    public static string FilePath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Mono", "mono.log");
+    public static string FilePath { get; } = UserPaths.Resolve("mono.log");
 
     public static void Write(string source, string? line)
     {

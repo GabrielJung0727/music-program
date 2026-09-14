@@ -41,9 +41,7 @@ internal static class Program
         catch { /* 로그조차 못 쓰면 할 수 있는 게 없다 */ }
     }
 
-    private static string CrashLogPath() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Mono", "crash.log");
+    private static string CrashLogPath() => UserPaths.Resolve("crash.log");
 
     /// <summary>
     /// 처리되지 않은 예외를 파일로 남긴다. 없으면 창이 아무 말 없이 사라져
@@ -61,9 +59,7 @@ internal static class Program
 
     private static async Task RunUpdateCli(string[] args)
     {
-        var logPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Mono", "update-check.log");
+        var logPath = UserPaths.Resolve("update-check.log");
         Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
         void Log(string line)
             => File.AppendAllText(logPath, DateTimeOffset.Now.ToString("o") + " " + line + Environment.NewLine);

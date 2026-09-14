@@ -10,10 +10,8 @@ using Mono.Shared;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(builder.Configuration["Mono:ControlUrl"] ?? "http://127.0.0.1:7702");
 
-// Velopack 이 current/ 를 갈아엎어도 토큰·카탈로그가 남도록 AppData 에 둔다.
-var data = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-    "Mono", "data");
+// 설치 루트 밖이다. 그 안에 두면 재설치 한 번에 카탈로그와 토큰이 사라진다.
+var data = UserPaths.Resolve("data");
 MigrateLegacyData(Path.Combine(AppContext.BaseDirectory, "data"), data);
 var library = builder.Configuration["Mono:LibraryRoot"] ?? Path.Combine(data, "library");
 // Mono:LibraryRoots 배열이 우선. 없으면 기존 단수 Mono:LibraryRoot 를 그대로 쓴다.

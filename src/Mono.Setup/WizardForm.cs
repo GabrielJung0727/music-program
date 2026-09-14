@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Reflection;
+using Mono.Shared;
 
 namespace Mono.Setup;
 
@@ -280,8 +281,12 @@ internal sealed class WizardForm : Form
     /// <summary>
     /// 설치 루트 안에서 Velopack 것이 아닌 항목. current·packages·Update.exe 는 설치가
     /// 다시 만들지만, 이것들은 사용자가 쌓은 것이라 지워지면 되돌릴 방법이 없다.
+    ///
+    /// 0.4.2 부터 앱은 이것들을 설치 루트 밖(MonoData)에 두므로 보통은 빼낼 것이 없다.
+    /// 그 전 판에서 올라오는 사람은 아직 옛 자리에 있고, 새 앱이 한 번이라도 떠서
+    /// 옮기기 전에 설치가 먼저 지나간다 — 그래서 이 방어는 남겨 둔다.
     /// </summary>
-    private static readonly string[] PreservedEntries = ["data", "prefs.ini"];
+    private static IReadOnlyList<string> PreservedEntries => UserPaths.UserOwnedEntries;
 
     /// <summary>
     /// 설치 전에 사용자 데이터를 루트 밖으로 옮긴다. 같은 볼륨에 두어야 이동이
@@ -374,10 +379,16 @@ internal sealed class WizardForm : Form
         FooterCenter(retry);
     }
 
+    /// <summary>
+    /// prefs.ini 는 앱이 읽는 자리에 써야 한다 — 설치 루트가 아니라 UserPaths.Root 다.
+    /// 설치 위치는 사용자가 바꿀 수 있지만 사용자 데이터 위치는 고정이고, 어디에
+    /// 깔았는지는 install_root 값으로 남는다.
+    /// </summary>
     private void WritePrefs()
     {
         Directory.CreateDirectory(_installRoot);
-        var prefs = Path.Combine(_installRoot, "prefs.ini");
+        var prefs = UserPaths.Resolve("prefs.ini");
+        Directory.CreateDirectory(Path.GetDirectoryName(prefs)!);
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (File.Exists(prefs))
         {
@@ -404,7 +415,8 @@ internal sealed class WizardForm : Form
                         ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN")
                         ?? Environment.GetEnvironmentVariable("GH_TOKEN");
             if (string.IsNullOrWhiteSpace(token)) return;
-            var prefs = Path.Combine(_installRoot, "prefs.ini");
+            var prefs = UserPaths.Resolve("prefs.ini");
+            Directory.CreateDirectory(Path.GetDirectoryName(prefs)!);
             var lines = File.Exists(prefs) ? File.ReadAllLines(prefs).ToList() : [];
             lines.RemoveAll(l => l.StartsWith("github_token=", StringComparison.OrdinalIgnoreCase));
             lines.Add("github_token=" + token.Trim());
