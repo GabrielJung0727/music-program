@@ -1,11 +1,14 @@
 ## mono – Self-Contained + Velopack 릴리스
 ## 대상: Windows 11 x64
 ##
-##   .\publish.ps1 -Version 0.4.3
-##   .\publish.ps1 -Version 0.4.3 -SkipZip -GitHubRelease
+##   .\publish.ps1 -Version 0.5.2
+##   .\publish.ps1 -Version 0.5.2 -SkipZip -GitHubRelease
 
 param(
-    [string]$Version = "0.4.3",
+    ## 비워 두면 Directory.Build.props 에서 읽는다. 여기에 숫자를 또 박아 두면 그쪽이 낡아도
+    ## 릴리스는 멀쩡히 나가므로 아무도 눈치채지 못한다 — 실제로 props 가 0.4.3 에 멈춰 있는 동안
+    ## 0.5.0 과 0.5.1 이 나갔다. 숫자는 props 한 곳에만 둔다.
+    [string]$Version = "",
     [switch]$GitHubRelease,
     [switch]$SkipZip,
     ## CI용. 자체 서명 인증서를 만들지 않는다 — 릴리스마다 다른, 신뢰받지 못하는 인증서가
@@ -17,6 +20,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $Version) {
+    $propsPath = "$PSScriptRoot\Directory.Build.props"
+    $Version = ([xml](Get-Content $propsPath)).Project.PropertyGroup.Version
+    if (-not $Version) { throw "Directory.Build.props 에서 <Version> 을 읽지 못했습니다." }
+    $Version = $Version.Trim()
+}
+
 $outDir = "$PSScriptRoot\publish\mono-win-x64"
 $releasesDir = "$PSScriptRoot\publish\releases"
 $iconPath = "$PSScriptRoot\src\Mono.Control\Assets\icons\app\mono-app.ico"
@@ -94,6 +105,30 @@ function Get-MonoCodeCert {
         Write-Host "Root 인증서 등록은 나중에 수동으로 가능합니다." -ForegroundColor Yellow
     }
     return $existing
+}
+
+function Get-ReleaseNotes([string]$Version) {
+    # CHANGELOG.md 의 "## <버전>" 절을 다음 "## " 가 나올 때까지 그대로 꺼낸다.
+    # 절이 없으면 릴리스를 막지는 않되, 무엇이 바뀌었는지 모르는 채 나간다는 걸 남긴다.
+    $path = "$PSScriptRoot\CHANGELOG.md"
+    if (Test-Path $path) {
+        $lines = Get-Content $path -Encoding UTF8
+        $start = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i].Trim() -eq "## $Version") { $start = $i + 1; break }
+        }
+        if ($start -ge 0) {
+            $body = @()
+            for ($i = $start; $i -lt $lines.Count; $i++) {
+                if ($lines[$i] -match '^## ') { break }
+                $body += $lines[$i]
+            }
+            $text = ($body -join "`n").Trim()
+            if ($text) { return $text }
+        }
+    }
+    Write-Host "CHANGELOG.md 에 '## $Version' 절이 없습니다 — 기본 문구로 나갑니다." -ForegroundColor Yellow
+    return "mono $Version — Setup.exe로 설치한 클라이언트용 업데이트 피드."
 }
 
 function Save-GithubTokenToPrefs {
@@ -217,7 +252,7 @@ $vpkArgs = @(
     '--outputDir', $releasesDir,
     '--icon', $iconPath,
     '--splashImage', $splashPath,
-    '--splashProgressColor', '#6D6DF6',
+    '--splashProgressColor', '#7C3AED',
     '--instWelcome', "$PSScriptRoot\tools\installer\welcome.txt",
     '--instConclusion', "$PSScriptRoot\tools\installer\conclusion.txt",
     '--shortcuts', 'StartMenuRoot'
@@ -246,6 +281,7 @@ if (-not $NoTokenSave) { Save-GithubTokenToPrefs }
 
 if ($GitHubRelease) {
     Write-Host ">>> GitHub Release v$Version" -ForegroundColor Cyan
+    $notes = Get-ReleaseNotes $Version
     $assets = Get-ChildItem $releasesDir -File |
         Where-Object { $_.Name -notmatch 'Portable' } |
         ForEach-Object { $_.FullName }
@@ -257,7 +293,13 @@ if ($GitHubRelease) {
     if ($exists) {
         gh release delete "v$Version" --yes
     }
-    gh release create "v$Version" @assets --title "mono $Version" --notes "mono $Version — Setup.exe로 설치한 클라이언트용 업데이트 피드."
+    $notesFile = Join-Path $env:TEMP "mono-release-notes-$Version.md"
+    Set-Content -Path $notesFile -Value $notes -Encoding UTF8
+    try {
+        gh release create "v$Version" @assets --title "mono $Version" --notes-file $notesFile
+    } finally {
+        Remove-Item $notesFile -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "`n=== 완료 ===" -ForegroundColor Green
