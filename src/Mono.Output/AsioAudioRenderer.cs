@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Mono.Shared;
 using NAudio.Wave;
 
 namespace Mono.Output;
@@ -213,7 +214,7 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 return false;
             }
 
-            var bits = buffer.BitDepth >= 24 ? 24 : 16;
+            var bits = PcmSamples.DeviceDepth(buffer.BitDepth);
             var channels = Math.Max(buffer.Channels, 1);
             if (_buffer is null || !SameFormat(buffer.SampleRate, bits, channels))
             {
@@ -223,6 +224,15 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
             }
 
             var payload = new ReadOnlySpan<byte>(buffer.Data, buffer.Offset, buffer.Count).ToArray();
+
+            // WASAPI 쪽과 같은 방어선 — 뎁스만 접히고 바이트는 안 접힌 페이로드를 그대로 쓰면
+            // 이후 정렬이 통째로 밀려 전 구간이 잡음이 된다.
+            if (buffer.BitDepth != bits && !buffer.IsDsd)
+            {
+                Console.WriteLine($"push: {buffer.BitDepth}bit 페이로드를 {bits}bit 로 변환합니다 — 상위 디코더가 뎁스를 접지 않았습니다.");
+                payload = PcmSamples.ToDeviceDepth(payload, buffer.BitDepth, PcmEncoding.Integer, out _);
+            }
+
             if (volumePercent < 100)
             {
                 payload = Attenuate(payload, bits, volumePercent);

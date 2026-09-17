@@ -53,46 +53,26 @@ public static class AudioSourceFactory
 public sealed class WavSlicer : ITrackSlicer
 {
     private readonly FileStream _fs;
-    private readonly long _dataPos;
-    private readonly long _dataSize;
+    private readonly WavHeader _header;
+    private readonly PcmFrameCursor _cursor;
 
     public WavSlicer(string path)
     {
         _fs = File.OpenRead(path);
-        using var br = new BinaryReader(_fs, System.Text.Encoding.ASCII, leaveOpen: true);
-        br.ReadBytes(12);
-        var rate = 44100;
-        var depth = 16;
-        var channels = 2;
-        while (_fs.Position < _fs.Length - 8)
+        var header = WavHeader.Parse(_fs);
+        if (header is null)
         {
-            var id = new string(br.ReadChars(4));
-            var size = br.ReadUInt32();
-            if (id == "fmt ")
-            {
-                br.ReadInt16();
-                channels = br.ReadInt16();
-                rate = br.ReadInt32();
-                br.ReadInt32();
-                br.ReadInt16();
-                depth = br.ReadInt16();
-                if (size > 16)
-                    br.ReadBytes((int)size - 16);
-            }
-            else if (id == "data")
-            {
-                _dataPos = _fs.Position;
-                _dataSize = Math.Min(size, _fs.Length - _dataPos);
-                break;
-            }
-            else
-            {
-                _fs.Position += size;
-            }
+            _fs.Dispose();
+            throw new InvalidDataException("WAV 헤더를 읽지 못했습니다: " + path);
         }
 
-        Format = new AudioFormat(rate, depth, Math.Max(channels, 1), false);
-        DurationMs = Format.BytesPerFrame == 0 ? 0 : _dataSize * 1000 / (Format.BytesPerFrame * (long)rate);
+        _header = header;
+        _cursor = new PcmFrameCursor(header.SampleRate, header.DataSize / header.SourceBytesPerFrame);
+
+        // 뎁스는 장치가 실제로 여는 16/24 로 접어서 알린다. 파일이 8·32bit 라고 해서 그 숫자를
+        // 그대로 흘려보내면 바이트 수와 뎁스가 어긋나 아래층 전체가 잡음이 된다.
+        Format = new AudioFormat(header.SampleRate, header.DeviceBits, header.Channels, false);
+        DurationMs = header.DurationMs;
     }
 
     public AudioFormat Format { get; }
@@ -100,26 +80,28 @@ public sealed class WavSlicer : ITrackSlicer
 
     public byte[] Read(long startMs, int durationMs)
     {
-        var bpf = Format.BytesPerFrame;
-        if (bpf == 0 || _dataSize <= 0)
+        var bpf = _header.SourceBytesPerFrame;
+        if (bpf == 0 || _header.DataSize <= 0 || durationMs <= 0)
             return [];
 
-        var startByte = Math.Clamp(startMs * Format.SampleRate / 1000 * bpf, 0, _dataSize);
-        var want = (int)Math.Min((long)durationMs * Format.SampleRate / 1000 * bpf, _dataSize - startByte);
-        if (want <= 0)
+        var (startFrame, frames) = _cursor.Advance(startMs, durationMs);
+        if (frames <= 0)
             return [];
 
-        var buffer = new byte[want];
-        _fs.Position = _dataPos + startByte;
+        var buffer = new byte[frames * bpf];
+        _fs.Position = _header.DataPosition + startFrame * bpf;
         var read = 0;
-        while (read < want)
+        while (read < buffer.Length)
         {
-            var n = _fs.Read(buffer, read, want - read);
+            var n = _fs.Read(buffer, read, buffer.Length - read);
             if (n <= 0) break;
             read += n;
         }
 
-        return read == want ? buffer : buffer[..read];
+        if (read <= 0) return [];
+        if (read < buffer.Length) buffer = buffer[..(read / bpf * bpf)];
+
+        return PcmSamples.ToDeviceDepth(buffer, _header.SourceBits, _header.Encoding, out _);
     }
 
     public void Dispose() => _fs.Dispose();

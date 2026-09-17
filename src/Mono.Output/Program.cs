@@ -25,8 +25,10 @@ var invite = Arg("--invite=");
 var deviceHint = Arg("--device=");
 var peerId = Arg("--peer=") ?? "out-" + Guid.NewGuid().ToString("n")[..6];
 var displayName = Arg("--name=") ?? Environment.MachineName;
-// 장치는 등록 시 한 모드로 고정된다. 묵시적 강등은 없다.
+// 장치는 등록 시 한 모드로 고정된다. 배타가 거절되면 공유로 내려가되 조용히 내려가지 않는다 —
+// Exclusive 플래그가 내려가고 사유가 stats 로 올라간다. --strict-exclusive 는 강등 자체를 막는다.
 var deviceMode = args.Contains("--shared") ? DeviceMode.SystemShared : DeviceMode.BitPerfectExclusive;
+var allowSharedFallback = !args.Contains("--strict-exclusive");
 var claimDsd = args.Contains("--dsd");
 var preferAsio = args.Contains("--asio");
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
@@ -47,7 +49,7 @@ if (preferAsio)
     {
         // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 사유까지 남긴다.
         Console.WriteLine($"ASIO 를 열지 못했습니다 ({asioError}) — WASAPI 로 진행합니다.");
-        renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+        renderer = new WasapiOutputDevice(deviceHint, deviceMode, allowSharedFallback);
     }
     else
     {
@@ -56,7 +58,7 @@ if (preferAsio)
 }
 else
 {
-    renderer = new WasapiOutputDevice(deviceHint, deviceMode);
+    renderer = new WasapiOutputDevice(deviceHint, deviceMode, allowSharedFallback);
 }
 var caps = renderer.GetSupportedFormats();
 var timeline = new Timeline();
@@ -71,6 +73,7 @@ var lastLog = DateTimeOffset.MinValue;
 Console.WriteLine($"Mono Output {peerId} → {host}:{matpPort}  device={renderer.DeviceName}");
 Console.WriteLine(renderer.HardwareVolume ? "하드웨어 볼륨 사용 가능 (bit-perfect 유지)" : "하드웨어 볼륨 없음 — 룸이 허용할 때만 디지털 감쇠");
 Console.WriteLine($"mode={deviceMode} exclusiveCapable={caps.SupportsExclusive} " +
+                  $"fallback={(allowSharedFallback && deviceMode == DeviceMode.BitPerfectExclusive ? "공유 허용" : "없음")} " +
                   $"rates=[{string.Join(",", caps.SampleRates)}] depths=[{string.Join(",", caps.BitDepths)}]");
 
 using var client = new TcpClient { NoDelay = true };
