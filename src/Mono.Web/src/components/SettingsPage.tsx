@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
-import { pickFolder, startOutput, restartOutput, outputStatus, hasShell } from "../lib/shell"
+import { pickFolder, listAudioDevices, restartOutput, outputStatus, hasShell, type AudioDeviceListing } from "../lib/shell"
+import { loadSetup, saveSetup, startConfiguredOutput, type AudioSetup } from "../lib/setup"
 import StreamingLoginModal from "./StreamingLoginModal"
 import GeneralSystemSettings from "./settings/GeneralSystemSettings"
 import { MonoIcon } from "./icons/MonoIcons"
@@ -28,26 +29,86 @@ export default function SettingsPage({
   const [memoryPlayback, setMemoryPlayback] = useState<boolean>(true)
   const [dsdStrategy, setDsdStrategy] = useState<"native" | "dop" | "pcm">("dop")
   const [bufferSize, setBufferSize] = useState<number>(256)
-  type DeviceEntry = { id: string; icon: React.ReactNode; name: string; driver: string; telemetry: string; isHidden?: boolean }
-  // 룸에 붙은 실제 Output 엔드포인트. 드라이버·클럭 수치는 Output 이 보고한 값이다.
-  const DEVICES: DeviceEntry[] = (room?.outputs ?? []).map((o, i) => ({
-    id: o.peerId,
-    icon: o.supportsDsd ? <MonoIcon.Headphones size={15} /> : <MonoIcon.Speaker size={15} />,
-    name: o.displayName ?? o.device ?? `출력 ${i + 1}`,
-    driver: [
-      o.exclusiveMode ? "Exclusive" : "Shared",
-      o.maxSampleRate ? `${Math.round(o.maxSampleRate / 1000)}kHz / ${o.maxBitDepth}-Bit` : null,
-    ].filter(Boolean).join(" • "),
-    telemetry: o.stats
-      ? `Offset ${(o.stats.offsetMs ?? 0).toFixed(2)}ms • Jitter ${(o.stats.jitterMs ?? 0).toFixed(2)}ms • Buffer ${o.stats.bufferMs ?? 0}ms • ${o.stats.locked ? "Locked" : "Unlocked"}`
-      : (o.note ?? ""),
-  }))
-
-  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null)
+  // ── 이 PC 에 달린 출력 하드웨어 ────────────────────────────────────────────
+  //
+  // 마법사에서만 고를 수 있으면 한 번 고른 장치를 바꾸려고 온보딩을 다시 돌려야 한다.
+  // 목록의 출처는 마법사와 같다 — 열거는 NAudio 를 든 Output 워커만 한다.
+  const [hwDevices, setHwDevices] = useState<AudioDeviceListing[]>([])
+  const [hwScanning, setHwScanning] = useState(false)
+  const [audio, setAudio] = useState<AudioSetup | undefined>(undefined)
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false)
-  const [showHiddenDevices, setShowHiddenDevices] = useState(false)
-  const activeDevice = DEVICES.find((d) => d.id === activeDeviceId) ?? DEVICES[0] ?? {
-    id: "", icon: <MonoIcon.Speaker size={15} />, name: "연결된 출력 없음", driver: "Mono Output 을 연결하세요", telemetry: "",
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const state = await loadSetup()
+      if (!alive) return
+      setAudio(state.audio)
+      setExclusiveMode(state.audio?.exclusiveMode ?? true)
+      if (state.audio?.bufferSize) setBufferSize(state.audio.bufferSize)
+    })()
+    void rescanDevices()
+    return () => { alive = false }
+  }, [])
+
+  async function rescanDevices() {
+    setHwScanning(true)
+    try { setHwDevices(await listAudioDevices()) } finally { setHwScanning(false) }
+  }
+
+  /**
+   * 고른 장치를 저장하고 워커를 그 장치로 다시 세운다.
+   *
+   * 저장만 하고 워커를 두면 다음 실행부터 적용된다 — 사용자는 방금 바꿨다고 믿는데
+   * 소리는 이전 장치에서 계속 난다. 눌렀으면 지금 바뀌어야 한다.
+   */
+  async function applyAudio(patch: Partial<AudioSetup>) {
+    const next: AudioSetup = {
+      driverType: patch.driverType ?? audio?.driverType ?? "WASAPI_EXCLUSIVE",
+      deviceId: patch.deviceId ?? audio?.deviceId ?? "",
+      deviceName: patch.deviceName ?? audio?.deviceName ?? "",
+      bufferSize: patch.bufferSize ?? audio?.bufferSize ?? 256,
+      exclusiveMode: patch.exclusiveMode ?? audio?.exclusiveMode ?? true,
+    }
+    setAudio(next)
+    await saveSetup({ audio: next })
+    if (!hasShell()) {
+      setEngineNote("출력 장치는 저장했습니다. 적용은 Mono 데스크톱 앱에서만 됩니다.")
+      return
+    }
+    const res = await startConfiguredOutput(room?.id ?? null)
+    setEngineNote(res.ok
+      ? `출력을 ${next.deviceName || "기본 장치"} 로 전환했습니다.`
+      : (res.error ?? "출력을 전환하지 못했습니다."))
+  }
+
+  const selectedHw = hwDevices.find((d) => d.id === audio?.deviceId)
+    ?? hwDevices.find((d) => d.name === audio?.deviceName)
+    ?? null
+
+  // 고른 장치가 룸에 붙어 실제로 보고하는 수치. 없으면 아직 연결 전이다.
+  const connected = (room?.outputs ?? [])[0] ?? null
+  const telemetry = connected?.stats
+    ? `Offset ${(connected.stats.offsetMs ?? 0).toFixed(2)}ms • Jitter ${(connected.stats.jitterMs ?? 0).toFixed(2)}ms • Buffer ${connected.stats.bufferMs ?? 0}ms • ${connected.stats.locked ? "Locked" : "Unlocked"}`
+    : (connected?.note ?? "출력이 아직 연결되지 않았습니다.")
+
+  // 워커가 배타를 거절당해 공유로 내려갔으면 그 사실이 여기로 올라온다.
+  const deviceNotice = connected?.stats?.deviceError ?? null
+
+  // 고른 장치가 목록에 없을 때 "장치가 사라졌다"고 말하기 전에, 목록 자체가 비어 있는
+  // 이유부터 본다 — 브라우저에서는 애초에 열거할 방법이 없고, 스캔은 아직 끝나지 않았을 수 있다.
+  function deviceSubtitle(): string {
+    if (selectedHw) return [selectedHw.architecture, ...selectedHw.specs].join(" • ")
+    if (!hasShell()) return "저장된 장치 — 목록은 Mono 데스크톱 앱에서만 보입니다"
+    if (hwScanning) return "장치를 찾는 중…"
+    if (audio?.deviceName) return "목록에 없는 장치 — Rescan 을 눌러 보세요"
+    return "장치를 고르면 그 장치로 재생합니다"
+  }
+
+  const activeDevice = {
+    icon: selectedHw?.dsdSupport ? <MonoIcon.Headphones size={15} /> : <MonoIcon.Speaker size={15} />,
+    name: selectedHw?.name ?? audio?.deviceName ?? "시스템 기본 출력",
+    driver: deviceSubtitle(),
   }
 
   const [lensMasterBypass, setLensMasterBypass] = useState<boolean>(true)
@@ -142,7 +203,19 @@ export default function SettingsPage({
 
               {/* Output device */}
               <div style={{ marginBottom: 28, position: "relative" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--settings-row-label)", marginBottom: 8 }}>Output Device</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--settings-row-label)" }}>Output Device</span>
+                  <button
+                    onClick={() => { if (!hwScanning) void rescanDevices() }}
+                    disabled={hwScanning}
+                    style={{
+                      background: "none", border: "none", cursor: hwScanning ? "default" : "pointer", fontFamily: "'DM Mono', monospace",
+                      fontSize: 11, color: "var(--settings-input-meta)", padding: 0,
+                    }}
+                  >
+                    {hwScanning ? "Scanning…" : "↻ Rescan"}
+                  </button>
+                </div>
 
                 {/* Trigger */}
                 <button
@@ -167,17 +240,23 @@ export default function SettingsPage({
                   </svg>
                 </button>
 
-                {/* Telemetry */}
+                {/* Telemetry — 지금 붙어 있는 엔드포인트가 보고하는 값 */}
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--settings-input-meta)", marginTop: 6 }}>
-                  {activeDevice.telemetry}
+                  {telemetry}
                 </div>
+
+                {/* 배타를 거절당해 공유로 내려갔으면 여기서 말해 준다 — 비트퍼펙트라고 믿게 두지 않는다. */}
+                {deviceNotice && (
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "#d97706", marginTop: 6, lineHeight: 1.5 }}>
+                    {deviceNotice}
+                  </div>
+                )}
 
                 {/* 출력 워커 제어 — Output 프로세스를 띄우고 내리는 건 데스크톱 셸만 할 수 있다. */}
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button
                     onClick={async () => {
-                      const backend = exclusiveMode ? "exclusive" : "shared"
-                      const res = await startOutput(room?.id ?? null, backend)
+                      const res = await startConfiguredOutput(room?.id ?? null)
                       setEngineNote(res.ok ? "출력을 연결했습니다." : (res.error ?? "출력을 시작하지 못했습니다."))
                     }}
                     style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: "1px solid var(--settings-input-border)", background: "var(--settings-input-bg)", color: "var(--settings-input-text)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
@@ -218,20 +297,38 @@ export default function SettingsPage({
                       onClick={() => setIsDeviceMenuOpen(false)}
                     />
                     <div className="device-select-menu">
-                      {/* Primary endpoints */}
-                      {DEVICES.filter((d) => !d.isHidden).map((dev) => {
-                        const isActive = dev.id === activeDeviceId
+                      {hwDevices.length === 0 ? (
+                        <div className="device-select-item device-select-item--hidden" style={{ cursor: "default" }}>
+                          <span className="device-select-item__driver" style={{ lineHeight: 1.6 }}>
+                            {!hasShell()
+                              ? "출력 장치는 Mono 데스크톱 앱에서만 찾을 수 있습니다."
+                              : hwScanning ? "장치를 찾는 중…" : "장치를 찾지 못했습니다. Rescan 을 눌러 보세요."}
+                          </span>
+                        </div>
+                      ) : hwDevices.map((dev) => {
+                        const isActive = dev.id === audio?.deviceId
                         return (
                           <button
                             key={dev.id}
                             className={`device-select-item${isActive ? " is-active" : ""}`}
-                            onClick={() => { setActiveDeviceId(dev.id); setIsDeviceMenuOpen(false) }}
+                            onClick={() => {
+                              setIsDeviceMenuOpen(false)
+                              void applyAudio({
+                                driverType: dev.driverType,
+                                deviceId: dev.id,
+                                deviceName: dev.name,
+                                // ASIO 는 본질적으로 배타다. 그쪽을 고르면 토글 값과 무관하게 배타로 간다.
+                                exclusiveMode: dev.driverType === "ASIO" ? true : exclusiveMode,
+                              })
+                            }}
                           >
                             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                              <span style={{ fontSize: 18, flexShrink: 0 }}>{dev.icon}</span>
+                              <span style={{ fontSize: 18, flexShrink: 0 }}>
+                                {dev.dsdSupport ? <MonoIcon.Headphones size={15} /> : <MonoIcon.Speaker size={15} />}
+                              </span>
                               <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 }}>
-                                <span className="device-select-item__name">{dev.name}</span>
-                                <span className="device-select-item__driver">{dev.driver}</span>
+                                <span className="device-select-item__name">{dev.name}{dev.isDefault ? " · 시스템 기본" : ""}</span>
+                                <span className="device-select-item__driver">{[dev.architecture, ...dev.specs].join(" • ")}</span>
                               </span>
                             </span>
                             {isActive && (
@@ -242,28 +339,6 @@ export default function SettingsPage({
                           </button>
                         )
                       })}
-
-                      {/* Hidden / System devices accordion */}
-                      <div className="device-select-hidden-header">
-                        <button
-                          className="device-select-hidden-toggle flex items-center gap-1"
-                          onClick={() => setShowHiddenDevices((v) => !v)}
-                        >
-                          <MonoIcon.ChevronDown size={11} style={{ transform: showHiddenDevices ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
-                          <span>{DEVICES.filter((d) => d.isHidden).length} Hidden &amp; System Devices</span>
-                        </button>
-                      </div>
-                      {showHiddenDevices && DEVICES.filter((d) => d.isHidden).map((dev) => (
-                        <div key={dev.id} className="device-select-item device-select-item--hidden">
-                          <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                            <span style={{ fontSize: 16, flexShrink: 0, opacity: 0.45 }}>{dev.icon}</span>
-                            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 }}>
-                              <span className="device-select-item__name">{dev.name}</span>
-                              <span className="device-select-item__driver">{dev.driver}</span>
-                            </span>
-                          </span>
-                        </div>
-                      ))}
                     </div>
                   </>
                 )}
@@ -274,7 +349,15 @@ export default function SettingsPage({
               {/* Toggle rows */}
               <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 28 }}>
                 {[
-                  { label: "Exclusive Mode", sub: "Bypasses OS audio mixer completely", value: exclusiveMode, set: setExclusiveMode },
+                  {
+                    label: "Exclusive Mode",
+                    sub: audio?.driverType === "ASIO"
+                      ? "ASIO 는 언제나 배타 점유입니다"
+                      : "장치가 거절하면 공유 모드로 내려가고, 그 사실을 위에 표시합니다",
+                    value: audio?.driverType === "ASIO" ? true : exclusiveMode,
+                    // 화면에만 두면 마법사에서 고른 값과 갈라진다 — 저장하고 워커까지 다시 세운다.
+                    set: (v: boolean) => { setExclusiveMode(v); void applyAudio({ exclusiveMode: v }) },
+                  },
                   { label: "Memory Playback (RAM Load)", sub: "Preloads tracks into RAM before streaming to DAC", value: memoryPlayback, set: setMemoryPlayback },
                 ].map((row) => (
                   <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
@@ -335,6 +418,14 @@ export default function SettingsPage({
                 <input
                   type="range" min={64} max={2048} step={64} value={bufferSize}
                   onChange={(e) => setBufferSize(Number(e.target.value))}
+                  // 놓았을 때만 저장한다 — 끄는 동안 매번 쓰면 Core 에 수십 번 PUT 이 날아간다.
+                  // 워커를 다시 세우지는 않는다: 이 값은 아직 워커에 전달되는 경로가 없다.
+                  onPointerUp={() => {
+                    if (audio && audio.bufferSize === bufferSize) return
+                    const next = { ...(audio ?? { driverType: "WASAPI_EXCLUSIVE" as const, deviceId: "", deviceName: "", exclusiveMode: true }), bufferSize }
+                    setAudio(next)
+                    void saveSetup({ audio: next })
+                  }}
                   style={{ width: "100%", height: 4, borderRadius: 2, accentColor: "var(--accent-solo)", cursor: "pointer", background: "var(--settings-input-border)", display: "block" }}
                 />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>

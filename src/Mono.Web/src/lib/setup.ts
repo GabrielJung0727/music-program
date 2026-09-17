@@ -1,3 +1,5 @@
+import { startOutput } from "./shell"
+
 // 첫 실행 마법사가 고른 값들. 이 PC 한 대에 매인 설정이다.
 //
 // 진실은 Core 의 data/setup.json 에 있다. localStorage 에만 두면 WebView 프로필을
@@ -93,4 +95,21 @@ export function backendFor(audio: AudioSetup | undefined): string | undefined {
   if (!audio) return undefined
   if (audio.driverType === "ASIO") return "asio"
   return audio.exclusiveMode === false ? "shared" : "exclusive"
+}
+
+/** 마지막으로 읽은 설정의 동기 사본. 장치 이름처럼 그 자리에서 필요한 값을 꺼낼 때 쓴다. */
+export function cachedSetup(): SetupState {
+  return readMirror() ?? EMPTY
+}
+
+/**
+ * 저장된 출력 장치로 Output 워커를 띄운다.
+ *
+ * startOutput 을 직접 부르면 백엔드와 장치 힌트를 빠뜨리기 쉽다. 빠뜨리면 마법사에서
+ * 무엇을 골랐든 OS 기본 장치로 열리는데, 화면에는 고른 장치 이름이 그대로 떠 있어서
+ * 소리가 다른 데서 난다는 걸 알아챌 방법이 없다. 시작 지점을 한 곳으로 모아 둔다.
+ */
+export async function startConfiguredOutput(roomId?: string | null) {
+  const audio = cachedSetup().audio
+  return startOutput(roomId ?? null, backendFor(audio), audio?.deviceName)
 }

@@ -44,6 +44,40 @@ function calcLatencyMs(bufferSize: number): string {
   return ((bufferSize / 44100) * 1000).toFixed(1);
 }
 
+/**
+ * 스캔 결과에 맞춰 고를 아키텍처와 장치를 정한다.
+ *
+ * 기본 아키텍처는 ASIO 인데 대부분의 PC 에는 ASIO 드라이버가 없다. 그러면 목록이 빈 채로
+ * 뜨고, 사용자가 "아키텍처를 직접 바꿔야 한다"는 걸 알아채리라 기대하게 된다. 못 알아채고
+ * 그냥 Next 를 누르면 고른 장치가 없어 저장되는 오디오 설정 자체가 없다 — 마법사는 끝났는데
+ * 재생은 계속 OS 기본 장치로 나가고, 무엇이 잘못됐는지 화면 어디에도 나오지 않는다.
+ *
+ * 사용자가 아키텍처를 직접 건드렸으면(userPickedDriver) 그 선택은 뒤집지 않는다.
+ */
+export function pickDefaults(
+  found: AudioDevice[],
+  driverType: "ASIO" | "WASAPI_EXCLUSIVE",
+  selectedDeviceId: string,
+  userPickedDriver: boolean
+): { driverType: "ASIO" | "WASAPI_EXCLUSIVE"; deviceId: string } {
+  if (found.length === 0) return { driverType, deviceId: selectedDeviceId };
+
+  let type = driverType;
+  if (!userPickedDriver && !found.some((d) => d.driverType === type)) {
+    type = found.find((d) => d.driverType !== type)?.driverType ?? type;
+  }
+
+  // 이미 고른 장치가 이 아키텍처에 있으면 그대로 둔다.
+  if (found.some((d) => d.id === selectedDeviceId && d.driverType === type)) {
+    return { driverType: type, deviceId: selectedDeviceId };
+  }
+
+  // 아무것도 안 고른 상태로 넘어가도 재생할 장치는 정해져 있게 한다.
+  const pool = found.filter((d) => d.driverType === type);
+  const pick = pool.find((d) => d.isDefault) ?? pool[0];
+  return { driverType: type, deviceId: pick?.id ?? "" };
+}
+
 function latencyGaugePct(bufferSize: number): number {
   const lo = Math.log2(64);
   const hi = Math.log2(1024);
@@ -70,22 +104,34 @@ export default function Step1AudioEngine({
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [scanned, setScanned] = useState(false);
+  const [driverTouched, setDriverTouched] = useState(false);
+
+  // Parent-controlled selection wins; fall back to internal
+  const selectedDeviceId: string = controlledDeviceId ?? internalDeviceId;
 
   // 장치 목록은 이 PC 에 실제로 달린 것만 보여 준다. 브라우저에서는 열거할 방법이 없다.
   async function rescan() {
     setScanning(true);
     try {
-      setDevices(await listAudioDevices());
+      const found = await listAudioDevices();
+      setDevices(found);
+      applyDefaults(found);
     } finally {
       setScanning(false);
       setScanned(true);
     }
   }
 
-  useEffect(() => { void rescan() }, []);
+  function applyDefaults(found: AudioDevice[]) {
+    const next = pickDefaults(found, driverType, selectedDeviceId, driverTouched);
+    if (next.driverType !== driverType) setDriverType(next.driverType);
+    if (next.deviceId !== selectedDeviceId) {
+      setInternalDeviceId(next.deviceId);
+      onSelectDevice?.(next.deviceId);
+    }
+  }
 
-  // Parent-controlled selection wins; fall back to internal
-  const selectedDeviceId: string = controlledDeviceId ?? internalDeviceId;
+  useEffect(() => { void rescan() }, []);
 
   function selectDevice(id: string) {
     const next = selectedDeviceId === id ? "" : id;
@@ -99,6 +145,14 @@ export default function Step1AudioEngine({
 
   function handleDriverSwitch(type: "ASIO" | "WASAPI_EXCLUSIVE") {
     setDriverType(type);
+    setDriverTouched(true);
+
+    // 고른 장치가 다른 아키텍처의 것이면 화면에서 사라진다 — 고른 게 없는 것과 같아진다.
+    // 새 아키텍처의 기본 장치로 옮겨 준다.
+    const next = pickDefaults(devices, type, selectedDeviceId, true);
+    if (next.deviceId === selectedDeviceId) return;
+    setInternalDeviceId(next.deviceId);
+    onSelectDevice?.(next.deviceId);
   }
 
   function handleRescan() {

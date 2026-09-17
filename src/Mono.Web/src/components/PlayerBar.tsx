@@ -2,7 +2,8 @@ import { useState, useEffect } from "react"
 import { Lock } from "lucide-react"
 import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock, useMonoCommands } from "../state/MonoProvider"
-import { startOutput, stopOutput } from "../lib/shell"
+import { stopOutput } from "../lib/shell"
+import { startConfiguredOutput } from "../lib/setup"
 import { MonoIcon } from "./icons/MonoIcons"
 
 export type PlayerMode = "solo" | "host" | "guest"
@@ -803,7 +804,7 @@ export default function PlayerBar({
                 </div>
                 <button
                   onClick={async () => {
-                    const res = await startOutput(room?.id ?? null)
+                    const res = await startConfiguredOutput(room?.id ?? null)
                     if (!res.ok) setOutputError(res.error ?? "출력을 시작하지 못했습니다")
                     else setOutputError(null)
                   }}

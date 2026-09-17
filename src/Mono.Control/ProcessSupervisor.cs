@@ -15,6 +15,9 @@ public sealed class ProcessSupervisor
     private Process? _core;
     private Process? _output;
     private string? _outputHost;
+
+    /// <summary>지금 돌고 있는 워커를 띄울 때 쓴 인자. 규격이 바뀌었는지 이걸로 판정한다.</summary>
+    private string? _outputArgs;
     private bool _outputIntentionallyStopped;
     private readonly Queue<DateTimeOffset> _restarts = new();
 
@@ -62,9 +65,12 @@ public sealed class ProcessSupervisor
     public event Action<string>? OutputFaulted;
 
     /// <summary>
-    /// 출력 드라이버 백엔드: exclusive · shared · asio.
+    /// 출력 드라이버 백엔드: exclusive · exclusive-strict · shared · asio.
     /// RME 같은 전문 인터페이스는 하드웨어 클럭이 외부에서 고정돼 WASAPI 배타 요청이
     /// 거절되는 일이 흔하다. 그런 장치는 ASIO 로 가야 비트퍼펙트가 성립한다.
+    ///
+    /// 기본값 exclusive 는 배타가 거절되면 공유로 내려가 소리는 계속 낸다(비트퍼펙트 표시는
+    /// 내려간다). exclusive-strict 는 강등 대신 멈추고 사유를 남긴다 — 측정용.
     /// </summary>
     public string Backend { get; set; } = "exclusive";
 
@@ -114,11 +120,6 @@ public sealed class ProcessSupervisor
 
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
-        // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
-        // 나중에 룸이 생기면 그 룸으로 다시 띄워야 소리가 난다.
-        if (OutputRunning && OutputRoomId == roomId) return true;
-        if (OutputRunning) StopOutput();
-
         var exe = FindExe("Mono.Output.exe", "Mono.Output");
         if (exe is null)
         {
@@ -126,16 +127,22 @@ public sealed class ProcessSupervisor
             return false;
         }
 
-        var args = $"--host={host}";
-        if (!string.IsNullOrWhiteSpace(roomId)) args += $" --room={roomId}";
-        if (Backend == "shared") args += " --shared";
-        else if (Backend == "asio") args += " --asio";
-        if (!string.IsNullOrWhiteSpace(DeviceHint)) args += $" --device=\"{DeviceHint}\"";
+        var args = BuildOutputArgs(roomId, host);
+
+        // 룸 없이 띄운 Output 은 Core 에 엔드포인트로만 등록되고 어떤 룸에도 들어가지 않는다.
+        // 나중에 룸이 생기면 그 룸으로 다시 띄워야 소리가 난다.
+        //
+        // 규격까지 같을 때만 그대로 둔다. 장치나 백엔드가 바뀌었는데 "이미 돌고 있다"고
+        // 넘어가면, 설정에서 장치를 바꿔도 소리는 이전 장치로 계속 나면서 화면만 새 장치를
+        // 가리킨다 — 사용자는 바뀐 줄 알고 있으므로 무엇이 틀렸는지 알아낼 방법이 없다.
+        if (OutputRunning && OutputRoomId == roomId && _outputArgs == args) return true;
+        if (OutputRunning) StopOutput();
 
         try
         {
             _outputIntentionallyStopped = false;
             _output = StartSilent(exe, args);
+            _outputArgs = args;
             OutputRoomId = roomId;
             _outputHost = host;
             WatchOutput(_output);
@@ -148,10 +155,23 @@ public sealed class ProcessSupervisor
         }
     }
 
+    /// <summary>워커에 넘길 인자 한 줄. 재시작 판정도 이 문자열 비교로 한다.</summary>
+    private string BuildOutputArgs(string? roomId, string host)
+    {
+        var args = $"--host={host}";
+        if (!string.IsNullOrWhiteSpace(roomId)) args += $" --room={roomId}";
+        if (Backend == "shared") args += " --shared";
+        else if (Backend == "asio") args += " --asio";
+        else if (Backend == "exclusive-strict") args += " --strict-exclusive";
+        if (!string.IsNullOrWhiteSpace(DeviceHint)) args += $" --device=\"{DeviceHint}\"";
+        return args;
+    }
+
     public void StopOutput()
     {
         _outputIntentionallyStopped = true;
         OutputRoomId = null;
+        _outputArgs = null;
         TryKill(ref _output);
     }
 
