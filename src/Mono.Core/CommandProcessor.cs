@@ -57,7 +57,10 @@ public sealed class CommandProcessor
             // ── 룸 ──────────────────────────────────────────────
             case MessageTypes.CreateRoom:
             {
-                var created = _rooms.Create(peerId, msg.RoomName ?? "Hi-Fi Lounge", msg.Mode ?? RoomMode.OpenLounge, displayName);
+                var mode = msg.Mode ?? RoomMode.OpenLounge;
+                if (AlreadyHostingALounge(peerId, mode) is { } busy) return busy;
+
+                var created = _rooms.Create(peerId, msg.RoomName ?? "Hi-Fi Lounge", mode, displayName);
                 Bind(peerId, created.Id);
                 return Broadcast(created);
             }
@@ -85,6 +88,8 @@ public sealed class CommandProcessor
             {
                 // 새 방을 만들지 않는다. 듣던 방을 그대로 공개로 바꾼다 — 큐도 재생 위치도 그대로다.
                 var roomId = NeedRoom(peerId, msg);
+                if (AlreadyHostingALounge(peerId, msg.Mode ?? RoomMode.OpenLounge, except: roomId) is { } busy) return busy;
+
                 return From(_rooms.ApplyHostSettings(roomId, peerId, r =>
                 {
                     r.Mode = msg.Mode == RoomMode.Invite ? RoomMode.Invite : RoomMode.OpenLounge;
@@ -928,6 +933,24 @@ public sealed class CommandProcessor
             : r.Error is not null
                 ? new CommandResult(r.Room, new MonoMessage { Type = MessageTypes.Error, Ok = false, Error = r.Error })
                 : Broadcast(r.Room!);
+
+    /// <summary>
+    /// 한 사람은 라운지를 하나만 연다.
+    ///
+    /// 여러 개를 열 수 있으면 같은 호스트의 방이 목록을 채운다 — 대부분은 곧 비는 방이고,
+    /// 듣는 사람 입장에서는 어느 게 진짜인지 알 수 없다. 혼자 듣기용 방은 라운지가 아니므로
+    /// 여기 걸리지 않는다. 이미 열어 둔 게 있으면 새로 열지 않고 사유를 돌려준다 —
+    /// 살아 있는 방을 말없이 닫아 버리면 듣고 있던 사람이 영문도 모르고 끊긴다.
+    /// </summary>
+    private CommandResult? AlreadyHostingALounge(string peerId, RoomMode mode, string? except = null)
+    {
+        if (mode == RoomMode.Solo) return null;
+
+        var open = _rooms.HostedLounge(peerId);
+        if (open is null || open.Id == except) return null;
+
+        return Fail($"이미 라운지 '{open.Name}' 를 열어 두셨습니다. 한 번에 하나만 열 수 있습니다 — 먼저 닫아 주세요.");
+    }
 
     private static CommandResult Broadcast(ListeningRoom room) => new(room, null);
     private static CommandResult Direct(MonoMessage msg) => new(null, msg);

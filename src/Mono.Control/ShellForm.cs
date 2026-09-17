@@ -443,6 +443,22 @@ public sealed class ShellForm : Form
         Activate();
     }
 
+    /// <summary>
+    /// 두 번째 인스턴스가 보낸 신호. 새 창을 띄우는 대신 이미 떠 있는 이 창을 앞으로 부른다 —
+    /// 트레이에 내려가 있으면 아이콘을 다시 눌러도 아무 일도 안 일어난 것처럼 보이기 때문에,
+    /// 사용자는 Mono 가 안 떠 있다고 믿고 한 벌 더 띄우게 된다.
+    /// </summary>
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == Program.ShowExistingMessage && Program.ShowExistingMessage != 0)
+        {
+            RestoreWindow();
+            BringToFront();
+        }
+
+        base.WndProc(ref m);
+    }
+
     private void QuitFromTray()
     {
         _quitting = true;

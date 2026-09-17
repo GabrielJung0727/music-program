@@ -41,6 +41,16 @@ public sealed class RoomManager
     }
 
     /// <summary>
+    /// 이 사람이 이미 열어 둔 라운지. 한 사람은 라운지를 하나만 연다 —
+    /// 여러 개를 열 수 있으면 같은 호스트의 빈 방이 목록을 채운다.
+    /// 혼자 듣기용 방은 라운지가 아니므로 여기 걸리지 않는다.
+    /// </summary>
+    public ListeningRoom? HostedLounge(string peerId)
+    {
+        lock (_gate) return _rooms.Values.FirstOrDefault(r => r.IsListed && r.HostPeerId == peerId);
+    }
+
+    /// <summary>
     /// 호스트가 라운지를 닫는다. 방은 그 자리에서 사라지고 남아 있던 사람은 나간 것이 된다.
     /// </summary>
     public (ListeningRoom? Room, string? Error) Close(string roomId, string peerId)

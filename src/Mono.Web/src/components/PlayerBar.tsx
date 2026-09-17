@@ -532,10 +532,11 @@ export default function PlayerBar({
           {(() => {
             const activeDevs = devices.filter((d) => d.active)
             const first = activeDevs[0]
+            // 아이콘은 JSX 다. 문자열에 넣으면 "[object Object] 장치이름" 이 그대로 찍힌다.
             const label = first
               ? activeDevs.length > 1
-                ? `${first.icon} ${first.name} +${activeDevs.length - 1}`
-                : `${first.icon} ${first.name}`
+                ? `${first.name} +${activeDevs.length - 1}`
+                : first.name
               : "No Output Selected"
             return (
               <button
@@ -543,6 +544,7 @@ export default function PlayerBar({
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--surface-elevated)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
                 style={{ cursor: "pointer", whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", fontFamily: "inherit" }}
               >
+                {first?.icon}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
                 <IconChevron size={10} />
               </button>

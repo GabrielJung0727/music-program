@@ -136,4 +136,94 @@ public class RoomCommandTests
         Assert.NotNull(result.Direct);
         Assert.Equal(MessageTypes.Error, result.Direct!.Type);
     }
+
+    /// <summary>
+    /// 한 사람은 라운지를 하나만 연다. 여러 개를 열 수 있으면 같은 호스트의 방이 목록을
+    /// 채우고, 듣는 쪽에서는 어느 게 진짜인지 알 수 없다.
+    /// </summary>
+    [Fact]
+    public void OnePersonCanOnlyOpenOneLounge()
+    {
+        var (commands, rooms) = NewStack();
+        commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreateRoom, RoomName = "첫 번째", Mode = RoomMode.OpenLounge,
+        }, "Listener");
+
+        var second = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreateRoom, RoomName = "두 번째", Mode = RoomMode.OpenLounge,
+        }, "Listener");
+
+        Assert.Equal(MessageTypes.Error, second.Direct?.Type);
+        Assert.Contains("첫 번째", second.Direct!.Error);
+        Assert.Single(rooms.List());
+    }
+
+    /// <summary>혼자 듣기는 라운지가 아니다 — 라운지를 열어 둔 채로도 혼자 들을 수 있어야 한다.</summary>
+    [Fact]
+    public void ASoloRoomIsNotBlockedByAnOpenLounge()
+    {
+        var (commands, rooms) = NewStack();
+        commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreateRoom, RoomName = "Live", Mode = RoomMode.OpenLounge,
+        }, "Listener");
+
+        var solo = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreateRoom, RoomName = "내 방", Mode = RoomMode.Solo,
+        }, "Listener");
+
+        Assert.NotEqual(MessageTypes.Error, solo.Direct?.Type ?? "");
+        Assert.Equal(2, rooms.List().Count);
+        Assert.Single(Listed(commands, "me"));
+    }
+
+    /// <summary>다른 사람은 각자 하나씩 열 수 있다.</summary>
+    [Fact]
+    public void TheLimitIsPerPersonNotGlobal()
+    {
+        var (commands, rooms) = NewStack();
+        commands.Execute("a", new MonoMessage { Type = MessageTypes.CreateRoom, RoomName = "A", Mode = RoomMode.OpenLounge }, "A");
+        var b = commands.Execute("b", new MonoMessage { Type = MessageTypes.CreateRoom, RoomName = "B", Mode = RoomMode.OpenLounge }, "B");
+
+        Assert.NotEqual(MessageTypes.Error, b.Direct?.Type ?? "");
+        Assert.Equal(2, Listed(commands, "a").Count);
+    }
+
+    /// <summary>닫고 나면 다시 열 수 있다.</summary>
+    [Fact]
+    public void ClosingFreesTheSlot()
+    {
+        var (commands, rooms) = NewStack();
+        var first = rooms.Create("me", "첫 번째", RoomMode.OpenLounge, "Listener");
+        commands.Execute("me", new MonoMessage { Type = MessageTypes.CloseRoom, RoomId = first.Id }, "Listener");
+
+        var again = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreateRoom, RoomName = "두 번째", Mode = RoomMode.OpenLounge,
+        }, "Listener");
+
+        Assert.NotEqual(MessageTypes.Error, again.Direct?.Type ?? "");
+        Assert.Single(rooms.List());
+    }
+
+    /// <summary>이미 라운지가 열려 있으면 듣던 방을 또 공개로 올릴 수 없다.</summary>
+    [Fact]
+    public void PublishingASecondLoungeIsRefused()
+    {
+        var (commands, rooms) = NewStack();
+        rooms.Create("me", "Live", RoomMode.OpenLounge, "Listener");
+        var solo = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+
+        var result = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.PublishRoom, RoomId = solo.Id, RoomName = "또 하나", Mode = RoomMode.OpenLounge,
+        }, "Listener");
+
+        Assert.Equal(MessageTypes.Error, result.Direct?.Type);
+        Assert.Equal(RoomMode.Solo, solo.Mode);
+        Assert.Single(Listed(commands, "me"));
+    }
 }

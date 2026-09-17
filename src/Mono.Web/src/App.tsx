@@ -28,8 +28,8 @@ import {
   type LoungeRoom,
 } from "./data/types"
 import { useLiveSession, useToast } from "./state/useLiveSession"
-import { loadSetup, saveSetup, backendFor, type SetupState } from "./lib/setup"
-import { hasShell, startOutput } from "./lib/shell"
+import { loadSetup, saveSetup, backendFor, startConfiguredOutput, type SetupState } from "./lib/setup"
+import { hasShell, startOutput, outputStatus } from "./lib/shell"
 import { useDebounced } from "./state/useDebounced"
 import { libArtists } from "./lib/libraryData"
 import {
@@ -622,6 +622,21 @@ export default function App() {
       void startOutput(null, backendFor(audio), audio.deviceName)
     }
   }, [setup, cmd, activeProfileId])
+
+  // 출력 워커는 룸 하나에 붙는다. 룸 없이 띄우면 Core 에 엔드포인트로만 등록되고 어떤 룸에도
+  // 들어가지 않는다 — 워커는 멀쩡히 돌고 있는데 소리는 안 나고, 화면은 "연결됨"이라고 말한다.
+  // 곡을 틀어 룸이 생기면 그 룸으로 다시 붙여 준다.
+  useEffect(() => {
+    const roomId = room?.id
+    if (!roomId || !hasShell()) return
+    let cancelled = false
+    void (async () => {
+      const status = await outputStatus()
+      if (cancelled || !status?.running || status.roomId === roomId) return
+      await startConfiguredOutput(roomId)
+    })()
+    return () => { cancelled = true }
+  }, [room?.id])
 
   const handleOnboardingComplete = (profile: ListenerProfile) => {
     // 고른 값 자체는 마법사가 Core 에 이미 저장했다. 여기서는 이번 화면에만 반영한다.

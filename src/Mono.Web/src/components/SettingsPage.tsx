@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { pickFolder, listAudioDevices, restartOutput, outputStatus, hasShell, type AudioDeviceListing } from "../lib/shell"
 import { loadSetup, saveSetup, startConfiguredOutput, type AudioSetup } from "../lib/setup"
@@ -80,6 +80,25 @@ export default function SettingsPage({
     setEngineNote(res.ok
       ? `출력을 ${next.deviceName || "기본 장치"} 로 전환했습니다.`
       : (res.error ?? "출력을 전환하지 못했습니다."))
+  }
+
+  // 기다리는 동안 room 은 갱신된다. 클로저에 잡힌 값은 낡으므로 ref 로 본다.
+  const roomRef = useRef(room)
+  useEffect(() => { roomRef.current = room }, [room])
+
+  /**
+   * 엔드포인트가 룸에 실제로 붙을 때까지 잠깐 기다린다.
+   *
+   * 워커는 프로세스가 뜨고 나서 Core 에 접속해 룸에 들어간다. 그 사이를 안 기다리면
+   * "연결했습니다" 를 띄운 직후 화면에는 여전히 출력이 없다고 나온다.
+   */
+  async function waitForOutput(timeoutMs = 6000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 400))
+      if ((roomRef.current?.outputs?.length ?? 0) > 0) return true
+    }
+    return false
   }
 
   const selectedHw = hwDevices.find((d) => d.id === audio?.deviceId)
@@ -257,7 +276,23 @@ export default function SettingsPage({
                   <button
                     onClick={async () => {
                       const res = await startConfiguredOutput(room?.id ?? null)
-                      setEngineNote(res.ok ? "출력을 연결했습니다." : (res.error ?? "출력을 시작하지 못했습니다."))
+                      if (!res.ok) {
+                        setEngineNote(res.error ?? "출력을 시작하지 못했습니다.")
+                        return
+                      }
+
+                      // 프로세스가 떴다는 것과 장치가 붙었다는 것은 다르다. 띄우자마자
+                      // "연결했습니다" 라고 하면, 소리는 안 나는데 화면만 연결됐다고 말한다.
+                      if (!room?.id) {
+                        setEngineNote("출력 워커를 띄웠습니다. 재생을 시작하면 이 장치로 나갑니다.")
+                        return
+                      }
+
+                      setEngineNote("출력 워커를 띄웠습니다 — 장치가 붙기를 기다리는 중…")
+                      const attached = await waitForOutput()
+                      setEngineNote(attached
+                        ? "출력을 연결했습니다."
+                        : "워커는 떴지만 아직 장치가 붙지 않았습니다. 상태를 눌러 확인해 보세요.")
                     }}
                     style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: "1px solid var(--settings-input-border)", background: "var(--settings-input-bg)", color: "var(--settings-input-text)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                   >
