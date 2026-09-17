@@ -77,7 +77,7 @@ export default function App() {
   // Core 가 진실의 원본이다. 아래 상태들은 전부 room_state 스냅샷에서 파생된다.
   const live = useLiveSession()
   const cmd = useMonoCommands()
-  const { connection, catalogLoaded, history, archives, displayName, streamingAccounts } = useMono()
+  const { connection, catalogLoaded, history, archives, displayName, streamingAccounts, room } = useMono()
   const { currentTrack, queue, playing, lounges } = live
 
   // 홈·라운지 화면의 섹션들은 카탈로그와 이력에서 집계해 쓴다.
@@ -452,10 +452,16 @@ export default function App() {
     }
   }
 
+  // 세션을 끝내겠냐고 물을 때 쓸 실제 인원. 예전에는 42 가 그대로 박혀 있었다.
+  const listenerCount = room?.members?.length ?? 1
+
   const handleStopHosting = () => {
-    cmd.leaveRoom()
+    // 나가기가 아니라 닫기다. 나가기만 하면 호스트가 없는 방이 라운지 목록에 그대로 남는다 —
+    // 세션을 끝냈다고 눌렀는데 방이 살아 있으면 지울 방법이 없다.
+    void cmd.closeRoom()
     setPlayerMode("solo")
     setActiveLoungeRoom(false)
+    setJoinedLoungeId(null)
     setCurrentTab("lounges")
     setActiveTab("live")
     setIsFullscreenPlayer(false)
@@ -486,8 +492,10 @@ export default function App() {
     const visibility = opts?.visibility ?? "public"
     setHostSessionPrivacy(visibility)
     setHostSessionSecretKey(opts?.secretKey)
+    // 듣던 방을 그대로 공개로 바꾼다. 새로 만들면 틀어 둔 곡이 끊기고,
+    // 솔로 방과 라운지가 따로 남아 목록에 빈 방이 하나 더 생긴다.
     void cmd
-      .createRoom(
+      .publishRoom(
         opts?.title?.trim() || `${activeProfile?.name ?? "Mono"} Live`,
         visibility === "unlisted" ? RoomMode.Invite : RoomMode.Open,
       )
@@ -966,7 +974,7 @@ export default function App() {
           <div className="w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
             <span className="text-xs font-mono font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full inline-block mb-3">SESSION TERMINATION</span>
             <div className="text-base font-bold mb-1.5" style={{ color: "var(--text-primary)" }}>End Live Lounge Session?</div>
-            <p className="text-xs leading-relaxed mt-1.5 mb-5" style={{ color: "var(--text-secondary)" }}>Ending this broadcast will terminate the bit-perfect audio stream and close the live lounge for all 42 connected listeners.</p>
+            <p className="text-xs leading-relaxed mt-1.5 mb-5" style={{ color: "var(--text-secondary)" }}>{"Ending this broadcast will terminate the bit-perfect audio stream and close the live lounge"}{listenerCount === 1 ? " for you." : ` for all ${listenerCount} connected listeners.`}</p>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setShowEndSessionModal(false)}

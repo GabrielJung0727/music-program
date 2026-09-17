@@ -5,7 +5,17 @@ public enum RoomMode
     OpenLounge,
     Invite,
     HostQueue,
-    Audiophile
+    Audiophile,
+
+    /// <summary>
+    /// 혼자 듣기. Core 에서는 혼자 듣는 것도 룸이라 큐·타임라인·출력이 매달릴 자리가 필요하지만,
+    /// 이건 라운지가 아니다 — 라운지 목록에 뜨지 않고 아무도 들어올 수 없다.
+    ///
+    /// 값을 4 로 붙인 건 앞의 넷을 밀지 않기 위해서다. 이 숫자는 그대로 와이어에 실린다.
+    /// 예전에 웹 쪽이 Solo 를 2 로 알고 보내는 바람에 혼자 듣기가 HostQueue 룸으로 만들어졌고,
+    /// 곡을 틀 때마다 공개 라운지가 하나씩 생겼다. 새 값을 넣을 때는 항상 뒤에 붙인다.
+    /// </summary>
+    Solo = 4
 }
 
 public enum PlaybackSourceMode

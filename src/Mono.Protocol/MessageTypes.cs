@@ -15,6 +15,12 @@ public static class MessageTypes
     public const string JoinRoom = "join_room";
     public const string LeaveRoom = "leave_room";
     public const string ListRooms = "list_rooms";
+
+    /// <summary>혼자 듣던 방을 그 자리에서 라운지로 연다 — 큐와 재생 위치를 그대로 들고 간다.</summary>
+    public const string PublishRoom = "publish_room";
+
+    /// <summary>호스트가 라운지를 닫는다.</summary>
+    public const string CloseRoom = "close_room";
     public const string RoomState = "room_state";
     public const string Invite = "invite";
     public const string Kick = "kick";

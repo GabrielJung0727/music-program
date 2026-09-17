@@ -56,6 +56,22 @@ public sealed class ListeningRoom
     public bool CloudSyncOptIn { get; set; }
     public byte[]? FanOutKey { get; set; }
     public DateTimeOffset StartedAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// 아무도 남지 않은 시각. 사람이 다시 들어오면 null 로 돌아간다.
+    /// 청소부가 이 시각을 보고 유예 시간이 지난 빈 방만 지운다 — 새로고침 한 번에
+    /// 방이 사라지면 곡을 틀던 사람이 큐를 잃는다.
+    /// </summary>
+    public DateTimeOffset? EmptySince { get; set; }
+
+    /// <summary>
+    /// 라운지 목록에 보일 방인가. 혼자 듣기용 방은 라운지가 아니다 —
+    /// 목록에 내보내면 곡을 틀 때마다 유령 라운지가 하나씩 쌓인다.
+    /// </summary>
+    public bool IsListed => Mode != RoomMode.Solo;
+
+    /// <summary>지금 이 방에 붙어 있는 사람·기기가 하나라도 있는가.</summary>
+    public bool HasMembers => ControlPeerIds.Count > 0 || OutputPeerIds.Count > 0 || SpectatorPeerIds.Count > 0;
     public List<QueueItem> Queue { get; } = [];
     public List<QueueRequest> Requests { get; } = [];
     public List<TimestampPin> Pins { get; } = [];

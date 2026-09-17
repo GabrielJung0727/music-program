@@ -81,11 +81,35 @@ public sealed class CommandProcessor
                 return From(left);
             }
 
+            case MessageTypes.PublishRoom:
+            {
+                // 새 방을 만들지 않는다. 듣던 방을 그대로 공개로 바꾼다 — 큐도 재생 위치도 그대로다.
+                var roomId = NeedRoom(peerId, msg);
+                return From(_rooms.ApplyHostSettings(roomId, peerId, r =>
+                {
+                    r.Mode = msg.Mode == RoomMode.Invite ? RoomMode.Invite : RoomMode.OpenLounge;
+                    if (!string.IsNullOrWhiteSpace(msg.RoomName)) r.Name = msg.RoomName!;
+                    if (r.Mode == RoomMode.Invite)
+                    {
+                        r.InviteCode = Random.Shared.Next(100000, 999999).ToString();
+                        r.InviteExpiresAt = DateTimeOffset.UtcNow.AddHours(6);
+                    }
+                }));
+            }
+
+            case MessageTypes.CloseRoom:
+            {
+                var roomId = NeedRoom(peerId, msg);
+                var closed = _rooms.Close(roomId, peerId);
+                if (closed.Error is null) _peerRoom.TryRemove(peerId, out _);
+                return From(closed);
+            }
+
             case MessageTypes.ListRooms:
                 return Direct(new MonoMessage
                 {
                     Type = MessageTypes.ListRooms,
-                    Body = JsonSerializer.Serialize(_rooms.List().Select(r => new
+                    Body = JsonSerializer.Serialize(_rooms.ListListed().Select(r => new
                     {
                         r.Id,
                         r.Name,

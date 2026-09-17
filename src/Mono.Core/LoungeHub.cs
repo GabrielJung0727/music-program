@@ -42,14 +42,21 @@ public sealed class LoungeHub : Hub
         return base.OnConnectedAsync();
     }
 
-    public override Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (Context.Items["peer"] is string peer)
         {
             _connections.Controls.TryRemove(peer, out _);
+
+            // 창을 닫거나 새로고침하면 leave_room 은 오지 않는다. 여기서 빼 주지 않으면
+            // 끊긴 사람이 멤버로 남아 방이 영영 비지 않는다.
+            foreach (var room in _rooms.DetachControl(peer))
+            {
+                await _broadcaster.PublishAsync(room);
+            }
         }
 
-        return base.OnDisconnectedAsync(exception);
+        await base.OnDisconnectedAsync(exception);
     }
 
     public async Task Send(MonoMessage message)

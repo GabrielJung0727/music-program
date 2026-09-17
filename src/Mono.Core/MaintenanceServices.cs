@@ -93,3 +93,48 @@ public sealed class RetentionService : BackgroundService
         }
     }
 }
+
+/// <summary>
+/// 빈 방 청소부.
+///
+/// 나가기는 멤버만 지우고 방은 남긴다. 지우는 경로가 없던 동안 한 번 만들어진 방은 Core 가
+/// 죽을 때까지 라운지 목록에 남았고, 재생할 때마다 유령 라운지가 하나씩 쌓였다.
+/// 유예를 두는 건 새로고침·재접속으로 잠깐 비는 순간에 듣던 큐까지 날리지 않기 위해서다.
+/// </summary>
+public sealed class RoomJanitor : BackgroundService
+{
+    /// <summary>비어 있어도 이 시간까지는 기다린다. 새로고침 한 번은 여기 안에서 끝난다.</summary>
+    public static readonly TimeSpan Grace = TimeSpan.FromMinutes(2);
+
+    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
+
+    private readonly RoomManager _rooms;
+    private readonly ILogger<RoomJanitor> _log;
+
+    public RoomJanitor(RoomManager rooms, ILogger<RoomJanitor> log)
+    {
+        _rooms = rooms;
+        _log = log;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var removed = _rooms.SweepEmpty(Grace, DateTimeOffset.UtcNow);
+                if (removed.Count > 0)
+                {
+                    _log.LogInformation("빈 방 {Count}개 정리: {Ids}", removed.Count, string.Join(", ", removed));
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogDebug(ex, "room sweep");
+            }
+
+            await Task.Delay(Interval, stoppingToken);
+        }
+    }
+}

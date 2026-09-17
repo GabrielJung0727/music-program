@@ -8,6 +8,8 @@ export const MSG = {
   redeem: "redeem",
 
   createRoom: "create_room",
+  publishRoom: "publish_room",
+  closeRoom: "close_room",
   joinRoom: "join_room",
   leaveRoom: "leave_room",
   listRooms: "list_rooms",
@@ -139,7 +141,10 @@ export interface MonoMessage {
 }
 
 // Mono.Shared 의 enum 은 System.Text.Json 기본 설정상 숫자로 직렬화된다.
-export const RoomMode = { Open: 0, Invite: 1, Solo: 2 } as const
+// C# 의 Mono.Shared.RoomMode 와 값이 같아야 한다 — 이 숫자가 그대로 와이어에 실린다.
+// Solo 를 2 로 알고 보내던 동안 혼자 듣기가 HostQueue 룸으로 만들어졌고, 곡을 틀 때마다
+// 공개 라운지가 하나씩 생겼다. 새 값은 C# 쪽과 같이, 항상 뒤에 붙인다.
+export const RoomMode = { Open: 0, Invite: 1, HostQueue: 2, Audiophile: 3, Solo: 4 } as const
 export type RoomMode = (typeof RoomMode)[keyof typeof RoomMode]
 
 export const StreamingProvider = { Local: 0, Tidal: 1, Qobuz: 2 } as const

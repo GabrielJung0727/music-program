@@ -34,6 +34,65 @@ public sealed class RoomManager
         lock (_gate) return _rooms.Values.ToList();
     }
 
+    /// <summary>라운지 목록에 내보낼 방만. 혼자 듣기용 방은 여기 들어오지 않는다.</summary>
+    public IReadOnlyList<ListeningRoom> ListListed()
+    {
+        lock (_gate) return _rooms.Values.Where(r => r.IsListed).ToList();
+    }
+
+    /// <summary>
+    /// 호스트가 라운지를 닫는다. 방은 그 자리에서 사라지고 남아 있던 사람은 나간 것이 된다.
+    /// </summary>
+    public (ListeningRoom? Room, string? Error) Close(string roomId, string peerId)
+    {
+        lock (_gate)
+        {
+            if (!_rooms.TryGetValue(roomId, out var room))
+            {
+                return (null, "room not found");
+            }
+
+            if (room.HostPeerId != peerId)
+            {
+                return (null, "호스트만 라운지를 닫을 수 있습니다.");
+            }
+
+            _rooms.Remove(roomId);
+            return (room, null);
+        }
+    }
+
+    /// <summary>
+    /// 비어 있은 지 오래된 방을 지운다.
+    ///
+    /// 나가기는 멤버만 지우고 방은 남겨 뒀다 — 지우는 경로가 아예 없어서, 한 번 만들어진 방은
+    /// Core 가 죽을 때까지 목록에 남았다. 유예를 두는 건 새로고침·재접속으로 잠깐 비는 순간에
+    /// 듣던 큐까지 같이 날아가지 않게 하기 위해서다.
+    /// </summary>
+    public IReadOnlyList<string> SweepEmpty(TimeSpan grace, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            var removed = new List<string>();
+            foreach (var (id, room) in _rooms.ToList())
+            {
+                if (room.HasMembers)
+                {
+                    room.EmptySince = null;
+                    continue;
+                }
+
+                room.EmptySince ??= now;
+                if (now - room.EmptySince.Value < grace) continue;
+
+                _rooms.Remove(id);
+                removed.Add(id);
+            }
+
+            return removed;
+        }
+    }
+
     public ListeningRoom Create(string hostPeerId, string name, RoomMode mode, string? displayName)
     {
         lock (_gate)
@@ -154,6 +213,29 @@ public sealed class RoomManager
 
             RefreshPath(room);
             return (room, null);
+        }
+    }
+
+    /// <summary>
+    /// 컨트롤 연결이 끊겼을 때 그 사람을 있던 방에서 빼낸다.
+    ///
+    /// 창을 닫거나 새로고침하면 leave_room 은 오지 않는다. 그래서 끊긴 사람이 멤버 목록에
+    /// 그대로 남았고, 방은 아무도 없는데도 영원히 "비지 않은" 상태였다 — 청소부가 있어도
+    /// 지울 수 없고, 라운지 목록에는 유령 방만 쌓였다.
+    /// </summary>
+    public IReadOnlyList<ListeningRoom> DetachControl(string peerId)
+    {
+        lock (_gate)
+        {
+            var touched = new List<ListeningRoom>();
+            foreach (var room in _rooms.Values.ToList())
+            {
+                if (!room.ControlPeerIds.Contains(peerId) && !room.SpectatorPeerIds.Contains(peerId)) continue;
+                var (left, _) = Leave(room.Id, peerId);
+                if (left is not null) touched.Add(left);
+            }
+
+            return touched;
         }
     }
 

@@ -94,6 +94,10 @@ export interface MonoCommands {
 
   // 룸
   createRoom(name: string, mode?: RoomMode): Promise<string | null>
+  /** 듣던 방을 그대로 라운지로 연다. 큐와 재생 위치를 유지한다. */
+  publishRoom(name: string, mode?: RoomMode): Promise<string | null>
+  /** 호스트가 라운지를 닫는다. 성공하면 방이 사라진다. */
+  closeRoom(): Promise<boolean>
   joinRoom(roomId: string, inviteCode?: string): Promise<void>
   leaveRoom(): void
   refreshRooms(): Promise<void>
@@ -184,6 +188,14 @@ export function MonoProvider({ children }: { children: ReactNode }) {
 
   /** 내가 들어와 있는 룸 id. room_state 는 내가 없는 룸의 것도 올 수 있다. */
   const myRoomRef = useRef<string | null>(null)
+
+  /**
+   * 마지막 스냅샷의 거울. 명령 클로저가 최신 방 상태를 보려면 ref 여야 한다 —
+   * room 을 직접 잡으면 방이 갱신될 때마다 명령 묶음이 통째로 다시 만들어진다.
+   */
+  const roomRef = useRef<RoomSnapshot | null>(null)
+
+  useEffect(() => { roomRef.current = room }, [room])
 
   useEffect(() => {
     const offState = client.onState((s) => {
@@ -294,7 +306,13 @@ export function MonoProvider({ children }: { children: ReactNode }) {
     [client],
   )
 
-  /** 솔로 재생용 룸을 필요할 때 한 번 만든다. Core 에서는 혼자 듣기도 룸이다. */
+  /**
+   * 솔로 재생용 룸을 필요할 때 한 번 만든다. Core 에서는 혼자 듣기도 룸이다 —
+   * 큐와 타임라인과 출력이 매달릴 자리가 있어야 하기 때문이다.
+   *
+   * 다만 이 방은 라운지가 아니다. RoomMode.Solo 는 라운지 목록에 나가지 않으므로,
+   * 곡을 튼다고 해서 호스트가 되지는 않는다. 호스트는 publishRoom 으로 고르는 것이다.
+   */
   const ensureRoom = useCallback(async (): Promise<string | null> => {
     if (myRoomRef.current) return myRoomRef.current
     try {
@@ -350,6 +368,49 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           setLastError(err instanceof Error ? err.message : String(err))
           return null
         }
+      },
+
+      /**
+       * 지금 듣던 방을 그 자리에서 라운지로 연다. 새 방을 만들지 않으므로 큐도 재생 위치도
+       * 그대로다 — 틀어 둔 곡이 끊기지 않고, 솔로 방과 라운지가 따로 남지도 않는다.
+       * 들은 게 없어서 방이 아직 없으면 그때는 새로 만든다.
+       */
+      async publishRoom(name, mode = RoomMode.Open) {
+        try {
+          // 남의 방은 공개로 바꿀 수 없다. 게스트로 들어와 있는데 호스트를 누르면
+          // 그때는 내 라운지를 새로 연다.
+          const current = myRoomRef.current
+          if (!current || roomRef.current?.hostPeerId !== client.peerId) {
+            return await this.createRoom(name, mode)
+          }
+          const res = await client.request(
+            { type: MSG.publishRoom, roomId: current, roomName: name, mode },
+            MSG.roomState,
+          )
+          const snap = parseBody<RoomSnapshot>(res)
+          if (!snap) return null
+          myRoomRef.current = snap.id
+          setRoom(snap)
+          return snap.id
+        } catch (err) {
+          setLastError(err instanceof Error ? err.message : String(err))
+          return null
+        }
+      },
+
+      /** 호스트가 라운지를 닫는다. 방은 그 자리에서 사라진다. */
+      async closeRoom() {
+        const id = myRoomRef.current
+        if (!id) return false
+        try {
+          await client.request({ type: MSG.closeRoom, roomId: id }, MSG.roomState)
+        } catch (err) {
+          setLastError(err instanceof Error ? err.message : String(err))
+          return false
+        }
+        myRoomRef.current = null
+        setRoom(null)
+        return true
       },
 
       async joinRoom(id, inviteCode) {
