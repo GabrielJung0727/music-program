@@ -5,6 +5,7 @@ import type { PlayerMode } from "../PlayerBar"
 import type { QueueTrack } from "../../data/types"
 import { useLiveSession } from "../../state/useLiveSession"
 import { MonoIcon } from "../icons/MonoIcons"
+import { albumArt } from "../../lib/artwork"
 
 interface Props {
   selectedAlbum: any
@@ -96,10 +97,10 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
       <div className="flex items-start gap-10">
         <div className="relative shrink-0">
           {artSrc && (
-            <img src={artSrc} aria-hidden="true" className="absolute -inset-4 w-[calc(100%+32px)] h-[calc(100%+32px)] object-cover rounded-3xl pointer-events-none" style={{ opacity: 0.12, filter: "blur(40px)", zIndex: 0 }} />
+            <img src={albumArt(artSrc)} aria-hidden="true" className="absolute -inset-4 w-[calc(100%+32px)] h-[calc(100%+32px)] object-cover rounded-3xl pointer-events-none" style={{ opacity: 0.12, filter: "blur(40px)", zIndex: 0 }} />
           )}
           <img
-            src={artSrc}
+            src={albumArt(artSrc)}
             alt={selectedAlbum?.title}
             className="relative w-56 h-56 rounded-2xl object-cover shadow-xl"
             style={{ border: "1px solid var(--album-detail-border)", zIndex: 1, background: artSrc ? undefined : "#E4E4E7" }}

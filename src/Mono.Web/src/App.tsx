@@ -3,6 +3,7 @@ import LiveLoungePage, { type HostLaunchOpts } from "./components/lounge/LiveLou
 import LiveLoungeRoom from "./components/lounge/LiveLoungeRoom"
 import HomePage from "./components/home/HomePage"
 import AlbumDetailView from "./components/detail/AlbumDetailView"
+import AllLoungesDirectory from "./components/lounge/AllLoungesDirectory"
 import ArtistDetailView from "./components/detail/ArtistDetailView"
 import AccountRequiredGateModal from "./components/AccountRequiredGateModal"
 import StreamingLoginModal from "./components/StreamingLoginModal"
@@ -43,6 +44,7 @@ import {
 } from "./lib/homeData"
 import { useMono, useMonoCommands } from "./state/MonoProvider"
 import { RoomMode, StreamingProvider } from "./lib/protocol"
+import { albumArt } from "./lib/artwork"
 
 // ── (Components extracted to dedicated files) ─────────────────────────────────
 // LoungeCard, SocialLoungesSection, AlbumCard, RecentlyAddedSection,
@@ -315,6 +317,12 @@ export default function App() {
   }, [])
 
   const [activeLoungeRoom, setActiveLoungeRoom] = useState<boolean>(false)
+  /** Live Lounges 첫 화면 대신 전체 목록을 보여 주는 중인가. */
+  const [browsingAllLounges, setBrowsingAllLounges] = useState<boolean>(false)
+  // 탭을 떠나면 전체 목록도 닫는다. 다음에 Lounges 를 누른 사람은 첫 화면을 기대한다.
+  useEffect(() => {
+    if (currentTab !== "lounges") setBrowsingAllLounges(false)
+  }, [currentTab])
   const [joinedLoungeId, setJoinedLoungeId] = useState<string | null>(null)
   const [hostSessionPrivacy, setHostSessionPrivacy] = useState<"public" | "unlisted">("public")
   const [hostSessionSecretKey, setHostSessionSecretKey] = useState<string | undefined>(undefined)
@@ -823,7 +831,7 @@ export default function App() {
                 >
                   {topArtist.art ? (
                     <img
-                      src={topArtist.art}
+                      src={albumArt(topArtist.art)}
                       alt={topArtist.name}
                       className="w-20 h-20 rounded-xl object-cover shadow-md search-hit-art shrink-0"
                     />
@@ -890,7 +898,7 @@ export default function App() {
                           className="cursor-pointer group"
                         >
                           <div className="rounded-xl overflow-hidden mb-2 search-hit-art aspect-square">
-                            <img src={album.coverUrl} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            <img src={albumArt(album.coverUrl)} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           </div>
                           <p className="text-sm font-serif font-bold search-hit-title leading-snug transition">{album.title}</p>
                           <p className="text-xs font-mono search-hit-meta">{album.artist} · {album.year}</p>
@@ -918,7 +926,7 @@ export default function App() {
                       className="flex items-center gap-5 search-results-card rounded-2xl px-6 py-5 cursor-pointer transition group"
                     >
                       {room.art ? (
-                        <img src={room.art} alt={room.title} className="w-14 h-14 rounded-xl object-cover search-hit-art shrink-0" />
+                        <img src={albumArt(room.art)} alt={room.title} className="w-14 h-14 rounded-xl object-cover search-hit-art shrink-0" />
                       ) : (
                         <div className="w-14 h-14 rounded-xl search-hit-art shrink-0" />
                       )}
@@ -997,9 +1005,16 @@ export default function App() {
               onOpenShare={handleOpenShare}
               theme={theme}
             />
+          ) : browsingAllLounges ? (
+            <AllLoungesDirectory
+              rooms={lounges}
+              onJoin={(roomId) => { setBrowsingAllLounges(false); joinLounge(roomId) }}
+              onBack={() => setBrowsingAllLounges(false)}
+            />
           ) : (
             <LiveLoungePage
               onJoin={joinLounge}
+              onBrowseAll={() => setBrowsingAllLounges(true)}
               onGoLive={(opts) => handleStartLounge(opts)}
               onOpenShare={handleOpenShare}
               rooms={lounges}
@@ -1293,7 +1308,7 @@ export default function App() {
                 </div>
                 {room && (
                   <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <img src={room.art} alt={room.title} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", flexShrink: 0 }} />
+                    <img src={albumArt(room.art)} alt={room.title} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", flexShrink: 0 }} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#E2E8F0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{room.title}</div>
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#64748B", marginTop: 2 }}>{room.audioSpec} · {room.listenerCount} listening</div>

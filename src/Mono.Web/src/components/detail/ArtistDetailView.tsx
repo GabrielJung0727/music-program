@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { PlayerMode } from "../PlayerBar"
 import { MonoIcon } from "../icons/MonoIcons"
+import { albumArt } from "../../lib/artwork"
 
 interface Props {
   selectedArtist: any
@@ -86,7 +87,7 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
         <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden shrink-0 shadow-2xl" style={{ border: "2px solid rgba(255,255,255,0.1)", background: "var(--surface-elevated)" }}>
           {!avatarError && selectedArtist.avatarUrl ? (
             <img
-              src={selectedArtist.avatarUrl}
+              src={albumArt(selectedArtist.avatarUrl)}
               alt={selectedArtist.name}
               className="w-full h-full object-cover object-center"
               onError={() => setAvatarError(true)}
@@ -175,7 +176,7 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
                 style={{ border: "1px solid var(--artist-art-border)" }}
               >
                 <img
-                  src={album.art}
+                  src={albumArt(album.art)}
                   alt={album.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -204,7 +205,7 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
               onClick={() => handleAlbumClick(entry.albumTitle)}
             >
               <img
-                src={entry.art}
+                src={albumArt(entry.art)}
                 alt={entry.albumTitle}
                 className="w-12 h-12 rounded-lg object-cover shrink-0"
                 style={{ border: "1px solid var(--artist-art-border)" }}

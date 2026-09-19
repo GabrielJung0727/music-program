@@ -267,7 +267,7 @@ function buildSpotlights(rooms: LoungeRoom[]): SpotlightEntry[] {
 }
 
 // ── Live Lounges Page ────────────────────────────────────────────────────────
-export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, archives, mostPlayed, onLoadArchive }: {
+export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, archives, mostPlayed, onLoadArchive, onBrowseAll }: {
   /** roomId 없이 부르면 첫 라운지로 들어간다(디자인의 기본 CTA). */
   onJoin: (roomId?: string) => void
   onGoLive: (opts: HostLaunchOpts) => void
@@ -279,6 +279,8 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
   /** 청취 이력에서 집계한 재생 순위. */
   mostPlayed: { rank: number; track: string; artist: string; plays: number; dr: string }[]
   onLoadArchive: (archiveId: string) => void
+  /** 전체 목록 화면으로. 이 페이지는 큐레이션이라 방이 늘어나면 다 담지 못한다. */
+  onBrowseAll: () => void
 }) {
   const [selectedCategory, setSelectedCategory] = useState<"all" | "popular" | "debut" | "indie" | "cozy">("all")
   const [isHostModalOpen, setIsHostModalOpen] = useState(false)
@@ -458,6 +460,10 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
           )
         })}
         <span className="text-xs text-zinc-400 font-medium ml-auto">{displayedRooms.length} room{displayedRooms.length !== 1 ? "s" : ""}</span>
+        <button onClick={onBrowseAll} className="lounge-browse-all">
+          All Rooms
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
       </div>
 
       {/* Lounge Grid */}

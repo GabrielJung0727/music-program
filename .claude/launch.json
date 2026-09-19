@@ -4,8 +4,23 @@
     {
       "name": "mono-core",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/Mono.Core"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Mono.Core"
+      ],
       "port": 7702
+    },
+    {
+      "name": "mono-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "src/Mono.Web"
+      ],
+      "port": 5273
     }
   ]
 }

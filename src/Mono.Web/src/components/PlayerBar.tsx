@@ -6,7 +6,7 @@ import { stopOutput, useOutputStatus } from "../lib/shell"
 import { startConfiguredOutput, cachedSetup } from "../lib/setup"
 import { MonoIcon } from "./icons/MonoIcons"
 import { RepeatMode } from "../lib/protocol"
-import { FALLBACK_ART } from "../lib/artwork"
+import { albumArt, FALLBACK_ART } from "../lib/artwork"
 
 export type PlayerMode = "solo" | "host" | "guest"
 
@@ -367,7 +367,7 @@ export default function PlayerBar({
                   }}
                 >
                   <img
-                    src={currentTrack.art || (currentTrack as any).coverUrl || FALLBACK_ART}
+                    src={albumArt(currentTrack.art || (currentTrack as any).coverUrl || FALLBACK_ART)}
                     alt={currentTrack.title}
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />

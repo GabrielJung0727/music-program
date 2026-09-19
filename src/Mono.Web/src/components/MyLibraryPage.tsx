@@ -5,6 +5,7 @@ import { libAlbums, libArtists, libComposers, libPlaylists, libTracks, type LibT
 import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./TrackActionMenu"
 import type { ShareData } from "./ShareModal"
 import { MonoIcon } from "./icons/MonoIcons"
+import { albumArt } from "../lib/artwork"
 
 function getAudioFidelityRank(formatStr: string = ""): number {
   if (!formatStr) return 0
@@ -300,7 +301,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                 onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 8px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)" }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06)" }}
               >
-                <img src={album.art} alt={album.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s ease" }}
+                <img src={albumArt(album.art)} alt={album.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s ease" }}
                   onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.04)")}
                   onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                 />
@@ -334,7 +335,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                   ;(e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"
                 }}
               >
-                <img src={artist.art} alt={artist.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s ease" }}
+                <img src={albumArt(artist.art)} alt={artist.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s ease" }}
                   onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.08)")}
                   onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                 />
@@ -373,7 +374,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
             >
               <div style={{ position: "relative", paddingTop: "133.33%", overflow: "hidden", background: "#F1F5F9" }}>
                 <img
-                  src={composer.art}
+                  src={albumArt(composer.art)}
                   alt={composer.name}
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.3s ease" }}
                   onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.05)")}
@@ -426,12 +427,12 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                 {pl.arts && pl.arts.length >= 4 ? (
                   <div style={{ width: 104, height: 104, borderRadius: 10, overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", flexShrink: 0 }}>
                     {pl.arts.slice(0, 4).map((art, j) => (
-                      <img key={j} src={art} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <img key={j} src={albumArt(art)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     ))}
                   </div>
                 ) : (
                   <div style={{ width: 104, height: 104, borderRadius: 10, overflow: "hidden", flexShrink: 0 }}>
-                    <img src={pl.art} alt={pl.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <img src={albumArt(pl.art)} alt={pl.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
                 )}
 
@@ -583,7 +584,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
             return albumGroups.map((group, gi) => (
               <div key={gi} style={{ marginBottom: 20 }}>
                 <div className="flex items-center gap-3" style={{ padding: "12px 10px 8px", borderBottom: "1px solid var(--lib-album-group-divider)", marginBottom: 2 }}>
-                  <img src={group.art} alt={group.album} style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }} />
+                  <img src={albumArt(group.art)} alt={group.album} style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{group.album}</div>
                     <div style={{ fontSize: 11, color: "var(--lib-album-group-artist)" }}>{group.artist} · {group.year}</div>

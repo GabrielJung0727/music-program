@@ -3,6 +3,7 @@ import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock } from "../state/MonoProvider"
 import { useLiveSession } from "../state/useLiveSession"
 import { MonoIcon } from "./icons/MonoIcons"
+import { albumArt } from "../lib/artwork"
 
 export interface FullscreenPlayerProps {
   isOpen: boolean
@@ -173,7 +174,7 @@ export default function FullscreenPlayer({
                   >
                     <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-100 shrink-0">
                       <img
-                        src={pick.art}
+                        src={albumArt(pick.art)}
                         alt={pick.album}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -222,7 +223,7 @@ export default function FullscreenPlayer({
           <div className="flex flex-col items-center shrink-0 relative">
             {/* Ambient glow */}
             <img
-              src={currentTrack.art || currentTrack.coverUrl || ""}
+              src={albumArt(currentTrack.art || currentTrack.coverUrl || "")}
               aria-hidden="true"
               className="absolute -inset-8 w-full h-full object-cover rounded-3xl pointer-events-none"
               style={{ zIndex: 0, opacity: 0.25, filter: "blur(48px)" }}
@@ -235,7 +236,7 @@ export default function FullscreenPlayer({
               className="relative w-[320px] h-[320px] lg:w-[380px] lg:h-[380px] rounded-3xl overflow-hidden shadow-2xl cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:brightness-105 active:scale-[0.98]"
               style={{ zIndex: 1, border: "1px solid var(--nowplaying-art-border)" }}
             >
-              <img src={currentTrack.art || currentTrack.coverUrl || ""} alt={currentTrack.title} className="object-cover w-full h-full" />
+              <img src={albumArt(currentTrack.art || currentTrack.coverUrl || "")} alt={currentTrack.title} className="object-cover w-full h-full" />
             </div>
             {/* Track info */}
             <div className="mt-5 text-center" style={{ zIndex: 1, position: "relative" }}>

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import type { HomeAlbum, InsightCard, LabelTile, LoungeCard as LoungeCardData } from "../../lib/homeData"
 import { MonoIcon } from "../icons/MonoIcons"
+import { albumArt } from "../../lib/artwork"
 
 // ── Lounge Card ──────────────────────────────────────────────────────────────
 function LoungeCard({ card, isJoined, onJoin, onLeave }: {
@@ -57,7 +58,7 @@ function LoungeCard({ card, isJoined, onJoin, onLeave }: {
       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; (e.currentTarget as HTMLDivElement).style.borderColor = isJoined ? "rgba(59,130,246,0.45)" : "rgba(255,255,255,0.08)"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)" }}
     >
       <div className="flex items-start gap-3">
-        <img src={card.art} alt={card.title} style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover", background: "var(--surface-hover)", flexShrink: 0 }} />
+        <img src={albumArt(card.art)} alt={card.title} style={{ width: 48, height: 48, borderRadius: 8, objectFit: "cover", background: "var(--surface-hover)", flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", lineHeight: "1.3", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.title}</div>
           <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Host: {card.host}</div>
@@ -155,7 +156,7 @@ function AlbumCard({ album, onPlay, onSelect }: { album: HomeAlbum; onPlay?: (al
   return (
     <div className="group flex flex-col cursor-pointer" onClick={() => onSelect?.(album)}>
       <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-200">
-        <img src={album.art} alt={album.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        <img src={albumArt(album.art)} alt={album.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
         {onPlay && (
           <button

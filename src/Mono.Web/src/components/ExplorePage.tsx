@@ -5,6 +5,7 @@ import { libPlaylists } from "../lib/libraryData"
 import { formatDuration } from "../lib/adapters"
 import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./TrackActionMenu"
 import { MonoIcon } from "./icons/MonoIcons"
+import { albumArt } from "../lib/artwork"
 
 function IconChevron({ size = 12 }: { size?: number }) {
   return (
@@ -380,7 +381,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {dailyMixes.map((mix, i) => (
                 <div key={i}>
                   <div className="aspect-square rounded-xl overflow-hidden relative cursor-pointer" style={{ background: "var(--surface-elevated)", marginBottom: 8 }}>
-                    <img src={mix.art} alt={mix.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
+                    <img src={albumArt(mix.art)} alt={mix.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
                       onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.06)")}
                       onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                     />
@@ -437,7 +438,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {suggestedAlbums.map((album, i) => (
                 <div key={i} style={{ cursor: "pointer" }} onClick={() => onSelectAlbum?.({ ...album, coverUrl: album.art })}>
                   <AlbumArtFrame>
-                    <img src={album.art} alt={album.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
+                    <img src={albumArt(album.art)} alt={album.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
                       onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.04)")}
                       onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                     />
@@ -463,7 +464,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {selections.map((item, i) => (
                 <div key={i} style={{ cursor: "pointer" }} onClick={() => onSelectAlbum?.({ art: item.art, coverUrl: item.art, title: item.title, artist: item.artist, year: item.year, trackIds: item.trackIds })}>
                   <AlbumArtFrame>
-                    <img src={item.art} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
+                    <img src={albumArt(item.art)} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
                       onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.04)")}
                       onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                     />
@@ -483,7 +484,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {awards.map((item, i) => (
                 <div key={i} style={{ cursor: "pointer" }} onClick={() => onSelectAlbum?.({ art: item.art, coverUrl: item.art, title: item.title, artist: item.artist, trackIds: item.trackIds })}>
                   <AlbumArtFrame>
-                    <img src={item.art} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
+                    <img src={albumArt(item.art)} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.25s" }}
                       onMouseEnter={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1.04)")}
                       onMouseLeave={(e) => ((e.target as HTMLImageElement).style.transform = "scale(1)")}
                     />
@@ -509,7 +510,7 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
                 <div key={i} className="explore-playlist-card">
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", aspectRatio: "1 / 1" }}>
                     {pl.arts.map((art, j) => (
-                      <img key={j} src={art} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <img key={j} src={albumArt(art)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     ))}
                   </div>
                   <div style={{ padding: "12px 14px 14px" }}>
@@ -556,7 +557,7 @@ function ExploreTrackRow({
         menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
       }}
     >
-      <img src={track.art} alt={track.title} className="w-10 h-10 rounded-md object-cover shrink-0" />
+      <img src={albumArt(track.art)} alt={track.title} className="w-10 h-10 rounded-md object-cover shrink-0" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="explore-album-title" style={{ marginBottom: 1 }}>{track.title}</div>
         <div className="explore-artist-name" style={{ fontSize: 11 }}>{track.artist}</div>
