@@ -284,7 +284,10 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     private bool TryOpen(DeviceConfig config, AudioClientShareMode share, out string refusal)
     {
         refusal = "";
-        for (var attempt = 0; attempt < 4; attempt++)
+        // ASIO 드라이버가 장치를 놓는 데 걸리는 시간은 장치마다 다르다. Fireface 처럼
+        // 끈질긴 장치는 2초를 넘기기도 해서, 예전 창(4회 × 600ms)에서는 간헐적으로
+        // 열리지 않고 그대로 실패했다. 기다리는 쪽이 실패보다 낫다 — 바쁘다는 응답일 때만 돈다.
+        for (var attempt = 0; attempt < 8; attempt++)
         {
             if (TryOpenOnce(config, share, out refusal)) return true;
             if (!LooksBusy(refusal)) return false;
@@ -296,9 +299,12 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
 
     private static bool LooksBusy(string refusal)
         => refusal.Contains("0x8889000A", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("0x88890008", StringComparison.OrdinalIgnoreCase)
            || refusal.Contains("being used", StringComparison.OrdinalIgnoreCase)
            || refusal.Contains("사용 중", StringComparison.OrdinalIgnoreCase)
-           || refusal.Contains("AUDCLNT_E_DEVICE_IN_USE", StringComparison.OrdinalIgnoreCase);
+           || refusal.Contains("in use", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("AUDCLNT_E_DEVICE_IN_USE", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("AUDCLNT_E_DEVICE_INVALIDATED", StringComparison.OrdinalIgnoreCase);
 
     private static bool Matches(WaveFormat actual, WaveFormat requested)
         => actual.SampleRate == requested.SampleRate

@@ -206,8 +206,11 @@ public sealed class CommandProcessor
             case MessageTypes.SeekPin:
                 return From(_rooms.SeekToPin(NeedRoom(peerId, msg), peerId, msg.Text ?? ""));
 
+            // 웹은 delta 로, CLI 는 index 로 보낸다. 예전에는 index 만 읽어서 웹의 「이전」
+            // (delta = -1)이 통째로 무시되고 기본값 1 이 쓰였다 — 이전을 눌러도 다음 곡으로
+            // 넘어가던 원인이다. 둘 다 받는다.
             case MessageTypes.Skip:
-                return From(_rooms.Skip(NeedRoom(peerId, msg), peerId, msg.Index ?? 1));
+                return From(_rooms.Skip(NeedRoom(peerId, msg), peerId, msg.Delta ?? msg.Index ?? 1));
 
             case MessageTypes.Resync:
                 return From(_rooms.Resync(NeedRoom(peerId, msg), peerId));

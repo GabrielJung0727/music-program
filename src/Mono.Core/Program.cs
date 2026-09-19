@@ -67,7 +67,7 @@ builder.Services.AddHostedService<FanOutService>();
 builder.Services.AddHostedService<TransportService>();
 builder.Services.AddHostedService<RetentionService>();
 builder.Services.AddHostedService<RoomJanitor>();
-builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanScheduler>(sp, library));
+builder.Services.AddHostedService(sp => ActivatorUtilities.CreateInstance<ScanScheduler>(sp, (IReadOnlyList<string>)libraryRoots));
 
 builder.Services.AddSingleton<ControlSession>();
 

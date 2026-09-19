@@ -3,14 +3,20 @@ using Mono.Protocol;
 
 namespace Mono.Core;
 
-/// <summary>라이브러리 스캔 스케줄. 기동 직후 1회, 이후 주기적으로 훑는다.</summary>
+/// <summary>
+/// 라이브러리 스캔 스케줄. 기동 직후 1회, 이후 주기적으로 훑는다.
+///
+/// 설정된 폴더를 전부 본다. 예전에는 기본 폴더 하나만 봤기 때문에, 사용자가 따로 추가한
+/// 폴더의 곡은 누가 스캔을 직접 누르기 전까지 태그를 다시 읽지 않았다 — 스캐너를 고쳐도
+/// 그 폴더에는 옛 메타데이터가 그대로 남았다.
+/// </summary>
 public sealed class ScanScheduler : BackgroundService
 {
     private readonly LibraryScanner _scanner;
     private readonly CatalogStore _catalog;
     private readonly RoomBroadcaster _broadcaster;
     private readonly ILogger<ScanScheduler> _log;
-    private readonly string _root;
+    private readonly IReadOnlyList<string> _roots;
     private readonly TimeSpan _interval;
 
     public ScanScheduler(
@@ -19,13 +25,13 @@ public sealed class ScanScheduler : BackgroundService
         RoomBroadcaster broadcaster,
         IConfiguration config,
         ILogger<ScanScheduler> log,
-        string root)
+        IReadOnlyList<string> roots)
     {
         _scanner = scanner;
         _catalog = catalog;
         _broadcaster = broadcaster;
         _log = log;
-        _root = root;
+        _roots = roots;
         var minutes = config.GetValue<int?>("Mono:ScanIntervalMinutes") ?? 30;
         _interval = TimeSpan.FromMinutes(Math.Max(1, minutes));
     }
@@ -37,7 +43,7 @@ public sealed class ScanScheduler : BackgroundService
             try
             {
                 var before = _catalog.Tracks.Count;
-                var count = _scanner.Scan(_root);
+                var count = _scanner.ScanAll(_roots);
                 if (_catalog.Tracks.Count != before)
                 {
                     _log.LogInformation("라이브러리 스캔: 파일 {Count}개, 카탈로그 {Tracks}곡", count, _catalog.Tracks.Count);

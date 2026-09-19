@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Mono.Core;
+using Mono.Protocol;
 using Mono.Shared;
 using Xunit;
 
@@ -25,6 +26,24 @@ public class TransportOrderTests
             new StreamingHub(catalog),
             new EndpointRegistry(Path.Combine(dir, "e.db")));
         return (rooms, catalog);
+    }
+
+    /// <summary>같은 룸·카탈로그 위에 명령 처리기를 얹는다 — 와이어에서 오는 메시지를 그대로 흘려보내려고.</summary>
+    private static CommandProcessor NewCommands(RoomManager rooms, CatalogStore catalog)
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mono-" + Guid.NewGuid().ToString("n"));
+        Directory.CreateDirectory(dir);
+        var streaming = new StreamingHub(catalog, Path.Combine(dir, "streaming.json"));
+        var history = new HistoryStore(Path.Combine(dir, "h.db"));
+        var endpoints = new EndpointRegistry(Path.Combine(dir, "e.db"));
+        return new CommandProcessor(
+            rooms, catalog,
+            new LibraryScanner(catalog, new ArtworkService(Path.Combine(dir, "art"))),
+            streaming, new PairingService(), history, endpoints,
+            new ZoneRegistry(Path.Combine(dir, "z.db")),
+            new WikipediaService(new HttpClient(), Path.Combine(dir, "wiki")),
+            new BackupService(dir),
+            [Path.Combine(dir, "library")]);
     }
 
     private static List<string> Album(CatalogStore catalog, int count, long durationMs = 240_000)
@@ -259,5 +278,86 @@ public class TransportOrderTests
         catalog.SetTrackDuration(ids[0], 275_000);
 
         Assert.Equal(275_000, catalog.Tracks[ids[0]].DurationMs);
+    }
+
+    /// <summary>
+    /// 웹은 skip 을 delta 로 보낸다. 예전에는 Core 가 index 만 읽어서 delta 가 통째로
+    /// 무시됐고, 기본값 1 이 쓰여 「이전」을 눌러도 다음 곡으로 넘어갔다.
+    /// </summary>
+    [Fact]
+    public void PreviousFromTheWebGoesBackNotForward()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 3);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        var commands = NewCommands(rooms, catalog);
+        rooms.PlayList(room.Id, "me", ids, 1);
+
+        commands.Execute("me", new MonoMessage { Type = MessageTypes.Skip, RoomId = room.Id, Delta = -1 }, "Listener");
+
+        Assert.Equal(0, room.QueueIndex);
+    }
+
+    /// <summary>CLI 는 index 로 보낸다. 그쪽도 그대로 동작해야 한다.</summary>
+    [Fact]
+    public void PreviousFromTheCliStillWorks()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 3);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        var commands = NewCommands(rooms, catalog);
+        rooms.PlayList(room.Id, "me", ids, 2);
+
+        commands.Execute("me", new MonoMessage { Type = MessageTypes.Skip, RoomId = room.Id, Index = -1 }, "Listener");
+
+        Assert.Equal(1, room.QueueIndex);
+    }
+
+    /// <summary>
+    /// 한참 듣다가 누른 「이전」은 이 곡을 처음부터 다시 튼다 — 실수로 한 번 눌렀다고
+    /// 듣던 곡을 잃지 않는다.
+    /// </summary>
+    [Fact]
+    public void PreviousRestartsTheTrackWhenYouAreIntoIt()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 3);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        rooms.PlayList(room.Id, "me", ids, 1);
+        rooms.Seek(room.Id, "me", 30_000);
+
+        rooms.Skip(room.Id, "me", -1);
+
+        Assert.Equal(1, room.QueueIndex);
+        Assert.Equal(0, room.MediaTimeAtOriginMs);
+    }
+
+    /// <summary>곡의 맨 앞에서 누르면 그때는 앞 곡으로 간다.</summary>
+    [Fact]
+    public void PreviousGoesBackWhenYouAreAtTheStart()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 3);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        rooms.PlayList(room.Id, "me", ids, 1);
+
+        rooms.Skip(room.Id, "me", -1);
+
+        Assert.Equal(0, room.QueueIndex);
+    }
+
+    /// <summary>「다음」은 그대로 다음 곡이다.</summary>
+    [Fact]
+    public void NextStillGoesForward()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 3);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        rooms.PlayList(room.Id, "me", ids, 0);
+        rooms.Seek(room.Id, "me", 30_000);
+
+        rooms.Skip(room.Id, "me", 1);
+
+        Assert.Equal(1, room.QueueIndex);
     }
 }

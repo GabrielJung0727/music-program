@@ -19,6 +19,14 @@ public sealed class ProcessSupervisor
 
     /// <summary>지금 돌고 있는 워커를 띄울 때 쓴 인자. 규격이 바뀌었는지 이걸로 판정한다.</summary>
     private string? _outputArgs;
+
+    /// <summary>
+    /// 마지막으로 워커를 띄울 때 쓴 인자. 워커를 내려도 지우지 않는다 —
+    /// 장치를 놓아줄 시간을 줘야 하는지는 "지금 돌고 있는가"가 아니라
+    /// "직전에 무엇으로 열었는가"로 정해진다. 죽은 워커의 드라이버 핸들도
+    /// 한동안 장치를 물고 있다.
+    /// </summary>
+    private string? _lastOutputArgs;
     private bool _outputIntentionallyStopped;
     private readonly Queue<DateTimeOffset> _restarts = new();
 
@@ -138,19 +146,26 @@ public sealed class ProcessSupervisor
         // 가리킨다 — 사용자는 바뀐 줄 알고 있으므로 무엇이 틀렸는지 알아낼 방법이 없다.
         if (OutputRunning && OutputRoomId == roomId && _outputArgs == args) return true;
 
-        var leavingAsio = OutputRunning && _outputArgs is not null && _outputArgs.Contains("--asio") && !args.Contains("--asio");
-        var enteringAsio = OutputRunning && _outputArgs is not null && !_outputArgs.Contains("--asio") && args.Contains("--asio");
+        // 직전에 무엇으로 열었는지로 판정한다. 예전에는 "지금 돌고 있는가"를 함께 봤는데,
+        // 워커가 이미 죽었거나 RestartOutput 으로 먼저 끊긴 뒤에는 그 조건이 거짓이 되어
+        // 기다리지 않고 바로 열었다. 드라이버 핸들은 프로세스보다 오래 남으므로 그때
+        // 장치가 잡혀 있고, ASIO 를 쓰다 WASAPI 로 돌아올 때 간헐적으로 열리지 않았다.
+        var previous = _outputArgs ?? _lastOutputArgs;
+        var wasAsio = previous?.Contains("--asio") == true;
+        var willBeAsio = args.Contains("--asio");
         if (OutputRunning) StopOutput();
 
-        // ASIO 는 프로세스를 Kill 해도 드라이버 핸들이 한동안 장치에 남아 있다.
-        // Fireface 처럼 배타 잠금이 끈질긴 장치에서 그 상태로 WASAPI 를 열면
-        // 공유/배타 버퍼가 겹쳐 지직거린다. ASIO 쪽 ReleaseHold(3s) 와 맞춘다.
-        if (leavingAsio || enteringAsio)
+        if (previous is not null && previous != args)
         {
-            AppLog.Write("control", leavingAsio
-                ? "ASIO → WASAPI: waiting for exclusive handle release"
-                : "WASAPI → ASIO: waiting for endpoint release");
-            Thread.Sleep(2800);
+            // ASIO 는 프로세스를 Kill 해도 드라이버 핸들이 한동안 장치에 남아 있다.
+            // Fireface 처럼 배타 잠금이 끈질긴 장치에서 그 상태로 WASAPI 를 열면
+            // 공유/배타 버퍼가 겹쳐 지직거린다. ASIO 쪽 ReleaseHold(3s) 와 맞춘다.
+            //
+            // ASIO 가 끼지 않은 전환(배타 → 공유, 장치 변경)도 짧게 기다린다. 엔드포인트가
+            // 완전히 풀리기 전에 다시 열면 같은 장치를 두 번 잡는 모양이 된다.
+            var waitMs = wasAsio || willBeAsio ? 2800 : 500;
+            AppLog.Write("control", $"output backend change: waiting {waitMs}ms for device release");
+            Thread.Sleep(waitMs);
         }
 
         try
@@ -158,6 +173,7 @@ public sealed class ProcessSupervisor
             _outputIntentionallyStopped = false;
             _output = StartSilent(exe, args);
             _outputArgs = args;
+            _lastOutputArgs = args;
             OutputRoomId = roomId;
             _outputHost = host;
             WatchOutput(_output);

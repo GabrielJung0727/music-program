@@ -751,6 +751,9 @@ public sealed class RoomManager
         }
     }
 
+    /// <summary>이 시간을 넘겨 들은 뒤의 「이전」은 앞 곡이 아니라 이 곡의 처음으로 간다.</summary>
+    public const long PreviousRestartsTrackMs = 3_000;
+
     public (ListeningRoom? Room, string? Error) Skip(string roomId, string peerId, int delta)
     {
         lock (_gate)
@@ -763,6 +766,15 @@ public sealed class RoomManager
             if (!room.CanDirect(peerId))
             {
                 return (null, "only host may skip");
+            }
+
+            // 곡을 한참 듣다가 누른 「이전」은 앞 곡으로 가라는 뜻이 아니라 이 곡을 다시
+            // 처음부터 들려 달라는 뜻이다. 플레이어의 오랜 관습이고, 그렇지 않으면 실수로
+            // 한 번 누를 때마다 방금 듣던 곡을 잃는다. 맨 앞에서 누르면 그때 앞 곡으로 간다.
+            if (delta < 0 && room.CurrentMediaTimeMs() > PreviousRestartsTrackMs)
+            {
+                StartTrackTimeline(room, 0);
+                return (room, null);
             }
 
             MarkComplete(room);
