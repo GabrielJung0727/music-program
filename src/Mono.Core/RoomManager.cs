@@ -1690,7 +1690,7 @@ public sealed class RoomManager
         var artist = track is null ? null : _catalog.Artists.GetValueOrDefault(track.ArtistId);
         var lyrics = LyricsParser.Parse(track?.LyricsLrc);
         var media = room.CurrentMediaTimeMs();
-        var duration = EffectiveDuration(track);
+        var duration = track?.DurationMs ?? 0;
         return new
         {
             room.Id,
@@ -1870,8 +1870,14 @@ public sealed class RoomManager
             .Concat(room.SpectatorPeerIds)
             .Distinct();
 
+    /// <summary>
+    /// 화면과 타임라인에 나가는 길이. 추정치를 내보내지 않는다 —
+    /// 실제보다 짧은 길이를 진행 바에 물리면 그 지점에서 바가 끝에 붙어 멈춘다
+    /// (노래는 계속 나오는데 바만 안 움직이는 증상). 모르면 0 으로 두고 화면이
+    /// 눈금 없이 그리게 한다. 값은 재생하면서 디코더에게 물어 채워진다.
+    /// </summary>
     public long EffectiveDurationOf(ListeningRoom room)
-        => EffectiveDuration(room.CurrentTrack(_catalog.Tracks));
+        => room.CurrentTrack(_catalog.Tracks)?.DurationMs ?? 0;
 
     private static long EffectiveDuration(Track? track)
         => track is null ? 0 : track.DurationMs > 0 ? track.DurationMs : 180_000;

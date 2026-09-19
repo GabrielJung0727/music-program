@@ -12,14 +12,23 @@ public sealed class TransportService : BackgroundService
     private readonly RoomManager _rooms;
     private readonly RoomBroadcaster _broadcaster;
     private readonly ConnectionRegistry _connections;
+    private readonly CatalogStore _catalog;
     private readonly ILogger<TransportService> _log;
     private DateTimeOffset _lastTimeline = DateTimeOffset.MinValue;
+    /// <summary>길이를 물어본 트랙. 열리지 않는 파일에 매 틱마다 다시 묻지 않는다.</summary>
+    private readonly HashSet<string> _probed = [];
 
-    public TransportService(RoomManager rooms, RoomBroadcaster broadcaster, ConnectionRegistry connections, ILogger<TransportService> log)
+    public TransportService(
+        RoomManager rooms,
+        RoomBroadcaster broadcaster,
+        ConnectionRegistry connections,
+        CatalogStore catalog,
+        ILogger<TransportService> log)
     {
         _rooms = rooms;
         _broadcaster = broadcaster;
         _connections = connections;
+        _catalog = catalog;
         _log = log;
     }
 
@@ -29,6 +38,11 @@ public sealed class TransportService : BackgroundService
         {
             try
             {
+                foreach (var room in FillMissingDurations())
+                {
+                    await _broadcaster.PublishAsync(room, stoppingToken);
+                }
+
                 foreach (var room in _rooms.AdvanceFinished())
                 {
                     await _broadcaster.PublishAsync(room, stoppingToken);
@@ -59,6 +73,44 @@ public sealed class TransportService : BackgroundService
 
             await Task.Delay(250, stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// 재생 중인 트랙의 길이가 비어 있으면 디코더에게 물어 채운다.
+    ///
+    /// 태그에 길이가 없는 파일은 스캔에서 0 으로 들어온다. 0 이면 진행 바가 눈금을
+    /// 못 잡고, 예전처럼 추정치(3분)를 물리면 그 지점에서 바가 끝에 붙어 멈춘다.
+    /// 파일을 여는 일이므로 룸 잠금 밖에서, 트랙당 한 번만 한다.
+    /// </summary>
+    private List<ListeningRoom> FillMissingDurations()
+    {
+        var changed = new List<ListeningRoom>();
+        foreach (var room in _rooms.List().Where(r => r.Playing))
+        {
+            var track = room.CurrentTrack(_catalog.Tracks);
+            if (track is null || track.DurationMs > 0 || !_probed.Add(track.Id))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var slicer = AudioSourceFactory.Open(track);
+                if (slicer.DurationMs <= 0)
+                {
+                    continue;
+                }
+
+                _catalog.SetTrackDuration(track.Id, slicer.DurationMs);
+                changed.Add(room);
+            }
+            catch (Exception ex)
+            {
+                _log.LogDebug(ex, "duration probe {Track}", track.Id);
+            }
+        }
+
+        return changed;
     }
 
     private async Task SendTimelineAsync(ListeningRoom room, CancellationToken ct)

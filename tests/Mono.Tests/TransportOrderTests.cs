@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Mono.Core;
 using Mono.Shared;
 using Xunit;
@@ -210,5 +211,53 @@ public class TransportOrderTests
 
         Assert.True(room.ResyncEpoch > before);
         Assert.Equal(60_000, room.MediaTimeAtOriginMs);
+    }
+
+    /// <summary>
+    /// 길이를 모르면 추정치를 화면에 내보내지 않는다.
+    ///
+    /// 실제보다 짧은 길이를 진행 바에 물리면 그 지점에서 바가 끝에 붙어 멈춘다 —
+    /// 노래는 계속 나오는데 바만 안 움직이는 증상이다. 0 을 주고 화면이 눈금 없이
+    /// 그리게 한다.
+    /// </summary>
+    [Fact]
+    public void AnUnknownDurationIsReportedAsUnknown()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 1, durationMs: 0);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        rooms.PlayList(room.Id, "me", ids, 0);
+
+        Assert.Equal(0, rooms.EffectiveDurationOf(room));
+
+        using var snapshot = JsonDocument.Parse(rooms.SnapshotJson(room));
+        Assert.Equal(0, snapshot.RootElement.GetProperty("durationMs").GetInt64());
+    }
+
+    /// <summary>아는 길이는 그대로 나간다.</summary>
+    [Fact]
+    public void AKnownDurationIsReportedAsIs()
+    {
+        var (rooms, catalog) = NewStack();
+        var ids = Album(catalog, 1, durationMs: 321_000);
+        var room = rooms.Create("me", "내 방", RoomMode.Solo, "Listener");
+        rooms.PlayList(room.Id, "me", ids, 0);
+
+        Assert.Equal(321_000, rooms.EffectiveDurationOf(room));
+
+        using var snapshot = JsonDocument.Parse(rooms.SnapshotJson(room));
+        Assert.Equal(321_000, snapshot.RootElement.GetProperty("durationMs").GetInt64());
+    }
+
+    /// <summary>재생하며 알아낸 길이는 카탈로그에 남는다 — 다음부터는 처음부터 제대로 보인다.</summary>
+    [Fact]
+    public void ADiscoveredDurationIsWrittenBack()
+    {
+        var (_, catalog) = NewStack();
+        var ids = Album(catalog, 1, durationMs: 0);
+
+        catalog.SetTrackDuration(ids[0], 275_000);
+
+        Assert.Equal(275_000, catalog.Tracks[ids[0]].DurationMs);
     }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Lock } from "lucide-react"
 import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock, useMonoCommands } from "../state/MonoProvider"
@@ -144,10 +144,50 @@ export default function PlayerBar({
   const cmd = useMonoCommands()
   const { positionMs, durationMs } = useMediaClock()
 
-  // 진행률은 Core 의 미디어 시계에서 온다. 드래그 중에만 로컬 값이 이긴다.
+  /*
+   * 진행률은 Core 의 미디어 시계가 진실이다. 로컬 값(scrubbing)은 "아직 확정되지 않은
+   * 요청"일 뿐이고, 절대 영구히 이기지 않는다.
+   *
+   * 예전에는 input 의 pointerup 에서만 로컬 값을 비웠다. 그 한 번을 놓치면 — 3px 짜리
+   * 막대라 바 밖에서 손을 떼는 일이 잦다 — 바가 그 자리에 붙어 버렸다. 노래는 흘러가는데
+   * 바만 안 움직이는 증상이 이것이다. 이제 세 가지가 로컬 값을 반드시 거둬 간다:
+   * 세대(resyncEpoch)가 바뀌거나, 창 어디서든 손을 떼거나, 조작이 멎고 1.5초가 지나거나.
+   * 드래그 중에는 움직일 때마다 타이머가 다시 서므로 끌고 있는 동안은 끊기지 않는다.
+   */
   const [scrubbing, setScrubbing] = useState<number | null>(null)
-  const livePercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0
+  const epoch = room?.resyncEpoch ?? 0
+
+  const hasTimeline = durationMs > 0
+  const livePercent = hasTimeline ? (positionMs / durationMs) * 100 : 0
   const progress = scrubbing ?? livePercent
+
+  const commitSeek = () => {
+    if (scrubbing === null || !hasTimeline) return
+    cmd.seek((scrubbing / 100) * durationMs)
+  }
+  // 창 리스너가 늘 최신 클로저를 부르도록 참조로 들고 있는다.
+  const commitSeekRef = useRef(commitSeek)
+  commitSeekRef.current = commitSeek
+
+  // Core 가 탐색을 받아 세대를 올리면 그 즉시 시계로 돌아간다.
+  useEffect(() => { setScrubbing(null) }, [epoch])
+
+  useEffect(() => {
+    if (scrubbing === null) return
+    const release = () => commitSeekRef.current()
+    window.addEventListener("pointerup", release)
+    window.addEventListener("pointercancel", release)
+    // 손 떼는 것을 끝내 못 들었을 때의 마지막 안전망. 여기서는 탐색을 보내지 않는다 —
+    // 어디서 끝났는지 모르는 조작을 대신 확정하는 것보다, 바를 시계에 돌려주는 편이 낫다.
+    // 값이 바뀔 때마다 이 효과가 다시 걸려 타이머도 다시 서므로 끌고 있는 동안에는 닿지 않는다.
+    const id = setTimeout(() => setScrubbing(null), 1500)
+    return () => {
+      window.removeEventListener("pointerup", release)
+      window.removeEventListener("pointercancel", release)
+      clearTimeout(id)
+    }
+  }, [scrubbing])
+
   const setProgress = (percent: number) => setScrubbing(percent)
 
   // 볼륨은 출력 엔드포인트가 진실이다. 없으면 100 으로 보인다.
@@ -544,28 +584,19 @@ export default function PlayerBar({
               style={{ flex: 1, position: "relative", height: 3, borderRadius: 2, cursor: (isListener || !currentTrack) ? "not-allowed" : "pointer" }}
             >
               {currentTrack && (
-                <div className={`h-full rounded-full transition-all duration-300 ${seekbarColor}`} style={{ position: "absolute", left: 0, top: 0, width: `${progress || 35}%`, pointerEvents: "none" }} />
+                <div className={`h-full rounded-full transition-all duration-300 ${seekbarColor}`} style={{ position: "absolute", left: 0, top: 0, width: `${Math.max(0, Math.min(100, progress))}%`, pointerEvents: "none" }} />
               )}
               <input
                 type="range" min={0} max={100} step={0.1} value={currentTrack ? progress : 0}
                 onChange={(e) => { if (!isListener && currentTrack) setProgress(Number(e.target.value)) }}
-                onPointerUp={() => {
-                  if (scrubbing === null || durationMs <= 0) return
-                  cmd.seek((scrubbing / 100) * durationMs)
-                  setScrubbing(null)
-                }}
-                onKeyUp={() => {
-                  if (scrubbing === null || durationMs <= 0) return
-                  cmd.seek((scrubbing / 100) * durationMs)
-                  setScrubbing(null)
-                }}
-                disabled={!currentTrack || isListener}
+                onKeyUp={commitSeek}
+                disabled={!currentTrack || isListener || !hasTimeline}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: (isListener || !currentTrack) ? "not-allowed" : "pointer", margin: 0 }}
               />
             </div>
 
             <span className="player-time-display player-time-display--right">
-              {currentTrack ? fmt(totalSecs) : "--:--"}
+              {currentTrack && hasTimeline ? fmt(totalSecs) : "--:--"}
             </span>
           </div>
         </div>

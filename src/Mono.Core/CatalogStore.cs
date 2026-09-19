@@ -95,6 +95,30 @@ public sealed class CatalogStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// 길이만 고쳐 쓴다. 태그에 길이가 없는 파일은 스캔 시점에 0 으로 들어오는데,
+    /// 0 이면 진행 바가 눈금을 못 잡고 트랙의 끝도 알 수 없다. 재생하면서 디코더가
+    /// 알려 준 값을 여기로 되돌려 둔다 — 다음부터는 처음부터 제대로 보인다.
+    /// </summary>
+    public void SetTrackDuration(string trackId, long durationMs)
+    {
+        if (durationMs <= 0) return;
+
+        lock (_gate)
+        {
+            if (!_tracks.TryGetValue(trackId, out var track) || track.DurationMs == durationMs)
+            {
+                return;
+            }
+
+            using var con = Open();
+            con.Execute(
+                "UPDATE tracks SET duration_ms=$dur WHERE id=$id",
+                ("$dur", durationMs), ("$id", trackId));
+            track.DurationMs = durationMs;
+        }
+    }
+
     public IReadOnlyList<object> Search(string query)
     {
         lock (_gate)
