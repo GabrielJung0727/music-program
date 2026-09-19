@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
-import { pickFolder, listAudioDevices, restartOutput, outputStatus, hasShell, type AudioDeviceListing } from "../lib/shell"
+import { pickFolder, listAudioDevices, restartOutput, outputStatus, hasShell, useOutputStatus, type AudioDeviceListing } from "../lib/shell"
 import { loadSetup, saveSetup, startConfiguredOutput, type AudioSetup } from "../lib/setup"
 import StreamingLoginModal from "./StreamingLoginModal"
 import GeneralSystemSettings from "./settings/GeneralSystemSettings"
@@ -21,6 +21,7 @@ export default function SettingsPage({
 }) {
   const { room, folders, catalog } = useMono()
   const cmd = useMonoCommands()
+  const worker = useOutputStatus()
   const [settingsTab, setSettingsTab] = useState<"audio" | "lens" | "storage" | "accounts" | "general">(initialTab)
   const [scanning, setScanning] = useState(false)
   const [engineNote, setEngineNote] = useState<string | null>(null)
@@ -76,7 +77,8 @@ export default function SettingsPage({
       setEngineNote("출력 장치는 저장했습니다. 적용은 Mono 데스크톱 앱에서만 됩니다.")
       return
     }
-    const res = await startConfiguredOutput(room?.id ?? null)
+    const roomId = room?.id ?? await cmd.ensureSoloRoom()
+    const res = await startConfiguredOutput(roomId)
     setEngineNote(res.ok
       ? `출력을 ${next.deviceName || "기본 장치"} 로 전환했습니다.`
       : (res.error ?? "출력을 전환하지 못했습니다."))
@@ -97,6 +99,8 @@ export default function SettingsPage({
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 400))
       if ((roomRef.current?.outputs?.length ?? 0) > 0) return true
+      const st = await outputStatus()
+      if (st?.running && st.roomId) return true
     }
     return false
   }
@@ -109,7 +113,10 @@ export default function SettingsPage({
   const connected = (room?.outputs ?? [])[0] ?? null
   const telemetry = connected?.stats
     ? `Offset ${(connected.stats.offsetMs ?? 0).toFixed(2)}ms • Jitter ${(connected.stats.jitterMs ?? 0).toFixed(2)}ms • Buffer ${connected.stats.bufferMs ?? 0}ms • ${connected.stats.locked ? "Locked" : "Unlocked"}`
-    : (connected?.note ?? "출력이 아직 연결되지 않았습니다.")
+    : connected?.note
+      ?? (worker?.running
+        ? `출력 워커 실행 중 (${worker.backend}) — 재생하면 이 장치에 붙습니다.`
+        : "출력이 아직 연결되지 않았습니다.")
 
   // 워커가 배타를 거절당해 공유로 내려갔으면 그 사실이 여기로 올라온다.
   const deviceNotice = connected?.stats?.deviceError ?? null
@@ -275,16 +282,10 @@ export default function SettingsPage({
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button
                     onClick={async () => {
-                      const res = await startConfiguredOutput(room?.id ?? null)
+                      const roomId = room?.id ?? await cmd.ensureSoloRoom()
+                      const res = await startConfiguredOutput(roomId)
                       if (!res.ok) {
                         setEngineNote(res.error ?? "출력을 시작하지 못했습니다.")
-                        return
-                      }
-
-                      // 프로세스가 떴다는 것과 장치가 붙었다는 것은 다르다. 띄우자마자
-                      // "연결했습니다" 라고 하면, 소리는 안 나는데 화면만 연결됐다고 말한다.
-                      if (!room?.id) {
-                        setEngineNote("출력 워커를 띄웠습니다. 재생을 시작하면 이 장치로 나갑니다.")
                         return
                       }
 
@@ -292,7 +293,9 @@ export default function SettingsPage({
                       const attached = await waitForOutput()
                       setEngineNote(attached
                         ? "출력을 연결했습니다."
-                        : "워커는 떴지만 아직 장치가 붙지 않았습니다. 상태를 눌러 확인해 보세요.")
+                        : worker?.running
+                          ? "워커는 실행 중입니다. 재생을 시작하면 이 장치로 나갑니다."
+                          : "워커는 떴지만 아직 장치가 붙지 않았습니다. 상태를 눌러 확인해 보세요.")
                     }}
                     style={{ flex: 1, padding: "9px 12px", borderRadius: 9, border: "1px solid var(--settings-input-border)", background: "var(--settings-input-bg)", color: "var(--settings-input-text)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                   >

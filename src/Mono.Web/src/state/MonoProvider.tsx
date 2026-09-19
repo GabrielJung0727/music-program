@@ -13,6 +13,7 @@ import {
   MSG,
   parseBody,
   QualityPolicy,
+  RepeatMode,
   RoomMode,
   StreamingProvider,
   type AlbumDetail,
@@ -27,6 +28,7 @@ import {
   type RoomSnapshot,
 } from "../lib/protocol"
 import { groupIntoAlbums, type LiveAlbum } from "../lib/adapters"
+import { clearDiscordNowPlaying, setDiscordNowPlaying } from "../lib/shell"
 
 /** Core 는 hello 의 displayName 을 멤버 목록·아카이브 참가자에 그대로 쓴다. */
 const NAME_KEY = "mono.displayName"
@@ -93,6 +95,8 @@ export interface MonoCommands {
   request(msg: MonoMessage, expect?: string): Promise<MonoMessage>
 
   // 룸
+  /** 솔로 재생용 룸. 없으면 만들고, 있으면 그 id. 출력 워커를 붙일 자리가 필요할 때 쓴다. */
+  ensureSoloRoom(): Promise<string | null>
   createRoom(name: string, mode?: RoomMode): Promise<string | null>
   /** 듣던 방을 그대로 라운지로 연다. 큐와 재생 위치를 유지한다. */
   publishRoom(name: string, mode?: RoomMode): Promise<string | null>
@@ -110,6 +114,8 @@ export interface MonoCommands {
   previous(): void
   seek(mediaTimeMs: number): void
   jumpTo(index: number): void
+  setShuffle(on: boolean): void
+  setRepeat(mode: RepeatMode): void
   setVolume(percent: number, targetPeerId?: string): void
 
   // 큐
@@ -117,6 +123,8 @@ export interface MonoCommands {
   enqueueMany(trackIds: string[]): void
   playNow(trackId: string): Promise<void>
   playAlbum(trackIds: string[]): Promise<void>
+  /** 목록을 통째로 큐에 걸고 고른 칸부터 재생한다. 앨범 가운데 곡을 눌렀을 때 쓴다. */
+  playFrom(trackIds: string[], startIndex: number): Promise<void>
   removeFromQueue(index: number): void
   moveInQueue(index: number, delta: number): void
   clearQueue(): void
@@ -196,6 +204,32 @@ export function MonoProvider({ children }: { children: ReactNode }) {
   const roomRef = useRef<RoomSnapshot | null>(null)
 
   useEffect(() => { roomRef.current = room }, [room])
+
+  // Discord 활동 카드. 곡이 바뀔 때만 보낸다 — 채팅·볼륨마다 때리면 Discord 가 잘라 낸다.
+  useEffect(() => {
+    const track = room?.currentTrack
+    if (!track) {
+      void clearDiscordNowPlaying()
+      return
+    }
+    void setDiscordNowPlaying({
+      title: track.title,
+      artist: track.artistName,
+      album: track.albumTitle,
+      artUrl: track.artUrl,
+      playing: room?.playing ?? false,
+      mediaOriginUnixMs: room?.mediaOriginUnixMs ?? 0,
+      mediaTimeAtOriginMs: room?.mediaTimeAtOriginMs ?? 0,
+      durationMs: track.durationMs || room?.durationMs || 0,
+    })
+  }, [
+    room?.currentTrack?.id,
+    room?.currentTrack?.title,
+    room?.playing,
+    room?.mediaOriginUnixMs,
+    room?.mediaTimeAtOriginMs,
+    room?.durationMs,
+  ])
 
   useEffect(() => {
     const offState = client.onState((s) => {
@@ -353,6 +387,8 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       send,
       request,
 
+      ensureSoloRoom: () => ensureRoom(),
+
       async createRoom(name, mode = RoomMode.Open) {
         try {
           const res = await client.request(
@@ -398,19 +434,22 @@ export function MonoProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      /** 호스트가 라운지를 닫는다. 방은 그 자리에서 사라진다. */
+      /** 호스트가 라운지를 끝낸다. 방은 솔로로 남고 큐·재생은 그대로다. */
       async closeRoom() {
         const id = myRoomRef.current
         if (!id) return false
         try {
-          await client.request({ type: MSG.closeRoom, roomId: id }, MSG.roomState)
+          const res = await client.request({ type: MSG.closeRoom, roomId: id }, MSG.roomState)
+          const snap = parseBody<RoomSnapshot>(res)
+          if (snap) {
+            myRoomRef.current = snap.id
+            setRoom(snap)
+          }
+          return true
         } catch (err) {
           setLastError(err instanceof Error ? err.message : String(err))
           return false
         }
-        myRoomRef.current = null
-        setRoom(null)
-        return true
       },
 
       async joinRoom(id, inviteCode) {
@@ -448,6 +487,8 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       previous: () => withRoom({ type: MSG.skip, delta: -1 }),
       seek: (mediaTimeMs) => withRoom({ type: MSG.seek, mediaTimeMs: Math.max(0, Math.round(mediaTimeMs)) }),
       jumpTo: (index) => withRoom({ type: MSG.jumpTo, index }),
+      setShuffle: (on) => withRoom({ type: MSG.setShuffle, flag: on }),
+      setRepeat: (mode) => withRoom({ type: MSG.setRepeat, index: mode }),
       setVolume: (percent, targetPeerId) =>
         withRoom({
           type: MSG.setVolume,
@@ -464,17 +505,48 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       async playNow(trackId) {
         const id = await ensureRoom()
         if (!id) return
-        client.send({ type: MSG.enqueue, roomId: id, trackId })
-        // 방금 넣은 곡으로 건너뛴다. 큐가 비어 있었다면 Core 가 알아서 0번을 재생한다.
-        client.send({ type: MSG.play, roomId: id })
+        const q = roomRef.current?.queue ?? []
+        const currentIndex = roomRef.current?.queueIndex ?? -1
+        const existing = q.findIndex((item) => item.trackId === trackId)
+        if (existing >= 0) {
+          // 지금 재생 중인 곡을 다시 고르면 jump 가 origin 을 0 으로 되감는다.
+          if (existing === currentIndex) {
+            if (!roomRef.current?.playing) {
+              client.send({ type: MSG.play, roomId: id })
+            }
+            return
+          }
+          client.send({ type: MSG.jumpTo, roomId: id, index: existing })
+        } else {
+          // enqueue 다음에 jump — 같은 TCP 순서라 방금 넣은 칸이 q.length 다.
+          client.send({ type: MSG.enqueue, roomId: id, trackId })
+          client.send({ type: MSG.jumpTo, roomId: id, index: q.length })
+        }
+        if (!roomRef.current?.playing) {
+          client.send({ type: MSG.play, roomId: id })
+        }
       },
 
       async playAlbum(trackIds) {
+        await this.playFrom(trackIds, 0)
+      },
+
+      /**
+       * 앨범 전체를 큐에 걸고 고른 칸부터 재생한다.
+       *
+       * 예전에는 clear → enqueue × N → play 를 따로 보냈다. 명령 사이마다 룸 상태가
+       * 방송되므로 큐에 한 곡만 들어 있는 순간이 보였고, 가운데 곡을 고르면 그 곡만
+       * 큐 끝에 붙어 순서가 뒤엉킨 것처럼(셔플이 켜진 것처럼) 보였다. 한 번에 보낸다.
+       */
+      async playFrom(trackIds, startIndex) {
         const id = await ensureRoom()
         if (!id || trackIds.length === 0) return
-        client.send({ type: MSG.clearQueue, roomId: id })
-        for (const trackId of trackIds) client.send({ type: MSG.enqueue, roomId: id, trackId })
-        client.send({ type: MSG.play, roomId: id })
+        client.send({
+          type: MSG.playList,
+          roomId: id,
+          trackIds,
+          index: Math.max(0, Math.min(startIndex, trackIds.length - 1)),
+        })
       },
 
       removeFromQueue: (index) => withRoom({ type: MSG.removeQueue, index }),

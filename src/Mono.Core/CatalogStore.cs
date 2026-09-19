@@ -47,7 +47,12 @@ public sealed class CatalogStore : IDisposable
     public IReadOnlyDictionary<string, Album> Albums { get { lock (_gate) return _albums; } }
     public IReadOnlyDictionary<string, Artist> Artists { get { lock (_gate) return _artists; } }
 
-    public void UpsertTrack(Track track, Album album, Artist artist)
+    /// <summary>
+    /// 트랙 한 개를 저장한다. <paramref name="albumArtist"/> 는 컴필레이션처럼 트랙 아티스트와
+    /// 앨범 아티스트가 다를 때만 넘긴다 — 앨범이 가리키는 아티스트 행이 없으면 앨범 화면의
+    /// 아티스트 이름이 빈칸이 된다.
+    /// </summary>
+    public void UpsertTrack(Track track, Album album, Artist artist, Artist? albumArtist = null)
     {
         lock (_gate)
         {
@@ -60,6 +65,11 @@ public sealed class CatalogStore : IDisposable
 
             using var con = Open();
             UpsertArtist(con, artist);
+            if (albumArtist is not null && albumArtist.Id != artist.Id)
+            {
+                UpsertArtist(con, albumArtist);
+            }
+
             UpsertAlbum(con, album);
             con.Execute("""
                 INSERT INTO tracks(id,title,album_id,artist_id,local_path,streaming_id,source,quality,sample_rate,bit_depth,channels,is_dsd,dsd_rate,duration_ms,lyrics,art,merged,track_no,genres,composers,added_at)
@@ -79,6 +89,7 @@ public sealed class CatalogStore : IDisposable
                 ("$gen", PackList(track.Genres)), ("$cmp", PackList(track.Composers)),
                 ("$added", track.AddedAt.ToString("o")));
             _artists[artist.Id] = artist;
+            if (albumArtist is not null) _artists[albumArtist.Id] = albumArtist;
             _albums[album.Id] = album;
             _tracks[track.Id] = track;
         }

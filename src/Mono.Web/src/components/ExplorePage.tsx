@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useRef } from "react"
 import { useMono } from "../state/MonoProvider"
 import { useLiveSession } from "../state/useLiveSession"
 import { libPlaylists } from "../lib/libraryData"
 import { formatDuration } from "../lib/adapters"
-import TrackActionMenu, { type TrackActionTarget } from "./TrackActionMenu"
+import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./TrackActionMenu"
 import { MonoIcon } from "./icons/MonoIcons"
 
 function IconChevron({ size = 12 }: { size?: number }) {
@@ -25,7 +25,7 @@ interface ExplorePageProps {
 
 export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSelectAlbum, connectedServices, onConnectService }: ExplorePageProps = {}) {
   const { catalog, playlists: corePlaylists } = useMono()
-  const { albums } = useLiveSession()
+  const { albums, currentTrack, playing } = useLiveSession()
 
   // Core 에는 편집자 추천 API 가 없다. 화면의 세 구획을 카탈로그에서 정직하게 채운다:
   // 최근 추가된 앨범 · DR 이 높은(다이내믹) 앨범 · 내 플레이리스트.
@@ -413,28 +413,14 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
               {recommendedColumns.map((col, ci) => (
                 <div key={ci} style={{ display: "flex", flexDirection: "column" }}>
                   {col.map((track, ti) => (
-                    <div
+                    <ExploreTrackRow
                       key={ti}
-                      className="group relative flex items-center gap-3 p-2 rounded-lg cursor-pointer"
-                      style={{ borderBottom: "1px solid var(--explore-track-divider)", transition: "background 0.12s" }}
-                      onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "var(--explore-track-hover-bg)")}
-                      onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
-                    >
-                      <img src={track.art} alt={track.title} className="w-10 h-10 rounded-md object-cover shrink-0" />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="explore-album-title" style={{ marginBottom: 1 }}>{track.title}</div>
-                        <div className="explore-artist-name" style={{ fontSize: 11 }}>{track.artist}</div>
-                      </div>
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>{track.duration}</span>
-                      {(onPlayNow || onPlayNext || onAddToQueue) && (
-                        <TrackActionMenu
-                          track={{ id: track.id, title: track.title, artist: track.artist, duration: track.duration, art: track.art }}
-                          onPlayNow={onPlayNow ?? (() => {})}
-                          onPlayNext={onPlayNext ?? (() => {})}
-                          onAddToQueue={onAddToQueue ?? (() => {})}
-                        />
-                      )}
-                    </div>
+                      track={track}
+                      opensMenu={playing && currentTrack != null && currentTrack.id !== track.id && currentTrack.title !== track.title}
+                      onPlayNow={onPlayNow}
+                      onPlayNext={onPlayNext}
+                      onAddToQueue={onAddToQueue}
+                    />
                   ))}
                 </div>
               ))}
@@ -540,6 +526,52 @@ export default function ExplorePage({ onPlayNow, onPlayNext, onAddToQueue, onSel
 
       <div style={{ height: 40 }} />
       </>)}
+    </div>
+  )
+}
+
+function ExploreTrackRow({
+  track,
+  opensMenu,
+  onPlayNow,
+  onPlayNext,
+  onAddToQueue,
+}: {
+  track: { id: string; title: string; artist: string; duration: string; art: string }
+  opensMenu: boolean
+  onPlayNow?: (track: TrackActionTarget) => void
+  onPlayNext?: (track: TrackActionTarget) => void
+  onAddToQueue?: (track: TrackActionTarget) => void
+}) {
+  const menuRef = useRef<TrackActionHandle>(null)
+  const payload: TrackActionTarget = { id: track.id, title: track.title, artist: track.artist, duration: track.duration, art: track.art }
+  return (
+    <div
+      className="group relative flex items-center gap-3 p-2 rounded-lg cursor-pointer"
+      style={{ borderBottom: "1px solid var(--explore-track-divider)", transition: "background 0.12s" }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = "var(--explore-track-hover-bg)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest(".track-more-btn, .track-dropdown-menu")) return
+        menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
+      }}
+    >
+      <img src={track.art} alt={track.title} className="w-10 h-10 rounded-md object-cover shrink-0" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="explore-album-title" style={{ marginBottom: 1 }}>{track.title}</div>
+        <div className="explore-artist-name" style={{ fontSize: 11 }}>{track.artist}</div>
+      </div>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>{track.duration}</span>
+      {(onPlayNow || onPlayNext || onAddToQueue) && (
+        <TrackActionMenu
+          ref={menuRef}
+          track={payload}
+          onPlayNow={onPlayNow ?? (() => {})}
+          onPlayNext={onPlayNext ?? (() => {})}
+          onAddToQueue={onAddToQueue ?? (() => {})}
+          titleOpensMenu={opensMenu}
+        />
+      )}
     </div>
   )
 }

@@ -28,6 +28,14 @@ public sealed class ListeningRoom
     public bool QueueLocked { get; set; }
     public bool FollowHostView { get; set; }
     public bool AutoAdvance { get; set; } = true;
+    /// <summary>
+    /// 셔플. 큐의 순서를 흐트러뜨리지 않고 "다음에 무엇을 트는가"만 바꾼다 —
+    /// 큐를 직접 섞으면 셔플을 끈 뒤에도 앨범 순서가 돌아오지 않는다.
+    /// </summary>
+    public bool Shuffle { get; set; }
+    public RepeatMode Repeat { get; set; } = RepeatMode.Off;
+    /// <summary>셔플이 이번 바퀴에 이미 튼 큐 인덱스. 한 바퀴를 돌면 비운다.</summary>
+    public List<int> ShuffleHistory { get; } = [];
     /// <summary>큐가 끝나갈 때 후보 3곡을 제시하는 스마트 오토플레이. 무응답이면 1번 후보를 재생한다.</summary>
     public bool SmartAutoplay { get; set; } = true;
     /// <summary>이번에 후보를 제시한 트랙 — 같은 트랙에 중복 제시하지 않기 위한 표식.</summary>

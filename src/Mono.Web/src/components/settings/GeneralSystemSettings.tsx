@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useMono, useMonoCommands } from "../../state/MonoProvider"
 import { MSG } from "../../lib/protocol"
-import { applyUpdate, checkForUpdate, hasShell, onUpdateProgress, type UpdateStatus } from "../../lib/shell"
+import { applyUpdate, checkForUpdate, hasShell, onUpdateProgress, type UpdateStatus, discordActivityStatus, setDiscordActivityEnabled, setDiscordApplicationId, openExternal } from "../../lib/shell"
 import { clearSetup } from "../../lib/setup"
 
 type RamBuffer = "Direct Disk Stream" | "512 MB" | "1 GB (Recommended)" | "2 GB Full Album"
@@ -964,6 +964,92 @@ type UpdatePhase = "idle" | "checking" | "current" | "available" | "downloading"
  * Velopack 피드에서 새 버전을 확인하고 적용한다.
  * 설치본에서만 동작한다 — zip 으로 풀어 쓰는 경우 교체할 대상이 없다.
  */
+function DiscordSection() {
+  const [enabled, setEnabled] = useState(true)
+  const [hasAppId, setHasAppId] = useState(false)
+  const [appId, setAppId] = useState("")
+  const [note, setNote] = useState<string | null>(null)
+  const desktop = hasShell()
+
+  useEffect(() => {
+    void discordActivityStatus().then((s) => {
+      if (!s) return
+      setEnabled(s.enabled)
+      setHasAppId(s.hasAppId)
+    })
+  }, [])
+
+  return (
+    <Section>
+      <SectionHeader
+        title="Discord"
+        subtitle="친구 목록에 Listening to Mono 로 지금 곡이 뜹니다. Discord 데스크톱이 켜져 있어야 합니다."
+      />
+      <Row
+        label="Show now playing on Discord"
+        subtitle={desktop
+          ? (hasAppId ? "Activity is ready — play a track to see it on your profile." : "Needs a Discord Application ID once. Open the portal, create an app named Mono, paste the ID below.")
+          : "Desktop app only."}
+        control={
+          <Toggle
+            value={enabled}
+            onChange={(v) => {
+              setEnabled(v)
+              void setDiscordActivityEnabled(v)
+            }}
+          />
+        }
+      />
+      <div style={{ padding: "12px 0 4px" }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--settings-row-label)", marginBottom: 6 }}>
+          Discord Application ID
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            value={appId}
+            onChange={(e) => setAppId(e.target.value)}
+            placeholder={hasAppId ? "Saved — paste a new ID to replace" : "e.g. 123456789012345678"}
+            disabled={!desktop}
+            style={{
+              flex: 1, minWidth: 0, fontFamily: "'DM Mono', monospace", fontSize: 12,
+              padding: "8px 10px", borderRadius: 8,
+              border: "1px solid var(--settings-input-border)",
+              background: "var(--settings-input-bg)", color: "var(--settings-input-text)",
+            }}
+          />
+          <Btn
+            disabled={!desktop || !appId.trim()}
+            onClick={() => {
+              void setDiscordApplicationId(appId.trim()).then((ok) => {
+                setHasAppId(ok)
+                setNote(ok ? "Application ID saved." : "Could not save the ID.")
+              })
+            }}
+          >
+            Save
+          </Btn>
+        </div>
+        <button
+          type="button"
+          onClick={() => openExternal("https://discord.com/developers/applications")}
+          style={{
+            marginTop: 8, background: "none", border: "none", padding: 0, cursor: "pointer",
+            fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--settings-row-sub)",
+            textDecoration: "underline",
+          }}
+        >
+          Open Discord Developer Portal →
+        </button>
+        {note && (
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "var(--settings-row-sub)", marginTop: 6 }}>
+            {note}
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
 function UpdateSection({ showToast }: { showToast: (msg: string) => void }) {
   const [phase, setPhase] = useState<UpdatePhase>("idle")
   const [status, setStatus] = useState<UpdateStatus | null>(null)
@@ -1186,6 +1272,8 @@ export default function GeneralSystemSettings({
           control={<Toggle value={s.exclusiveMediaKeys} onChange={(v) => patch("exclusiveMediaKeys", v)} />}
         />
       </Section>
+
+      <DiscordSection />
 
       {/* Section 2: Display & Audio Badges */}
       <Section>

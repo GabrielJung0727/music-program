@@ -1,8 +1,8 @@
 ## mono – Self-Contained + Velopack 릴리스
 ## 대상: Windows 11 x64
 ##
-##   .\publish.ps1 -Version 0.5.2
-##   .\publish.ps1 -Version 0.5.2 -SkipZip -GitHubRelease
+##   .\publish.ps1 -Version 0.5.3
+##   .\publish.ps1 -Version 0.5.3 -SkipZip -GitHubRelease
 
 param(
     ## 비워 두면 Directory.Build.props 에서 읽는다. 여기에 숫자를 또 박아 두면 그쪽이 낡아도

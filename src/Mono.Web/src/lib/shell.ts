@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react"
+
 // Mono.Control(WebView2 셸)이 심어 주는 네이티브 브리지.
 // 브라우저에서 그냥 열면 window.mono 가 없다 — 호출부는 항상 hasShell() 을 먼저 본다.
 
@@ -29,6 +31,23 @@ export interface UpdateStatus {
   installed: boolean
 }
 
+export interface DiscordNowPlaying {
+  title: string
+  artist?: string | null
+  album?: string | null
+  artUrl?: string | null
+  playing: boolean
+  mediaOriginUnixMs: number
+  mediaTimeAtOriginMs: number
+  durationMs: number
+}
+
+export interface DiscordActivityStatus {
+  enabled: boolean
+  connected: boolean
+  hasAppId: boolean
+}
+
 interface MonoBridge {
   isShell: true
   call(op: string, args?: Record<string, unknown>): Promise<unknown>
@@ -52,6 +71,13 @@ interface MonoBridge {
     logPath(): Promise<string>
     quit(): Promise<boolean>
     minimizeToTray(): Promise<boolean>
+  }
+  discord: {
+    set(payload: DiscordNowPlaying): Promise<{ ok: boolean; connected: boolean }>
+    clear(): Promise<boolean>
+    status(): Promise<DiscordActivityStatus>
+    setEnabled(enabled: boolean): Promise<{ enabled: boolean }>
+    setAppId(appId: string): Promise<{ hasAppId: boolean }>
   }
 }
 
@@ -167,4 +193,49 @@ export async function outputStatus(): Promise<OutputStatus | null> {
   } catch {
     return null
   }
+}
+
+/** 셸 출력 워커가 실제로 떠 있는지. 룸 스냅샷의 outputs 보다 앞선 신호다. */
+export function useOutputStatus(intervalMs = 1500): OutputStatus | null {
+  const [status, setStatus] = useState<OutputStatus | null>(null)
+  useEffect(() => {
+    if (!hasShell()) return
+    let alive = true
+    const tick = async () => {
+      const next = await outputStatus()
+      if (alive) setStatus(next)
+    }
+    void tick()
+    const id = window.setInterval(() => { void tick() }, intervalMs)
+    return () => { alive = false; window.clearInterval(id) }
+  }, [intervalMs])
+  return status
+}
+
+export async function setDiscordNowPlaying(payload: DiscordNowPlaying): Promise<void> {
+  const bridge = shell()
+  if (!bridge) return
+  try { await bridge.discord.set(payload) } catch { /* Discord 가 꺼져 있으면 그냥 넘어간다 */ }
+}
+
+export async function clearDiscordNowPlaying(): Promise<void> {
+  try { await shell()?.discord.clear() } catch { /* ignore */ }
+}
+
+export async function discordActivityStatus(): Promise<DiscordActivityStatus | null> {
+  const bridge = shell()
+  if (!bridge) return null
+  try { return await bridge.discord.status() } catch { return null }
+}
+
+export async function setDiscordActivityEnabled(enabled: boolean): Promise<boolean> {
+  const bridge = shell()
+  if (!bridge) return false
+  try { return (await bridge.discord.setEnabled(enabled)).enabled } catch { return false }
+}
+
+export async function setDiscordApplicationId(appId: string): Promise<boolean> {
+  const bridge = shell()
+  if (!bridge) return false
+  try { return (await bridge.discord.setAppId(appId)).hasAppId } catch { return false }
 }

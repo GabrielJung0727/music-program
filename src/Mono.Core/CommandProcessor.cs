@@ -105,8 +105,19 @@ public sealed class CommandProcessor
             case MessageTypes.CloseRoom:
             {
                 var roomId = NeedRoom(peerId, msg);
+                var before = _rooms.Get(roomId);
+                var guests = before is null
+                    ? []
+                    : before.ControlPeerIds.Concat(before.SpectatorPeerIds)
+                        .Where(id => id != peerId)
+                        .Distinct()
+                        .ToList();
                 var closed = _rooms.Close(roomId, peerId);
-                if (closed.Error is null) _peerRoom.TryRemove(peerId, out _);
+                if (closed.Error is null)
+                {
+                    // 호스트는 솔로 방에 남는다. 게스트만 바인딩을 끊는다.
+                    foreach (var guest in guests) _peerRoom.TryRemove(guest, out _);
+                }
                 return From(closed);
             }
 
@@ -170,6 +181,17 @@ public sealed class CommandProcessor
 
             case MessageTypes.JumpTo:
                 return From(_rooms.JumpTo(NeedRoom(peerId, msg), peerId, msg.Index ?? 0));
+
+            // 앨범을 통째로 걸고 고른 칸부터 재생한다. clear/enqueue/jump/play 를 따로 보내면
+            // 그 사이사이의 룸 상태가 방송되어 큐가 한 곡짜리로 보이는 순간이 생긴다.
+            case MessageTypes.PlayList:
+                return From(_rooms.PlayList(NeedRoom(peerId, msg), peerId, msg.TrackIds ?? [], msg.Index ?? 0));
+
+            case MessageTypes.SetShuffle:
+                return From(_rooms.SetShuffle(NeedRoom(peerId, msg), peerId, msg.Flag ?? false));
+
+            case MessageTypes.SetRepeat:
+                return From(_rooms.SetRepeat(NeedRoom(peerId, msg), peerId, (RepeatMode)(msg.Index ?? 0)));
 
             // ── 트랜스포트 ──────────────────────────────────────
             case MessageTypes.Play:

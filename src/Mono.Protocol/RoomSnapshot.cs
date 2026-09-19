@@ -37,6 +37,8 @@ public sealed class RoomSnapshot
     public bool FollowHostView { get; set; }
     public bool AutoAdvance { get; set; }
     public bool SmartAutoplay { get; set; }
+    public bool Shuffle { get; set; }
+    public RepeatMode Repeat { get; set; }
     public int LinerPage { get; set; }
     public double LinerScrollY { get; set; }
     public int MaxMembers { get; set; }

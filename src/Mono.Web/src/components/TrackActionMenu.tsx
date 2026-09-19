@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react"
 
 export interface TrackActionTarget {
   /** Core 의 트랙 id. 목업에서 온 항목에는 없어서 제목으로 되찾는다. */
@@ -19,22 +19,37 @@ interface Props {
   onPlayNext: (track: TrackActionTarget) => void
   onAddToQueue: (track: TrackActionTarget) => void
   isGuest?: boolean
+  /** 제목 노드. 클릭 시 메뉴를 열거나(재생 중 다른 곡) 바로 Play Now. */
+  title?: React.ReactNode
+  /** true 면 제목 클릭이 메뉴를 연다. false/생략 이면 제목 클릭 = Play Now. */
+  titleOpensMenu?: boolean
+  /** 제목만 쓰는 칸에서는 케밥을 숨긴다. */
+  hideKebab?: boolean
 }
 
 interface MenuPos { top: number; left: number; flipUp: boolean }
 
-export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQueue, isGuest }: Props) {
+/** 행 전체 클릭이 제목 클릭과 같게 동작하게 한다. */
+export type TrackActionHandle = {
+  activate: (anchor: DOMRect) => void
+}
+
+const TrackActionMenu = forwardRef<TrackActionHandle, Props>(function TrackActionMenu(
+  { track, onPlayNow, onPlayNext, onAddToQueue, isGuest, title, titleOpensMenu, hideKebab },
+  ref,
+) {
   const [isOpen, setIsOpen] = useState(false)
   const [pos, setPos] = useState<MenuPos>({ top: 0, left: 0, flipUp: false })
   const btnRef = useRef<HTMLButtonElement>(null)
+  const titleRef = useRef<HTMLElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
   useEffect(() => {
     if (!isOpen) return
     const handle = (e: MouseEvent) => {
       if (
         !btnRef.current?.contains(e.target as Node) &&
+        !titleRef.current?.contains(e.target as Node) &&
         !menuRef.current?.contains(e.target as Node)
       ) setIsOpen(false)
     }
@@ -42,7 +57,6 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
     return () => document.removeEventListener("mousedown", handle)
   }, [isOpen])
 
-  // Close on Escape
   useEffect(() => {
     if (!isOpen) return
     const handle = (e: KeyboardEvent) => { if (e.key === "Escape") setIsOpen(false) }
@@ -50,24 +64,56 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
     return () => document.removeEventListener("keydown", handle)
   }, [isOpen])
 
-  const openMenu = (e: React.MouseEvent) => {
+  const placeMenu = (anchor: DOMRect, alignLeft: boolean) => {
+    const menuHeight = isGuest ? 110 : 168
+    const flipUp = anchor.bottom + menuHeight + 8 > window.innerHeight
+    const left = alignLeft ? anchor.left : anchor.right - 192
+    setPos({
+      top: flipUp ? anchor.top - menuHeight - 4 : anchor.bottom + 4,
+      left: Math.max(8, left),
+      flipUp,
+    })
+    setIsOpen(true)
+  }
+
+  const openFromKebab = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!btnRef.current) return
-    const r = btnRef.current.getBoundingClientRect()
-    const menuHeight = isGuest ? 80 : 132
-    const flipUp = r.bottom + menuHeight + 8 > window.innerHeight
-    // Align right edge of menu with right edge of button
-    setPos({ top: flipUp ? r.top - menuHeight - 4 : r.bottom + 4, left: r.right - 192, flipUp })
-    setIsOpen(v => !v)
+    if (isOpen) { setIsOpen(false); return }
+    placeMenu(btnRef.current.getBoundingClientRect(), false)
   }
+
+  const onTitleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    activate(e.currentTarget.getBoundingClientRect(), true)
+  }
+
+  const activate = (anchor: DOMRect, alignLeft = true) => {
+    if (titleOpensMenu) {
+      if (isOpen) { setIsOpen(false); return }
+      placeMenu(anchor, alignLeft)
+      return
+    }
+    onPlayNow(track)
+  }
+
+  useImperativeHandle(ref, () => ({
+    activate: (anchor) => activate(anchor, true),
+  }))
 
   const run = (fn: () => void) => { fn(); setIsOpen(false) }
 
   return (
     <>
+      {title != null && (
+        <span ref={titleRef as React.RefObject<HTMLSpanElement>} onClick={onTitleClick} style={{ cursor: "pointer" }}>
+          {title}
+        </span>
+      )}
+      {!hideKebab && (
       <button
         ref={btnRef}
-        onClick={openMenu}
+        onClick={openFromKebab}
         aria-expanded={isOpen}
         className={`track-more-btn p-1.5 rounded-md transition-all cursor-pointer ${isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
         title="More options"
@@ -84,6 +130,7 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
           <circle cx="19" cy="12" r="1.5"/>
         </svg>
       </button>
+      )}
 
       {isOpen && (
         <div
@@ -109,7 +156,9 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
               }
             `}</style>
 
-            {/* Play Now */}
+            <div className="track-menu-kicker">Selected track</div>
+            <div className="track-menu-current">{track.title}</div>
+
             <MenuItem
               icon={
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -119,7 +168,6 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
               onClick={() => run(() => onPlayNow(track))}
             />
 
-            {/* Play Next */}
             <MenuItem
               icon={
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -133,17 +181,13 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
               onClick={() => run(() => onPlayNext(track))}
             />
 
-            {/* Add to Queue */}
             <MenuItem
               icon={
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-                  <line x1="8" y1="18" x2="21" y2="18"/>
-                  <line x1="3" y1="6"  x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
-                  <line x1="3" y1="18" x2="3.01" y2="18"/>
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               }
-              label="Add to Queue"
+              label="Add to End"
               sub={isGuest ? "Host controlled" : "Append to setlist"}
               disabled={isGuest}
               onClick={() => run(() => onAddToQueue(track))}
@@ -159,7 +203,9 @@ export default function TrackActionMenu({ track, onPlayNow, onPlayNext, onAddToQ
       )}
     </>
   )
-}
+})
+
+export default TrackActionMenu
 
 function MenuItem({ icon, label, sub, disabled, onClick }: {
   icon: React.ReactNode

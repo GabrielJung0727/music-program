@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import type { ShareData } from "../ShareModal"
 import { type LoungeRoom } from "../../data/types"
 import { MonoIcon } from "../icons/MonoIcons"
+import { albumArt, onArtError } from "../../lib/artwork"
 
 
 // ── Live Lounge Page ─────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ function LoungeGridCard({ room, onJoin, onShare }: { room: LoungeRoom; onJoin: (
   return (
     <div className="lounge-room-card">
       <div style={{ height: 76, background: "#0F172A", position: "relative", overflow: "hidden", flexShrink: 0 }}>
-        <img src={room.art} alt={room.title} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.35 }} />
+        <img src={albumArt(room.art)} onError={onArtError} alt={room.title} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.35 }} />
         <div style={{ position: "absolute", top: 9, left: 10, right: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 600, color: listenerColor, background: "rgba(0,0,0,0.55)", borderRadius: 20, padding: "3px 9px", display: "inline-flex", alignItems: "center", gap: 5 }}>
             {isIntimate ? <MonoIcon.Cup size={11} /> : <span style={{ fontSize: 8 }}>●</span>}
@@ -398,7 +399,7 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, opacity: spotlightFade ? 1 : 0, transition: "opacity 0.16s ease" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <img src={activeSpotlight.art} alt={activeSpotlight.title} style={{ width: 76, height: 76, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: "2px solid var(--lounge-spotlight-art-border)" }} />
+            <img src={albumArt(activeSpotlight.art)} onError={onArtError} alt={activeSpotlight.title} style={{ width: 76, height: 76, borderRadius: 12, objectFit: "cover", flexShrink: 0, border: "2px solid var(--lounge-spotlight-art-border)" }} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.3px", color: "var(--lounge-spotlight-title)" }}>{activeSpotlight.title}</div>
               <div style={{ fontSize: 12.5, marginBottom: 10, color: "var(--lounge-spotlight-meta)" }}>{activeSpotlight.subtitle}</div>
@@ -494,7 +495,7 @@ export default function LiveLoungePage({ onJoin, onGoLive, onOpenShare, rooms, a
           <div className="flex flex-col gap-3">
             {archives.map((s) => (
               <div key={s.id} className="lounge-row p-4 flex items-center gap-4">
-                <img src={s.art} alt={s.title} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "rgba(255,255,255,0.05)" }} />
+                <img src={albumArt(s.art)} onError={onArtError} alt={s.title} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0, background: "rgba(255,255,255,0.05)" }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--lounge-text-title)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</div>
                   <div style={{ fontSize: 12, color: "var(--lounge-text-muted)" }}>Host: {s.host} &nbsp;·&nbsp; {s.tracks} tracks &nbsp;·&nbsp; {s.date}</div>

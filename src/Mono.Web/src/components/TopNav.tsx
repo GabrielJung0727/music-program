@@ -226,14 +226,14 @@ export default function TopNav({
           {/* Quick Preview Popover */}
           {showQuickPreview && searchQuery.trim().length > 0 && (
             <div
-              className="absolute left-0 right-0 rounded-2xl shadow-2xl overflow-hidden"
-              style={{ top: "calc(100% + 8px)", zIndex: 9999, minWidth: 320, background: "var(--surface-card)", border: "1px solid var(--border-subtle)", backdropFilter: "blur(12px)" }}
+              className="absolute left-0 right-0 rounded-2xl shadow-2xl overflow-hidden search-dropdown"
+              style={{ top: "calc(100% + 8px)", zIndex: 9999, minWidth: 320, backdropFilter: "blur(12px)" }}
               onMouseDown={(e) => e.preventDefault()}
             >
               {filteredAlbums.length === 0 && filteredTracks.length === 0 ? (
                 <div className="px-4 py-5 text-center">
-                  <p className="text-xs font-mono text-slate-400">No matching audiophile records found.</p>
-                  <p className="text-[10px] font-mono text-slate-300 mt-1">Try "Blue", "Miles", "Kind", or "Train"</p>
+                  <p className="text-xs font-mono search-hit-meta">No matching audiophile records found.</p>
+                  <p className="text-[10px] font-mono search-hit-meta mt-1">Try "Blue", "Miles", "Kind", or "Train"</p>
                 </div>
               ) : (
                 <>
@@ -241,14 +241,14 @@ export default function TopNav({
                     <div
                       key={album.title}
                       onClick={() => { setShowQuickPreview(false); setSearchQuery(""); setIsSearchActive(false); onSelectAlbum(album) }}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer transition group"
+                      className="flex items-center gap-3 px-4 py-3 search-hit cursor-pointer transition group"
                     >
-                      <img src={album.coverUrl} alt={album.title} className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0" />
+                      <img src={album.coverUrl} alt={album.title} className="w-9 h-9 rounded-lg object-cover search-hit-art shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-serif font-semibold text-slate-900 truncate group-hover:text-blue-700 transition">{album.title}</p>
-                        <p className="text-[10px] font-mono text-slate-400 truncate">{album.artist} · {album.year}</p>
+                        <p className="text-sm font-serif font-semibold search-hit-title truncate transition">{album.title}</p>
+                        <p className="text-[10px] font-mono search-hit-meta truncate">{album.artist} · {album.year}</p>
                       </div>
-                      <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full shrink-0 ${album.format.includes("DSD") ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200"}`}>
+                      <span className={`path-badge ${album.format.includes("DSD") ? "path-badge--hi" : "path-badge--format"}`}>
                         {album.format.split(" ").slice(0, 2).join(" ")}
                       </span>
                     </div>
@@ -257,16 +257,16 @@ export default function TopNav({
                   {filteredTracks.slice(0, 3).map(track => (
                     <div
                       key={`${track.title}-${track.album}`}
-                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition ${track.isCurrent ? "bg-blue-50/40 hover:bg-blue-50/60" : "hover:bg-slate-50"}`}
+                      className={`flex items-center gap-3 px-4 py-3 search-hit cursor-pointer transition ${track.isCurrent ? "search-hit--active" : ""}`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${track.isCurrent ? "bg-blue-100" : "bg-slate-100"}`}>
-                        <MonoIcon.PlayMini size={12} className={track.isCurrent ? "text-blue-600" : "text-slate-400"} />
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 search-hit-art">
+                        <MonoIcon.PlayMini size={12} style={{ color: track.isCurrent ? "var(--accent-violet)" : "var(--text-muted)" }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-serif font-semibold truncate ${track.isCurrent ? "text-blue-700" : "text-slate-900"}`}>{track.title}</p>
-                        <p className="text-[10px] font-mono text-slate-400 truncate">{track.artist} · {track.album} · {track.duration}</p>
+                        <p className="text-sm font-serif font-semibold truncate search-hit-title">{track.title}</p>
+                        <p className="text-[10px] font-mono search-hit-meta truncate">{track.artist} · {track.album} · {track.duration}</p>
                       </div>
-                      <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full shrink-0 ${track.dr === "DR 14" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : track.dr === "DR 13" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>{track.dr}</span>
+                      <span className={`path-badge ${track.dr === "DR 14" ? "path-badge--hi" : track.dr === "DR 13" ? "path-badge--mid" : "path-badge--muted"}`}>{track.dr}</span>
                     </div>
                   ))}
                 </>
@@ -277,34 +277,35 @@ export default function TopNav({
                 <div
                   key={room.id}
                   onClick={() => { setShowQuickPreview(false); setSearchQuery(""); setIsSearchActive(false); onJoinLounge(room.id) }}
-                  className="flex items-center gap-3 px-4 py-3 bg-slate-900 hover:bg-slate-800 cursor-pointer transition group"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer transition group"
+                  style={{ background: "var(--chassis-bg)", borderTop: "1px solid var(--border-subtle)" }}
                 >
-                  <div className="w-9 h-9 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-white/5">
+                  <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 search-hit-art">
                     {room.art && <img src={room.art} alt={room.title} className="w-full h-full object-cover" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
-                      <p className="text-xs font-serif font-semibold text-white truncate">{room.title}</p>
+                      <p className="text-xs font-serif font-semibold search-hit-title truncate">{room.title}</p>
                     </div>
-                    <p className="text-[10px] font-mono text-slate-400 mt-0.5 flex items-center gap-1">
+                    <p className="text-[10px] font-mono search-hit-meta mt-0.5 flex items-center gap-1">
                       <span>Host: {room.hostName}</span>
                       <MonoIcon.Crown size={11} className="text-amber-400 inline" />
                       <span>· {room.listenerCount} listening</span>
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono bg-blue-600 text-white px-2.5 py-1 rounded-full shrink-0 group-hover:bg-blue-500 transition">Join →</span>
+                  <span className="text-[10px] font-mono path-badge path-badge--hi shrink-0">Join →</span>
                 </div>
               ))}
 
               {/* Footer */}
-              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--surface-elevated)" }}>
-                <span className="text-[10px] font-mono text-slate-400">Press Enter ↵ for comprehensive search</span>
+              <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "var(--surface-elevated)", borderTop: "1px solid var(--border-subtle)" }}>
+                <span className="text-[10px] font-mono search-hit-meta">Press Enter ↵ for comprehensive search</span>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { setShowQuickPreview(false); setIsSearchActive(true) }}
-                  className="text-[10px] font-mono text-blue-600 hover:text-blue-800 cursor-pointer transition"
-                  style={{ background: "none", border: "none", fontFamily: "inherit", padding: 0 }}
+                  className="text-[10px] font-mono cursor-pointer transition"
+                  style={{ background: "none", border: "none", fontFamily: "inherit", padding: 0, color: "var(--accent-violet)" }}
                 >
                   View All Results →
                 </button>

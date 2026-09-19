@@ -9,19 +9,22 @@
       <svc:SvgAssetConverter x:Key="SvgIcon"/>
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
+          <!-- Figma Mono Design System — light chassis + signature violet -->
           <SolidColorBrush x:Key="Mono.Bg" Color="#FFFFFF"/>
-          <SolidColorBrush x:Key="Mono.Sidebar" Color="#F7F7FA"/>
+          <SolidColorBrush x:Key="Mono.Sidebar" Color="#F8FAFC"/>
           <SolidColorBrush x:Key="Mono.Surface" Color="#FFFFFF"/>
-          <SolidColorBrush x:Key="Mono.Panel" Color="#F7F7FA"/>
-          <SolidColorBrush x:Key="Mono.Border" Color="#E6E7EC"/>
-          <SolidColorBrush x:Key="Mono.Hover" Color="#ECECF8"/>
-          <SolidColorBrush x:Key="Mono.Text" Color="#1A1A1E"/>
-          <SolidColorBrush x:Key="Mono.Muted" Color="#6B6F7A"/>
-          <SolidColorBrush x:Key="Mono.Art" Color="#ECECF8"/>
-          <SolidColorBrush x:Key="Mono.Accent" Color="#6D6DF6"/>
+          <SolidColorBrush x:Key="Mono.Panel" Color="#F1F5F9"/>
+          <SolidColorBrush x:Key="Mono.Border" Color="#E2E8F0"/>
+          <SolidColorBrush x:Key="Mono.Hover" Color="#F5F3FF"/>
+          <SolidColorBrush x:Key="Mono.Text" Color="#0F172A"/>
+          <SolidColorBrush x:Key="Mono.Muted" Color="#64748B"/>
+          <SolidColorBrush x:Key="Mono.Art" Color="#F1F5F9"/>
+          <SolidColorBrush x:Key="Mono.Accent" Color="#7C3AED"/>
+          <SolidColorBrush x:Key="Mono.AccentHover" Color="#6D28D9"/>
+          <SolidColorBrush x:Key="Mono.Lounge" Color="#2563EB"/>
           <SolidColorBrush x:Key="Mono.Onboarding" Color="#CCFFFFFF"/>
           <SolidColorBrush x:Key="Mono.Card" Color="#FFFFFF"/>
-          <SolidColorBrush x:Key="Mono.GhostFg" Color="#1A1A1E"/>
+          <SolidColorBrush x:Key="Mono.GhostFg" Color="#0F172A"/>
           <SolidColorBrush x:Key="Mono.Warn" Color="#D9762F"/>
           <SolidColorBrush x:Key="Mono.Bad" Color="#CC4444"/>
 
@@ -56,19 +59,22 @@
           <svg:SvgImage x:Key="Mono.Icon.NpCredits" Source="avares://Mono.Control/Assets/icons/ui/np-credits.svg"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="Mono.Bg" Color="#121317"/>
-          <SolidColorBrush x:Key="Mono.Sidebar" Color="#18181C"/>
-          <SolidColorBrush x:Key="Mono.Surface" Color="#1C1C22"/>
-          <SolidColorBrush x:Key="Mono.Panel" Color="#22222A"/>
-          <SolidColorBrush x:Key="Mono.Border" Color="#2E2E38"/>
-          <SolidColorBrush x:Key="Mono.Hover" Color="#2A2A38"/>
-          <SolidColorBrush x:Key="Mono.Text" Color="#F2F2F5"/>
-          <SolidColorBrush x:Key="Mono.Muted" Color="#9A9AA8"/>
-          <SolidColorBrush x:Key="Mono.Art" Color="#22222C"/>
-          <SolidColorBrush x:Key="Mono.Accent" Color="#8F8FF8"/>
-          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC121317"/>
-          <SolidColorBrush x:Key="Mono.Card" Color="#1C1C22"/>
-          <SolidColorBrush x:Key="Mono.GhostFg" Color="#F2F2F5"/>
+          <!-- Figma Mono Design System — dark chassis + luminous violet -->
+          <SolidColorBrush x:Key="Mono.Bg" Color="#0F172A"/>
+          <SolidColorBrush x:Key="Mono.Sidebar" Color="#1E293B"/>
+          <SolidColorBrush x:Key="Mono.Surface" Color="#1E293B"/>
+          <SolidColorBrush x:Key="Mono.Panel" Color="#334155"/>
+          <SolidColorBrush x:Key="Mono.Border" Color="#334155"/>
+          <SolidColorBrush x:Key="Mono.Hover" Color="#334155"/>
+          <SolidColorBrush x:Key="Mono.Text" Color="#F1F5F9"/>
+          <SolidColorBrush x:Key="Mono.Muted" Color="#94A3B8"/>
+          <SolidColorBrush x:Key="Mono.Art" Color="#334155"/>
+          <SolidColorBrush x:Key="Mono.Accent" Color="#8B5CF6"/>
+          <SolidColorBrush x:Key="Mono.AccentHover" Color="#7C3AED"/>
+          <SolidColorBrush x:Key="Mono.Lounge" Color="#3B82F6"/>
+          <SolidColorBrush x:Key="Mono.Onboarding" Color="#CC0F172A"/>
+          <SolidColorBrush x:Key="Mono.Card" Color="#1E293B"/>
+          <SolidColorBrush x:Key="Mono.GhostFg" Color="#F1F5F9"/>
           <SolidColorBrush x:Key="Mono.Warn" Color="#E39A5C"/>
           <SolidColorBrush x:Key="Mono.Bad" Color="#EE8888"/>
 

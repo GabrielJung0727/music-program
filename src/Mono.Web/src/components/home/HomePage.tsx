@@ -150,13 +150,8 @@ function SocialLoungesSection({ joinedLoungeId, onToggleJoin, onLeaveLounge, car
 
 // ── Album Card ───────────────────────────────────────────────────────────────
 function AlbumCard({ album, onPlay, onSelect }: { album: HomeAlbum; onPlay?: (album: HomeAlbum) => void; onSelect?: (album: HomeAlbum) => void }) {
-  const drVal = parseInt(album.dr.replace(/\D/g, ""), 10)
-  const drDesc = drVal >= 13
-    ? "Wide Dynamic Range · Uncompressed Master"
-    : drVal >= 9
-    ? "Balanced Studio Master · High-Fidelity"
-    : "High Loudness Compression · Heavy Limiting"
-
+  // DR 배지는 여기서 뺐다. 카드 폭이 좁아 포맷 배지와 나란히 두면 둘 다 잘렸고,
+  // 잘린 숫자는 없는 것만 못하다. 다이나믹 레인지는 앨범 디테일에서 온전히 보여 준다.
   return (
     <div className="group flex flex-col cursor-pointer" onClick={() => onSelect?.(album)}>
       <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-200">
@@ -182,31 +177,17 @@ function AlbumCard({ album, onPlay, onSelect }: { album: HomeAlbum; onPlay?: (al
             className="text-[11px] font-mono px-2 py-0.5 rounded truncate min-w-0 flex-shrink"
             style={{ fontFamily: "'DM Mono', monospace", background: "var(--home-badge-bg)", color: "var(--home-badge-text)", border: "1px solid var(--home-badge-border)" }}
           >{album.format}</span>
-          <div className="relative inline-flex items-center group/dr cursor-help flex-shrink-0">
-            <span
-              className="text-[11px] font-mono font-medium px-2 py-0.5 rounded"
-              style={{ fontFamily: "'DM Mono', monospace", background: "var(--home-badge-bg)", color: "var(--home-badge-text)", border: "1px solid var(--home-badge-border)", transition: "background 0.15s" }}
-            >{album.dr}</span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/dr:flex flex-col items-center z-50 pointer-events-none" style={{ minWidth: 200 }}>
-              <div className="text-[11px] leading-tight font-mono py-1.5 px-2.5 rounded-lg shadow-2xl text-center" style={{ whiteSpace: "normal", background: "var(--home-badge-tooltip-bg)", border: "1px solid var(--home-badge-tooltip-border)", color: "var(--home-badge-tooltip-text)" }}>
-                <span className="font-semibold block mb-0.5" style={{ color: "var(--home-badge-tooltip-accent)" }}>{album.dr} Dynamic Headroom</span>
-                <span className="text-[10px]" style={{ color: "#a1a1aa" }}>{drDesc}</span>
-              </div>
-              <div className="w-0 h-0 border-x-4 border-x-transparent border-t-4" style={{ borderTopColor: "var(--home-badge-tooltip-arrow)" }} />
-            </div>
-          </div>
         </div>
       </div>
     </div>
   )
 }
 
-type RepertoireSort = "rotation" | "fidelity" | "dr" | "acquisition"
+type RepertoireSort = "rotation" | "fidelity" | "acquisition"
 
 const REPERTOIRE_SORT_OPTIONS: { key: RepertoireSort; label: string }[] = [
   { key: "rotation",    label: "In Rotation (Default)" },
   { key: "fidelity",   label: "Audio Fidelity" },
-  { key: "dr",         label: "Dynamic Range (DR)" },
   { key: "acquisition", label: "Acquisition Index" },
 ]
 
@@ -250,7 +231,6 @@ function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, 
   const sorted = [...filtered].sort((a, b) => {
     if (sortKey === "rotation")    return b.plays - a.plays
     if (sortKey === "fidelity")    return fidelityRank(b.format) - fidelityRank(a.format)
-    if (sortKey === "dr")          return parseInt(b.dr.replace(/\D/g, ""), 10) - parseInt(a.dr.replace(/\D/g, ""), 10)
     if (sortKey === "acquisition") return b.added.localeCompare(a.added)
     return 0
   })

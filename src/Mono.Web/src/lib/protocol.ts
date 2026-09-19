@@ -41,6 +41,9 @@ export const MSG = {
   seek: "seek",
   skip: "skip",
   jumpTo: "jump_to",
+  playList: "play_list",
+  setShuffle: "set_shuffle",
+  setRepeat: "set_repeat",
   resync: "resync",
 
   pin: "pin",
@@ -146,6 +149,10 @@ export interface MonoMessage {
 // 공개 라운지가 하나씩 생겼다. 새 값은 C# 쪽과 같이, 항상 뒤에 붙인다.
 export const RoomMode = { Open: 0, Invite: 1, HostQueue: 2, Audiophile: 3, Solo: 4 } as const
 export type RoomMode = (typeof RoomMode)[keyof typeof RoomMode]
+
+// Mono.Shared.RepeatMode 와 값이 같아야 한다.
+export const RepeatMode = { Off: 0, All: 1, One: 2 } as const
+export type RepeatMode = (typeof RepeatMode)[keyof typeof RepeatMode]
 
 export const StreamingProvider = { Local: 0, Tidal: 1, Qobuz: 2 } as const
 export type StreamingProvider = (typeof StreamingProvider)[keyof typeof StreamingProvider]
@@ -318,6 +325,8 @@ export interface RoomSnapshot {
   followHostView: boolean
   autoAdvance: boolean
   smartAutoplay: boolean
+  shuffle: boolean
+  repeat: RepeatMode
   linerPage: number
   linerScrollY: number
   maxMembers: number

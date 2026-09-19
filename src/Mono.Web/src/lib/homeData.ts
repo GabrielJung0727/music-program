@@ -72,17 +72,9 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
   const hiRes = catalog.filter((t) => t.isDsd || t.bitDepth >= 24 || t.sampleRate >= 88200).length
   const hiResRatio = total > 0 ? `${((hiRes / total) * 100).toFixed(1)}%` : "—"
 
-  // DR 배지는 "DR 14" 꼴이다. 숫자만 뽑아 평균을 낸다.
-  const drValues = catalog
-    .map((t) => Number.parseInt((t.badge ?? "").replace(/\D/g, ""), 10))
-    .filter((n) => Number.isFinite(n) && n > 0 && n < 30)
-  const avgDr =
-    drValues.length > 0
-      ? `DR ${(drValues.reduce((a, b) => a + b, 0) / drValues.length).toFixed(1)}`
-      : "—"
-
-  const localCount = catalog.filter((t) => t.hasLocal).length
-  const bitPerfect = total > 0 ? `${Math.round((localCount / total) * 100)}%` : "—"
+  // 다이나믹 레인지와 비트퍼펙트는 여기서 말하지 않는다. DR 은 배지가 잘려 읽히지 않았고,
+  // 비트퍼펙트는 유저가 설정에서 직접 고르는 것이라 라이브러리 통계로 단정할 값이 아니다.
+  const albumCount = new Set(catalog.map((t) => t.album).filter(Boolean)).size
 
   const labelCounts = new Map<string, number>()
   for (const t of catalog) {
@@ -104,17 +96,17 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
       dot: null,
     },
     {
-      title: "Avg. Dynamics",
-      value: avgDr,
-      sub: drValues.length > 0 ? `${drValues.length.toLocaleString()}곡 측정됨` : "측정된 곡이 없습니다",
+      title: "Albums",
+      value: albumCount > 0 ? albumCount.toLocaleString() : "—",
+      sub: `트랙 ${total.toLocaleString()}곡`,
       valueColor: "var(--text-primary)",
       icon: "wave",
       dot: null,
     },
     {
-      title: "Local Masters",
-      value: bitPerfect,
-      sub: `로컬 파일 ${localCount.toLocaleString()} / 전체 ${total.toLocaleString()}`,
+      title: "This Week",
+      value: recentPlays > 0 ? `${recentPlays.toLocaleString()}회` : "—",
+      sub: recentPlays > 0 ? "최근 7일 재생" : "이번 주 재생 기록이 없습니다",
       valueColor: "var(--text-primary)",
       icon: null,
       dot: "#059669",
@@ -122,7 +114,7 @@ export function insightCards(catalog: CatalogTrack[], history: HistoryEntry[]): 
     {
       title: "Top Label",
       value: topLabel?.[0] ?? "—",
-      sub: topLabel ? `${topLabel[1].toLocaleString()}곡 · 이번 주 ${recentPlays}회 재생` : "레이블 정보 없음",
+      sub: topLabel ? `${topLabel[1].toLocaleString()}곡` : "레이블 정보 없음",
       valueColor: "var(--text-primary)",
       icon: "tag",
       dot: null,

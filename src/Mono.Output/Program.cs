@@ -196,7 +196,11 @@ try
                     continue;
                 }
 
-                if (audio.Epoch != timeline.Epoch)
+                // 지난 세대만 버린다. Core 는 탐색 직후 새 epoch 의 오디오를 곧바로 밀어 넣는데,
+                // 그 epoch 를 알려 주는 room_state 가 한 박자 늦게 도착할 때가 있다. 예전에는
+                // 그 사이에 온 프레임을 전부 버려서 탐색 지점 앞부분이 통째로 사라졌다 —
+                // 큐에 두었다가 타임라인이 따라잡으면 그대로 쓴다.
+                if (audio.Epoch < timeline.Epoch)
                 {
                     continue;
                 }
@@ -342,6 +346,13 @@ void RenderLoop(CancellationToken ct)
 
             while (frames.TryPeek(out var head))
             {
+                // 아직 못 받은 세대의 프레임은 큐에 둔다. 지금 타임라인으로 PTS 를 풀면
+                // 지난 세대의 origin 으로 계산되어 엉뚱한 시각에 나간다.
+                if (head.Epoch != timeline.Epoch)
+                {
+                    break;
+                }
+
                 var playAtLocal = timeline.PlayAtLocalUnixMs(head.PtsMs, clock.OffsetMs, clock.TargetBufferMs);
                 var wait = playAtLocal - ClockSync.UnixMs();
                 if (wait > 3)

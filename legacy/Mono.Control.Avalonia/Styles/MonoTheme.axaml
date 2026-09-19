@@ -55,9 +55,12 @@
   <Style Selector="Button.primary">
     <Setter Property="Background" Value="{DynamicResource Mono.Accent}"/>
     <Setter Property="Foreground" Value="White"/>
-    <Setter Property="CornerRadius" Value="20"/>
+    <Setter Property="CornerRadius" Value="999"/>
     <Setter Property="Padding" Value="18,10"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Mono.AccentHover}"/>
   </Style>
 
   <Style Selector="Button.ghost">
@@ -65,7 +68,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Mono.GhostFg}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource Mono.Border}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="20"/>
+    <Setter Property="CornerRadius" Value="999"/>
     <Setter Property="Padding" Value="14,8"/>
   </Style>
 

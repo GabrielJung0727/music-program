@@ -52,6 +52,9 @@ public static class MessageTypes
     public const string SeekPin = "seek_pin";
     public const string Skip = "skip";
     public const string JumpTo = "jump_to";
+    public const string PlayList = "play_list";
+    public const string SetShuffle = "set_shuffle";
+    public const string SetRepeat = "set_repeat";
     public const string Resync = "resync";
     public const string Timeline = "timeline";
 

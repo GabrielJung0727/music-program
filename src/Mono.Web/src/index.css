@@ -2,6 +2,9 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap');
 @import 'tailwindcss';
 
+/* Class-based dark mode (html.dark) — not prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Semantic Studio Tokens ─────────────────────────────────────────────── */
 @layer base {
   :root,
@@ -6715,6 +6718,32 @@ html.dark .btn-host-lounge-dot {
   color: #a78bfa;
 }
 
+/* 라운지에서는 트랜스포트 강조색이 파랑이다 — 혼자 듣기(보라)와 구분된다. */
+.player-btn-icon.is-active.is-live {
+  color: #0284c7;
+}
+
+.dark .player-btn-icon.is-active.is-live {
+  color: #38bdf8;
+}
+
+/* 색만으로는 켜졌는지 알기 어렵다는 리포트가 있었다. 켜진 버튼 아래에 점을 남긴다. */
+.player-btn-icon.player-btn-toggle.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.player-btn-icon {
+  position: relative;
+}
+
 /* ── Queue button — frameless, matches other transport controls ── */
 .queue-btn {
   background: transparent !important;
@@ -8117,6 +8146,32 @@ html.dark [role="menuitem"]:hover {
   background-color: #27272a !important;
 }
 html.dark .track-menu-item p,
+html.dark [role="menuitem"] p {
+  color: #a1a1aa !important;
+}
+
+.track-menu-kicker {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px 10px 2px;
+}
+.track-menu-current {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.dark .track-menu-kicker { color: #71717a !important; }
+html.dark .track-menu-current { color: #f4f4f5 !important; border-bottom-color: #27272a !important; }
 html.dark [role="menuitem"] p,
 html.dark [role="menuitem"] span:last-child {
   color: #71717a !important;
@@ -9742,4 +9797,119 @@ html.dark .library-track-row.library-track-row-active .library-track-album {
 html.dark .library-track-row.library-track-row-active .library-track-time,
 html.dark .library-track-row.library-track-row-active .library-track-num {
   color: #a1a1aa !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Path badge · Search hits — dark-safe surfaces (fix light slate hardcodes)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.path-badge {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  background: var(--spec-badge-bg);
+  color: var(--spec-badge-text);
+  border: 1px solid var(--spec-badge-border);
+}
+
+.path-badge--muted {
+  background: var(--album-detail-dr-bg, var(--surface-elevated));
+  color: var(--album-detail-dr-text, var(--text-muted));
+  border: 1px solid var(--album-detail-dr-border, var(--border-subtle));
+}
+
+.path-badge--hi {
+  background: rgba(16, 185, 129, 0.10);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+html.dark .path-badge--hi {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.path-badge--mid {
+  background: rgba(245, 158, 11, 0.10);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+html.dark .path-badge--mid {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.path-badge--format {
+  background: rgba(124, 58, 237, 0.08);
+  color: #6d28d9;
+  border: 1px solid rgba(124, 58, 237, 0.22);
+}
+html.dark .path-badge--format {
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.28);
+}
+
+.search-dropdown {
+  background: var(--surface-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary);
+}
+
+.search-hit {
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background 0.12s ease;
+}
+.search-hit:hover {
+  background: var(--surface-hover) !important;
+}
+.search-hit--active {
+  background: color-mix(in srgb, var(--accent-violet) 12%, transparent) !important;
+  border-color: color-mix(in srgb, var(--accent-violet) 28%, transparent) !important;
+}
+
+.search-hit-title {
+  color: var(--text-primary) !important;
+}
+.search-hit-meta {
+  color: var(--text-muted) !important;
+}
+.search-hit-art {
+  background: var(--surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+.search-results-page {
+  color: var(--text-primary);
+}
+.search-results-page h1,
+.search-results-page .search-results-title {
+  color: var(--text-primary) !important;
+}
+.search-results-page .search-results-meta {
+  color: var(--text-muted) !important;
+}
+.search-results-card {
+  background: var(--surface-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary);
+}
+.search-results-card:hover {
+  border-color: var(--border-strong) !important;
+}
+
+/* Force album telemetry pills off light chassis when dark is active */
+html.dark .album-detail-pill,
+html.dark .badge-dr-meter {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #cbd5e1 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }

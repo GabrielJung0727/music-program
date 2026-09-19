@@ -49,18 +49,28 @@ public class RoomLifecycleTests
         Assert.Equal(PlaybackSourceMode.ClockSync, room.SourceMode);
     }
 
-    /// <summary>호스트가 닫으면 그 자리에서 사라진다.</summary>
+    /// <summary>호스트가 라운지를 닫아도 혼자 듣기는 남는다 — 방을 지으면 곡이 빈다.</summary>
     [Fact]
-    public void ClosingARoomRemovesIt()
+    public void ClosingALoungeReturnsItToSolo()
     {
         var rooms = NewRooms();
         var room = rooms.Create("host", "Live", RoomMode.OpenLounge, "Host");
+        rooms.Join(room.Id, "guest", PeerRole.Control, null, "Guest");
+        room.Queue.Add(new QueueItem { Id = "q1", TrackId = "t1", AddedByPeerId = "host" });
+        room.Playing = true;
 
         var (closed, error) = rooms.Close(room.Id, "host");
 
         Assert.Null(error);
         Assert.NotNull(closed);
-        Assert.Empty(rooms.List());
+        Assert.Equal(RoomMode.Solo, closed!.Mode);
+        Assert.False(closed.IsListed);
+        Assert.True(closed.Playing);
+        Assert.Single(closed.Queue);
+        Assert.Contains("host", closed.ControlPeerIds);
+        Assert.DoesNotContain("guest", closed.ControlPeerIds);
+        Assert.Single(rooms.List());
+        Assert.Empty(rooms.ListListed());
     }
 
     /// <summary>호스트가 아니면 남의 라운지를 닫을 수 없다.</summary>

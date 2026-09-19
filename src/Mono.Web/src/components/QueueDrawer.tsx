@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import type { QueueTrack } from "../data/types"
 import { MonoIcon } from "./icons/MonoIcons"
+import { FALLBACK_ART } from "../lib/artwork"
 
 interface Props {
   isOpen: boolean
@@ -170,7 +171,7 @@ export default function QueueDrawer({
                   width: 46, height: 46, borderRadius: 8, overflow: "hidden",
                   flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)",
                 }}>
-                  <img src={currentTrack.art || (currentTrack as any).coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80"} alt={currentTrack.album} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={currentTrack.art || (currentTrack as any).coverUrl || FALLBACK_ART} alt={currentTrack.album} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -285,7 +286,7 @@ export default function QueueDrawer({
                         background: "#F4F4F5", flexShrink: 0,
                         border: "1px solid #E4E4E7",
                       }}>
-                        <img src={track.art || (track as any).coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80"} alt={track.album} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={track.art || (track as any).coverUrl || FALLBACK_ART} alt={track.album} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
 
                       {/* Meta */}

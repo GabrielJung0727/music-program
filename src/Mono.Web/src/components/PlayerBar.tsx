@@ -2,9 +2,11 @@ import { useState, useEffect } from "react"
 import { Lock } from "lucide-react"
 import { type QueueTrack } from "../data/types"
 import { useMono, useMediaClock, useMonoCommands } from "../state/MonoProvider"
-import { stopOutput } from "../lib/shell"
-import { startConfiguredOutput } from "../lib/setup"
+import { stopOutput, useOutputStatus } from "../lib/shell"
+import { startConfiguredOutput, cachedSetup } from "../lib/setup"
 import { MonoIcon } from "./icons/MonoIcons"
+import { RepeatMode } from "../lib/protocol"
+import { FALLBACK_ART } from "../lib/artwork"
 
 export type PlayerMode = "solo" | "host" | "guest"
 
@@ -58,6 +60,18 @@ function IconShuffle() {
       <line x1="4" y1="20" x2="21" y2="3" />
       <polyline points="21 16 21 21 16 21" />
       <line x1="15" y1="15" x2="21" y2="21" />
+    </svg>
+  )
+}
+
+function IconLoopOne() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="17 1 21 5 17 9" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <polyline points="7 23 3 19 7 15" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+      <text x="12" y="15.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="currentColor" stroke="none">1</text>
     </svg>
   )
 }
@@ -150,6 +164,15 @@ export default function PlayerBar({
   /** 숨김은 순수 UI 취향이라 Core 에 보내지 않는다. */
   const [hiddenDeviceIds, setHiddenDeviceIds] = useState<string[]>([])
   const [outputError, setOutputError] = useState<string | null>(null)
+  const worker = useOutputStatus()
+  const setupDeviceName = cachedSetup().audio?.deviceName ?? ""
+
+  async function attachOutput() {
+    const roomId = room?.id ?? await cmd.ensureSoloRoom()
+    const res = await startConfiguredOutput(roomId)
+    if (!res.ok) setOutputError(res.error ?? "출력을 시작하지 못했습니다")
+    else setOutputError(null)
+  }
 
   // 신호 경로 각 단계의 실제 값. 룸 스냅샷과 출력 엔드포인트가 진실이다.
   const snapTrack = room?.currentTrack
@@ -159,20 +182,25 @@ export default function PlayerBar({
     : "소스 없음"
   const driverLabel = activeOutput
     ? `${activeOutput.exclusiveMode ? "Exclusive Lock" : "Shared Mixer"}${room?.bitPerfect ? " · Bit-Perfect" : room?.srcApplied ? " · SRC 적용됨" : ""}`
-    : "출력 연결 안 됨"
+    : worker?.running
+      ? `워커 실행 중 (${worker.backend || "local"})`
+      : "출력 연결 안 됨"
   const bufferLabel = activeOutput?.stats?.bufferMs != null
     ? `Buffer: ${activeOutput.stats.bufferMs}ms · Latency: ${activeOutput.reportedLatencyMs}ms`
     : activeOutput ? `Latency: ${activeOutput.reportedLatencyMs}ms` : "—"
-  const dacLabel = activeOutput?.device ?? activeOutput?.displayName ?? "출력 장치 없음"
+  const dacLabel = activeOutput?.device ?? activeOutput?.displayName ?? (worker?.running ? (setupDeviceName || "이 PC 출력") : "출력 장치 없음")
   const dacDetail = activeOutput
     ? [
         activeOutput.maxSampleRate ? `${Math.round(activeOutput.maxSampleRate / 1000)}kHz / ${activeOutput.maxBitDepth}-Bit` : null,
         activeOutput.supportsDsd ? "DSD" : null,
         activeOutput.hardwareVolume ? "Hardware volume" : "Software volume",
       ].filter(Boolean).join(" · ")
-    : "Mono Output 을 연결하세요"
-  // 룸에 붙은 실제 Output 엔드포인트. 하나도 없으면 목록이 비고, 셸이 있으면 연결 버튼을 준다.
-  const devices = (room?.outputs ?? []).map((o, i) => ({
+    : worker?.running
+      ? "출력 워커가 이 장치로 재생 중입니다"
+      : "Mono Output 을 연결하세요"
+  // 룸에 붙은 실제 Output 엔드포인트. 워커는 떠 있는데 룸 목록이 비면
+  // (시작 때 --room 없이 띄운 경우) 설정에 고른 장치 이름을 보여 준다.
+  const roomDevices = (room?.outputs ?? []).map((o, i) => ({
     id: o.peerId,
     name: o.displayName ?? o.device ?? `출력 ${i + 1}`,
     spec: [
@@ -187,10 +215,32 @@ export default function PlayerBar({
     // 디자인은 dB 로 보여 준다. Core 는 0~100% 를 안다.
     volume: percentToDb(o.volumePercent),
     isHidden: hiddenDeviceIds.includes(o.peerId),
-    isSystem: false,
+    isLocalWorker: false,
   }))
+  const devices = roomDevices.length > 0
+    ? roomDevices
+    : worker?.running
+      ? [{
+          id: "local-worker",
+          name: setupDeviceName || "이 PC 출력",
+          spec: [worker.backend || null, "워커 실행 중"].filter(Boolean).join(" • "),
+          supportsDsd: false,
+          icon: <MonoIcon.Speaker size={13} className="inline mr-1" />,
+          active: true,
+          volume: 0,
+          isHidden: false,
+          isLocalWorker: true,
+        }]
+      : []
 
   const isGuest = playerMode === "guest"
+  // 셔플·반복은 룸이 진실이다. 로컬 state 로 두면 게스트 화면과 호스트 화면이 갈라진다.
+  const shuffleOn = room?.shuffle ?? false
+  const repeatMode: RepeatMode = room?.repeat ?? RepeatMode.Off
+  const nextRepeat: RepeatMode =
+    repeatMode === RepeatMode.Off ? RepeatMode.All : repeatMode === RepeatMode.All ? RepeatMode.One : RepeatMode.Off
+  const repeatLabel =
+    repeatMode === RepeatMode.All ? "Repeat all" : repeatMode === RepeatMode.One ? "Repeat one" : "Repeat off"
   const isHost = playerMode === "host"
 
   type PlaybackMode = "hosting" | "listener" | "solo"
@@ -317,7 +367,7 @@ export default function PlayerBar({
                   }}
                 >
                   <img
-                    src={currentTrack.art || (currentTrack as any).coverUrl || "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80"}
+                    src={currentTrack.art || (currentTrack as any).coverUrl || FALLBACK_ART}
                     alt={currentTrack.title}
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
@@ -403,12 +453,16 @@ export default function PlayerBar({
         {/* Center — Controls + Progress */}
         <div className="player-center-section justify-self-center">
           <div className="player-controls-row">
-            {/* Shuffle */}
+            {/* Shuffle — 켜져 있으면 눈에 보여야 한다. 게스트는 호스트가 정한 상태를 보기만 한다. */}
             <button
-              className="player-btn-icon"
-              style={{ cursor: (isGuest || !currentTrack) ? "not-allowed" : "pointer", opacity: (isGuest || !currentTrack) ? 0.3 : 1 }}
+              onClick={() => cmd.setShuffle(!shuffleOn)}
+              className={`player-btn-icon player-btn-toggle ${shuffleOn ? "is-active" : ""} ${shuffleOn && (isHosting || isListener) ? "is-live" : ""}`}
+              style={{ cursor: (isGuest || !currentTrack) ? "not-allowed" : "pointer", opacity: !currentTrack ? 0.3 : isGuest ? 0.55 : 1 }}
               disabled={isGuest || !currentTrack}
-              title="Shuffle"
+              title={isGuest
+                ? `Shuffle ${shuffleOn ? "on" : "off"} — 호스트가 정합니다`
+                : shuffleOn ? "Shuffle on" : "Shuffle off"}
+              aria-pressed={shuffleOn}
             >
               <IconShuffle />
             </button>
@@ -453,14 +507,16 @@ export default function PlayerBar({
               <IconNext />
             </button>
 
-            {/* Loop / Repeat */}
+            {/* Loop / Repeat — off → all → one 을 돌고, 지금 어느 상태인지 아이콘에 남는다. */}
             <button
-              className="player-btn-icon"
-              style={{ cursor: (isGuest || !currentTrack) ? "not-allowed" : "pointer", opacity: (isGuest || !currentTrack) ? 0.3 : 1 }}
+              onClick={() => cmd.setRepeat(nextRepeat)}
+              className={`player-btn-icon player-btn-toggle ${repeatMode !== RepeatMode.Off ? "is-active" : ""} ${repeatMode !== RepeatMode.Off && (isHosting || isListener) ? "is-live" : ""}`}
+              style={{ cursor: (isGuest || !currentTrack) ? "not-allowed" : "pointer", opacity: !currentTrack ? 0.3 : isGuest ? 0.55 : 1 }}
               disabled={isGuest || !currentTrack}
-              title="Repeat"
+              title={isGuest ? `${repeatLabel} — 호스트가 정합니다` : repeatLabel}
+              aria-pressed={repeatMode !== RepeatMode.Off}
             >
-              <IconLoop />
+              {repeatMode === RepeatMode.One ? <IconLoopOne /> : <IconLoop />}
             </button>
 
             {/* Queue toggle */}
@@ -571,22 +627,22 @@ export default function PlayerBar({
       {/* Signal Path Inspector Popover */}
       {isSignalPathOpen && (
         <div
+          className="signal-path-popover"
+          data-component="signal-path-modal"
           style={{
             position: "fixed", bottom: 96, right: 32, width: 340,
-            background: "#FFFFFF", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
-            border: "1px solid #E5E7EB", padding: 20, zIndex: 60,
+            borderRadius: 16, padding: 20, zIndex: 60,
           }}
         >
           <div className="flex items-start justify-between mb-4">
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Audio Signal Path</div>
-              <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>Living Room · May L3</div>
+              <div className="sp-title" style={{ fontSize: 13, fontWeight: 700 }}>Audio Signal Path</div>
+              <div className="sp-subtitle" style={{ fontSize: 11, marginTop: 2 }}>Living Room · May L3</div>
             </div>
             <button
               onClick={() => setIsSignalPathOpen(false)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#334155")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
+              className="sp-close"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
               aria-label="Close"
             >
               <MonoIcon.Close size={14} />
@@ -597,12 +653,12 @@ export default function PlayerBar({
             <div style={{ paddingLeft: 0, paddingBottom: 0 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2563EB", marginTop: 3, flexShrink: 0 }} />
-                  <div style={{ width: 1, height: 24, borderLeft: "1px dashed #CBD5E1", marginTop: 3 }} />
+                  <div className="sp-dot-source" style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 3, flexShrink: 0 }} />
+                  <div className="sp-rail" style={{ width: 1, height: 24, borderLeft: "1px dashed var(--border-subtle)", marginTop: 3 }} />
                 </div>
                 <div style={{ paddingBottom: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{sourceLabel}</div>
-                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>
+                  <div className="sp-node-title" style={{ fontSize: 12, fontWeight: 600 }}>{sourceLabel}</div>
+                  <div className="sp-node-meta" style={{ fontSize: 11, marginTop: 1 }}>
                     {currentTrack ? `${currentTrack.title} — ${currentTrack.artist}` : "재생 중인 곡이 없습니다"}
                   </div>
                 </div>
@@ -612,14 +668,14 @@ export default function PlayerBar({
             <div style={{ paddingBottom: 0 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: isDspBypassed ? "#CBD5E1" : "#2563EB", marginTop: 3, flexShrink: 0, transition: "background 0.2s" }} />
-                  <div style={{ width: 1, height: 24, borderLeft: "1px dashed #CBD5E1", marginTop: 3 }} />
+                  <div className={isDspBypassed ? "sp-dot-dsp" : "sp-dot-dsp"} style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 3, flexShrink: 0, opacity: isDspBypassed ? 0.35 : 1, transition: "opacity 0.2s" }} />
+                  <div className="sp-rail" style={{ width: 1, height: 24, borderLeft: "1px dashed var(--border-subtle)", marginTop: 3 }} />
                 </div>
                 <div style={{ paddingBottom: 16, flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: isDspBypassed ? "#94A3B8" : "#0F172A", transition: "color 0.2s" }}>Parametric EQ</span>
+                    <span className="sp-node-title" style={{ fontSize: 12, fontWeight: 600, opacity: isDspBypassed ? 0.55 : 1, transition: "opacity 0.2s" }}>Parametric EQ</span>
                     {isDspBypassed && (
-                      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 600, color: "#94A3B8", background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 4, padding: "1px 6px" }}>
+                      <span className="sp-bypassed-badge" style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 600, borderRadius: 4, padding: "1px 6px", border: "1px solid" }}>
                         Bypassed
                       </span>
                     )}
@@ -628,23 +684,25 @@ export default function PlayerBar({
                     onClick={() => {
                       const next = !isDspBypassed
                       setIsDspBypassed(next)
-                      // dspEnabled 는 바이패스의 반대다. preset 은 룸이 이미 가진 값을 유지한다.
                       cmd.setDsp(room?.dspPreset ?? 0, !next)
                     }}
+                    className="sp-bypass-btn"
                     style={{
                       fontSize: 11, fontWeight: 500,
-                      color: isDspBypassed ? "#7C3AED" : "#374151",
-                      background: isDspBypassed ? "#F5F3FF" : "#F8FAFC",
-                      border: `1px solid ${isDspBypassed ? "#C4B5FD" : "#E2E8F0"}`,
                       borderRadius: 6, padding: "4px 10px", cursor: "pointer",
                       fontFamily: "inherit", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 6,
+                      border: "1px solid",
                     }}
                   >
-                    <span style={{
-                      width: 24, height: 14, borderRadius: 7, background: isDspBypassed ? "#7C3AED" : "#D1D5DB",
-                      display: "inline-flex", alignItems: "center", padding: "0 2px",
-                      transition: "background 0.2s", flexShrink: 0,
-                    }}>
+                    <span
+                      className="sp-toggle-track"
+                      style={{
+                        width: 24, height: 14, borderRadius: 7,
+                        display: "inline-flex", alignItems: "center", padding: "0 2px",
+                        transition: "background 0.2s", flexShrink: 0,
+                        background: isDspBypassed ? "var(--accent-violet)" : "var(--border-strong)",
+                      }}
+                    >
                       <span style={{
                         width: 10, height: 10, borderRadius: "50%", background: "#FFFFFF",
                         transform: isDspBypassed ? "translateX(10px)" : "translateX(0)",
@@ -660,12 +718,12 @@ export default function PlayerBar({
             <div style={{ paddingBottom: 0 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#2563EB", marginTop: 3, flexShrink: 0 }} />
-                  <div style={{ width: 1, height: 24, borderLeft: "1px dashed #CBD5E1", marginTop: 3 }} />
+                  <div className="sp-dot-hw" style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 3, flexShrink: 0 }} />
+                  <div className="sp-rail" style={{ width: 1, height: 24, borderLeft: "1px dashed var(--border-subtle)", marginTop: 3 }} />
                 </div>
                 <div style={{ paddingBottom: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{driverLabel}</div>
-                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{bufferLabel}</div>
+                  <div className="sp-node-title" style={{ fontSize: 12, fontWeight: 600 }}>{driverLabel}</div>
+                  <div className="sp-node-meta" style={{ fontSize: 11, marginTop: 1 }}>{bufferLabel}</div>
                 </div>
               </div>
             </div>
@@ -673,19 +731,19 @@ export default function PlayerBar({
             <div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ flexShrink: 0, marginTop: 3 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#059669" }} />
+                  <div className="sp-dot-dac" style={{ width: 8, height: 8, borderRadius: "50%" }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{dacLabel}</div>
-                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>{dacDetail}</div>
+                  <div className="sp-node-title" style={{ fontSize: 12, fontWeight: 600 }}>{dacLabel}</div>
+                  <div className="sp-node-meta" style={{ fontSize: 11, marginTop: 1 }}>{dacDetail}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #F1F5F9", margin: "16px 0 12px" }} />
+          <div className="sp-divider" style={{ borderTop: "1px solid var(--border-subtle)", margin: "16px 0 12px" }} />
           <div className="flex items-center justify-between">
-            <span style={{ fontSize: 11, fontWeight: 500, color: isDspBypassed ? "#7C3AED" : "#2563EB" }}>
+            <span className="sp-status-badge" style={{ fontSize: 11, fontWeight: 500 }}>
               {isDspBypassed ? (
                 <span className="flex items-center gap-1.5">
                   <MonoIcon.BitPerfect size={15} />
@@ -700,9 +758,8 @@ export default function PlayerBar({
             </span>
             <button
               onClick={onNavigateToLens}
-              style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color 0.15s", display: "flex", alignItems: "center", gap: 3 }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#0F172A")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
+              className="sp-configure-link"
+              style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, background: "none", border: "none", cursor: "pointer", padding: 0, transition: "color 0.15s", display: "flex", alignItems: "center", gap: 3 }}
             >
               <span>LENS</span>
               <MonoIcon.ExternalLink size={10} />
@@ -710,9 +767,8 @@ export default function PlayerBar({
           </div>
           <a
             href="#"
-            style={{ fontSize: 11, color: "#2563EB", display: "block", marginTop: 10, cursor: "pointer", textDecoration: "none" }}
-            onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline")}
-            onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = "none")}
+            className="sp-configure-link"
+            style={{ fontSize: 11, display: "block", marginTop: 10, cursor: "pointer", textDecoration: "none" }}
             onClick={(e) => e.preventDefault()}
           >
             Configure Audio Engine & EQ in Settings →
@@ -757,19 +813,18 @@ export default function PlayerBar({
 
         return (
           <div
+            className="signal-path-popover"
             style={{
               position: "fixed", bottom: 96, right: 32, width: 360,
-              background: "#FFFFFF", borderRadius: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)",
-              border: "1px solid #E5E7EB", padding: 20, zIndex: 60, userSelect: "none",
+              borderRadius: 18, padding: 20, zIndex: 60, userSelect: "none",
             }}
           >
             <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Audio Outputs</span>
+              <span className="sp-title" style={{ fontSize: 13, fontWeight: 700 }}>Audio Outputs</span>
               <button
                 onClick={() => setIsDevicePopoverOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#334155")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#94A3B8")}
+                className="sp-close"
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit", transition: "color 0.15s", display: "flex", alignItems: "center" }}
                 aria-label="Close"
               >
                 <MonoIcon.Close size={14} />
@@ -777,8 +832,8 @@ export default function PlayerBar({
             </div>
 
             {activeDevs.length >= 2 && (
-              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 600, color: "#94A3B8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+              <div style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+                <div className="sp-node-meta" style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
                   Group Master Volume
                 </div>
                 <div className="flex items-center gap-3">
@@ -805,11 +860,7 @@ export default function PlayerBar({
                   Mono Output 을 이 PC 에 붙이면 비트퍼펙트로 재생됩니다.
                 </div>
                 <button
-                  onClick={async () => {
-                    const res = await startConfiguredOutput(room?.id ?? null)
-                    if (!res.ok) setOutputError(res.error ?? "출력을 시작하지 못했습니다")
-                    else setOutputError(null)
-                  }}
+                  onClick={() => { void attachOutput() }}
                   style={{ padding: "9px 18px", borderRadius: 9, border: "none", background: "#2563EB", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                 >
                   출력 연결
@@ -833,7 +884,7 @@ export default function PlayerBar({
                   onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
                 >
                   <button
-                    onClick={(e) => { e.stopPropagation(); toggleDevice(dev.id) }}
+                    onClick={(e) => { e.stopPropagation(); if (!dev.isLocalWorker) toggleDevice(dev.id) }}
                     style={{
                       width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 1,
                       border: dev.active ? "none" : "1.5px solid #CBD5E1",
@@ -845,14 +896,22 @@ export default function PlayerBar({
                     {dev.active && <MonoIcon.Check size={12} strokeWidth={2.5} />}
                   </button>
 
-                  <div style={{ flex: 1, minWidth: 0 }} onClick={() => selectSolo(dev.id)}>
+                  <div style={{ flex: 1, minWidth: 0 }} onClick={() => { if (!dev.isLocalWorker) selectSolo(dev.id) }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: dev.active ? "#0F172A" : "#374151", marginBottom: 1, display: "flex", alignItems: "center" }}>
                       {dev.icon} <span>{dev.name}</span>
                     </div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", marginBottom: dev.active ? 8 : 0 }}>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#94A3B8", marginBottom: dev.active && !dev.isLocalWorker ? 8 : 0 }}>
                       {dev.spec}
                     </div>
-                    {dev.active && (
+                    {dev.isLocalWorker && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); void attachOutput() }}
+                        style={{ marginTop: 8, padding: "6px 12px", borderRadius: 8, border: "none", background: "#2563EB", color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        룸에 연결
+                      </button>
+                    )}
+                    {dev.active && !dev.isLocalWorker && (
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="range" min={-60} max={0} step={0.5}
@@ -873,10 +932,13 @@ export default function PlayerBar({
                         </span>
                       </div>
                     )}
+                    {outputError && dev.isLocalWorker && (
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "#DC2626", marginTop: 8, lineHeight: 1.5 }}>{outputError}</div>
+                    )}
                   </div>
 
                   <button
-                    onClick={(e) => { e.stopPropagation(); hideDevice(dev.id) }}
+                    onClick={(e) => { e.stopPropagation(); if (!dev.isLocalWorker) hideDevice(dev.id) }}
                     style={{
                       background: "none", border: "none", cursor: "pointer", padding: "2px 4px",
                       color: "#CBD5E1", transition: "color 0.15s", flexShrink: 0, marginTop: 2, display: "flex", alignItems: "center",

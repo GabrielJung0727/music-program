@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading;
 
 namespace Mono.Control;
 
@@ -136,7 +137,21 @@ public sealed class ProcessSupervisor
         // 넘어가면, 설정에서 장치를 바꿔도 소리는 이전 장치로 계속 나면서 화면만 새 장치를
         // 가리킨다 — 사용자는 바뀐 줄 알고 있으므로 무엇이 틀렸는지 알아낼 방법이 없다.
         if (OutputRunning && OutputRoomId == roomId && _outputArgs == args) return true;
+
+        var leavingAsio = OutputRunning && _outputArgs is not null && _outputArgs.Contains("--asio") && !args.Contains("--asio");
+        var enteringAsio = OutputRunning && _outputArgs is not null && !_outputArgs.Contains("--asio") && args.Contains("--asio");
         if (OutputRunning) StopOutput();
+
+        // ASIO 는 프로세스를 Kill 해도 드라이버 핸들이 한동안 장치에 남아 있다.
+        // Fireface 처럼 배타 잠금이 끈질긴 장치에서 그 상태로 WASAPI 를 열면
+        // 공유/배타 버퍼가 겹쳐 지직거린다. ASIO 쪽 ReleaseHold(3s) 와 맞춘다.
+        if (leavingAsio || enteringAsio)
+        {
+            AppLog.Write("control", leavingAsio
+                ? "ASIO → WASAPI: waiting for exclusive handle release"
+                : "WASAPI → ASIO: waiting for endpoint release");
+            Thread.Sleep(2800);
+        }
 
         try
         {

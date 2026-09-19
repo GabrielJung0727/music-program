@@ -222,7 +222,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     }
 
     /// <summary>한 공유 모드로 장치를 열어 본다. 성공하면 핸들과 상태를 여기서 확정한다.</summary>
-    private bool TryOpen(DeviceConfig config, AudioClientShareMode share, out string refusal)
+    private bool TryOpenOnce(DeviceConfig config, AudioClientShareMode share, out string refusal)
     {
         var latency = share == AudioClientShareMode.Exclusive ? 10 : 20;
         var requested = BuildFormat(config.SampleRate, config.BitDepth, config.Channels);
@@ -268,7 +268,6 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         }
         catch (Exception ex)
         {
-            // 실패한 클라이언트를 놓아주지 않으면 장치를 문 채 남는다.
             try { attempt?.Dispose(); } catch { /* 이미 닫혔으면 무시 */ }
             _out = null;
             _buffer = null;
@@ -277,6 +276,29 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             return false;
         }
     }
+
+    /// <summary>
+    /// 장치가 잠겨 있으면 잠깐 기다렸다가 다시 연다.
+    /// ASIO 워커를 막 죽인 직후 WASAPI 가 같은 Fireface 를 열 때 흔하다.
+    /// </summary>
+    private bool TryOpen(DeviceConfig config, AudioClientShareMode share, out string refusal)
+    {
+        refusal = "";
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            if (TryOpenOnce(config, share, out refusal)) return true;
+            if (!LooksBusy(refusal)) return false;
+            Thread.Sleep(600);
+        }
+
+        return false;
+    }
+
+    private static bool LooksBusy(string refusal)
+        => refusal.Contains("0x8889000A", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("being used", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("사용 중", StringComparison.OrdinalIgnoreCase)
+           || refusal.Contains("AUDCLNT_E_DEVICE_IN_USE", StringComparison.OrdinalIgnoreCase);
 
     private static bool Matches(WaveFormat actual, WaveFormat requested)
         => actual.SampleRate == requested.SampleRate

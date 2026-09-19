@@ -5,8 +5,8 @@ import { type ListenerProfile } from "./Step3AudiophileRig";
 import Step1AudioEngine, { type AudioEngineConfig } from "./Step1AudioEngine";
 import { useMono, useMonoCommands } from "../../state/MonoProvider";
 import { StreamingProvider } from "../../lib/protocol";
-import { hasShell, pickFolder, startOutput } from "../../lib/shell";
-import { saveSetup, backendFor, type AudioSetup } from "../../lib/setup";
+import { hasShell, pickFolder } from "../../lib/shell";
+import { saveSetup, startConfiguredOutput, type AudioSetup } from "../../lib/setup";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -804,7 +804,10 @@ export default function OnboardingWizard({
     // 다음 실행이 아니라 지금부터 그 장치로 들리게 한다. 마법사에서 DAC 를 고르고
     // 첫 곡이 내장 스피커로 나오면 무엇을 고른 건지 알 수 없다.
     if (chosen && hasShell()) {
-      void startOutput(null, backendFor(chosen), chosen.deviceName);
+      void (async () => {
+        const roomId = await cmd.ensureSoloRoom();
+        await startConfiguredOutput(roomId);
+      })();
     }
     void saveSetup({
       completed: true,

@@ -9,7 +9,7 @@ import StreamingLoginModal from "./components/StreamingLoginModal"
 import OnboardingWizard from "./components/onboarding/OnboardingWizard"
 import type { ListenerProfile } from "./components/onboarding/Step3AudiophileRig"
 import QueueDrawer from "./components/QueueDrawer"
-import TrackActionMenu, { type TrackActionTarget } from "./components/TrackActionMenu"
+import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./components/TrackActionMenu"
 import FullscreenPlayer from "./components/FullscreenPlayer"
 import SettingsPage from "./components/SettingsPage"
 import SettingsModal from "./components/SettingsModal"
@@ -28,8 +28,8 @@ import {
   type LoungeRoom,
 } from "./data/types"
 import { useLiveSession, useToast } from "./state/useLiveSession"
-import { loadSetup, saveSetup, backendFor, startConfiguredOutput, type SetupState } from "./lib/setup"
-import { hasShell, startOutput, outputStatus } from "./lib/shell"
+import { loadSetup, saveSetup, startConfiguredOutput, type SetupState } from "./lib/setup"
+import { hasShell, outputStatus } from "./lib/shell"
 import { useDebounced } from "./state/useDebounced"
 import { libArtists } from "./lib/libraryData"
 import {
@@ -70,6 +70,62 @@ function toQueueTrack(t: TrackActionTarget): import("./data/types").QueueTrack {
     art: t.art || (t as any).coverUrl,
     source: t.source,
   }
+}
+
+function SearchTrackRow({
+  track,
+  index,
+  playing,
+  isGuest,
+  onPlayNow,
+  onPlayNext,
+  onAddToQueue,
+}: {
+  track: SearchTrack
+  index: number
+  playing: boolean
+  isGuest: boolean
+  onPlayNow: (t: TrackActionTarget) => void
+  onPlayNext: (t: TrackActionTarget) => void
+  onAddToQueue: (t: TrackActionTarget) => void
+}) {
+  const menuRef = useRef<TrackActionHandle>(null)
+  const payload: TrackActionTarget = { title: track.title, artist: track.artist, album: track.album, duration: track.duration, dr: track.dr }
+  return (
+    <div
+      className={`group relative flex items-center gap-3 px-4 py-3 rounded-xl transition cursor-pointer search-hit ${track.isCurrent ? "search-hit--active" : ""}`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest(".track-more-btn, .track-dropdown-menu")) return
+        menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
+      }}
+    >
+      <div className="w-6 shrink-0 flex justify-center">
+        {track.isCurrent ? (
+          <span className="flex items-center gap-1" style={{ color: "var(--accent-violet)" }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: "var(--accent-violet)" }} />
+            <MonoIcon.PlayMini size={10} color="var(--accent-violet)" />
+          </span>
+        ) : (
+          <span className="text-xs font-mono search-hit-meta">{String(index + 1).padStart(2, "0")}</span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-serif font-semibold truncate search-hit-title">{track.title}</p>
+        <p className="text-xs font-mono search-hit-meta truncate">{track.album}</p>
+      </div>
+      <span className={`path-badge ${track.dr === "DR 14" ? "path-badge--hi" : track.dr === "DR 13" ? "path-badge--mid" : "path-badge--muted"}`}>{track.dr}</span>
+      <span className="text-xs font-mono search-hit-meta shrink-0">{track.duration}</span>
+      <TrackActionMenu
+        ref={menuRef}
+        track={payload}
+        onPlayNow={onPlayNow}
+        onPlayNext={onPlayNext}
+        onAddToQueue={onAddToQueue}
+        isGuest={isGuest}
+        titleOpensMenu={playing && !track.isCurrent}
+      />
+    </div>
+  )
 }
 
 // ── App Root ─────────────────────────────────────────────────────────────────
@@ -379,6 +435,20 @@ export default function App() {
     void cmd.playNow(id)
   }
 
+  /**
+   * 앨범 전체를 큐에 걸고 고른 칸부터 재생한다. 한 번의 명령으로 나가므로 큐가
+   * 중간 상태(한 곡짜리)로 방송되지 않는다.
+   */
+  const handlePlayAlbumFrom = (tracks: TrackActionTarget[], startIndex: number) => {
+    const resolved = tracks.map((t) => ({ target: t, id: resolveTrackId(t) }))
+    const ids = resolved.filter((r): r is { target: TrackActionTarget; id: string } => r.id !== null)
+    if (ids.length === 0) { showToast("이 앨범을 라이브러리에서 찾지 못했습니다"); return }
+    // 못 찾은 곡이 앞에 있었다면 시작 위치도 그만큼 당긴다.
+    const wanted = resolved[startIndex]?.id
+    const index = wanted ? Math.max(0, ids.findIndex((r) => r.id === wanted)) : 0
+    void cmd.playFrom(ids.map((r) => r.id), index)
+  }
+
   const handlePlayNext = (track: TrackActionTarget) => {
     const id = resolveTrackId(track)
     if (!id) { showToast(`"${track.title}" 을(를) 라이브러리에서 찾지 못했습니다`); return }
@@ -456,16 +526,16 @@ export default function App() {
   const listenerCount = room?.members?.length ?? 1
 
   const handleStopHosting = () => {
-    // 나가기가 아니라 닫기다. 나가기만 하면 호스트가 없는 방이 라운지 목록에 그대로 남는다 —
-    // 세션을 끝냈다고 눌렀는데 방이 살아 있으면 지울 방법이 없다.
-    void cmd.closeRoom()
-    setPlayerMode("solo")
-    setActiveLoungeRoom(false)
-    setJoinedLoungeId(null)
-    setCurrentTab("lounges")
-    setActiveTab("live")
-    setIsFullscreenPlayer(false)
-    setShowEndSessionModal(false)
+    // 라운지 목록에서만 내린다. 방을 지우면 틀어 둔 곡이 플레이어에서 사라진다.
+    void cmd.closeRoom().then(() => {
+      setPlayerMode("solo")
+      setActiveLoungeRoom(false)
+      setJoinedLoungeId(null)
+      setCurrentTab("home")
+      setActiveTab("home")
+      setIsFullscreenPlayer(false)
+      setShowEndSessionModal(false)
+    })
   }
 
   const [showEndSessionModal, setShowEndSessionModal] = useState<boolean>(false)
@@ -618,8 +688,12 @@ export default function App() {
 
     const audio = setup.audio
     // 셸이 없으면 Output 프로세스를 띄울 방법 자체가 없다.
+    // 룸 없이 띄우면 워커는 도는데 화면의 outputs 는 비어 "연결 안 됨"으로 보인다.
     if (audio?.deviceName && hasShell()) {
-      void startOutput(null, backendFor(audio), audio.deviceName)
+      void (async () => {
+        const roomId = await cmd.ensureSoloRoom()
+        await startConfiguredOutput(roomId)
+      })()
     }
   }, [setup, cmd, activeProfileId])
 
@@ -721,18 +795,18 @@ export default function App() {
       <main style={{ flex: 1, overflowY: "auto", paddingBottom: 96 }}>
         {isSearchActive && !selectedAlbum && !selectedArtist ? (
           /* ── Search Results View ──────────────────────────────────────────── */
-          <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+          <div className="max-w-6xl mx-auto px-6 py-8 space-y-8 search-results-page">
 
             {/* Search header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-serif font-bold text-slate-900">Results for &ldquo;{searchQuery}&rdquo;</h1>
-                <p className="text-xs font-mono text-slate-400 mt-0.5">{filteredTracks.length} tracks · {filteredAlbums.length} albums · {matchedLounges.length} live lounge{matchedLounges.length !== 1 ? "s" : ""} · {topArtist ? 1 : 0} artist</p>
+                <h1 className="text-xl font-serif font-bold search-results-title">Results for &ldquo;{searchQuery}&rdquo;</h1>
+                <p className="text-xs font-mono search-results-meta mt-0.5">{filteredTracks.length} tracks · {filteredAlbums.length} albums · {matchedLounges.length} live lounge{matchedLounges.length !== 1 ? "s" : ""} · {topArtist ? 1 : 0} artist</p>
               </div>
               <button
                 onClick={() => { setSearchQuery(""); setIsSearchActive(false) }}
-                className="text-xs font-mono text-slate-500 hover:text-slate-900 border border-slate-200 hover:border-slate-400 px-3.5 py-1.5 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
-                style={{ background: "none" }}
+                className="text-xs font-mono px-3.5 py-1.5 rounded-full cursor-pointer transition inline-flex items-center gap-1.5"
+                style={{ background: "none", color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
               >
                 <MonoIcon.Close size={12} />
                 <span>Clear &amp; Close</span>
@@ -742,30 +816,30 @@ export default function App() {
             {/* Top Result — 검색어와 가장 잘 맞는 아티스트 */}
             {topArtist && (
               <div>
-                <p className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Top Result</p>
+                <p className="text-xs font-mono font-bold search-results-meta uppercase tracking-wider mb-3">Top Result</p>
                 <div
                   onClick={() => { setIsSearchActive(false); setSearchQuery(""); openArtist(topArtist.id) }}
-                  className="flex items-center gap-6 bg-gradient-to-r from-slate-50 to-white border border-slate-200/80 rounded-2xl p-5 cursor-pointer hover:shadow-md transition group"
+                  className="flex items-center gap-6 search-results-card rounded-2xl p-5 cursor-pointer transition group"
                 >
                   {topArtist.art ? (
                     <img
                       src={topArtist.art}
                       alt={topArtist.name}
-                      className="w-20 h-20 rounded-xl object-cover shadow-md border border-slate-200 shrink-0"
+                      className="w-20 h-20 rounded-xl object-cover shadow-md search-hit-art shrink-0"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-xl shadow-md border border-slate-200 shrink-0 bg-slate-200" />
+                    <div className="w-20 h-20 rounded-xl shadow-md search-hit-art shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-2xl font-serif font-bold text-slate-900 group-hover:text-blue-700 transition leading-tight">{topArtist.name}</p>
-                    <p className="text-xs font-mono text-slate-500 mt-0.5 uppercase tracking-wider">{topArtist.count}</p>
+                    <p className="text-2xl font-serif font-bold search-hit-title transition leading-tight">{topArtist.name}</p>
+                    <p className="text-xs font-mono search-hit-meta mt-0.5 uppercase tracking-wider">{topArtist.count}</p>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                       {topArtist.genres.map(g => (
-                        <span key={g} className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full border border-slate-200/60">{g}</span>
+                        <span key={g} className="path-badge path-badge--muted">{g}</span>
                       ))}
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-blue-600 group-hover:text-blue-800 transition shrink-0">View Liner Notes →</span>
+                  <span className="text-xs font-mono shrink-0" style={{ color: "var(--accent-violet)" }}>View Liner Notes →</span>
                 </div>
               </div>
             )}
@@ -773,48 +847,30 @@ export default function App() {
             {/* 2-column split: Tracks + Albums */}
             {filteredTracks.length === 0 && filteredAlbums.length === 0 ? (
               <div className="py-16 text-center">
-                <p className="text-base font-serif text-slate-500">No results found for &ldquo;{searchQuery}&rdquo;</p>
-                <p className="text-xs font-mono text-slate-400 mt-2">앨범·아티스트·곡 제목으로 라이브러리를 검색합니다.</p>
+                <p className="text-base font-serif search-hit-meta">No results found for &ldquo;{searchQuery}&rdquo;</p>
+                <p className="text-xs font-mono search-hit-meta mt-2">앨범·아티스트·곡 제목으로 라이브러리를 검색합니다.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-8">
 
                 {/* Left: Hi-Res Tracks */}
                 <div>
-                  <p className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Hi-Res Tracks ({filteredTracks.length})</p>
+                  <p className="text-xs font-mono font-bold search-results-meta uppercase tracking-wider mb-3">Hi-Res Tracks ({filteredTracks.length})</p>
                   {filteredTracks.length === 0 ? (
-                    <p className="text-xs font-mono text-slate-400 px-4">No matching tracks.</p>
+                    <p className="text-xs font-mono search-hit-meta px-4">No matching tracks.</p>
                   ) : (
                     <div className="flex flex-col gap-1">
                       {filteredTracks.map((track, i) => (
-                        <div
+                        <SearchTrackRow
                           key={`${track.title}-${track.album}`}
-                          className={`group relative flex items-center gap-3 px-4 py-3 rounded-xl transition cursor-pointer ${track.isCurrent ? "bg-blue-50/70 border border-blue-200/60" : "hover:bg-slate-50 border border-transparent"}`}
-                        >
-                          <div className="w-6 shrink-0 flex justify-center">
-                            {track.isCurrent ? (
-                              <span className="flex items-center gap-1 text-blue-600">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse inline-block" />
-                                <MonoIcon.PlayMini size={10} color="#2563eb" />
-                              </span>
-                            ) : (
-                              <span className="text-xs font-mono text-slate-400">{String(i + 1).padStart(2, "0")}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-serif font-semibold truncate ${track.isCurrent ? "text-blue-700" : "text-slate-900"}`}>{track.title}</p>
-                            <p className="text-xs font-mono text-slate-400 truncate">{track.album}</p>
-                          </div>
-                          <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full shrink-0 ${track.dr === "DR 14" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : track.dr === "DR 13" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-500 border-slate-200"}`}>{track.dr}</span>
-                          <span className="text-xs font-mono text-slate-400 shrink-0">{track.duration}</span>
-                          <TrackActionMenu
-                            track={{ title: track.title, artist: track.artist, album: track.album, duration: track.duration, dr: track.dr }}
-                            onPlayNow={handlePlayNow}
-                            onPlayNext={handlePlayNext}
-                            onAddToQueue={handleAddToQueue}
-                            isGuest={playerMode === "guest"}
-                          />
-                        </div>
+                          track={track}
+                          index={i}
+                          playing={playing}
+                          isGuest={playerMode === "guest"}
+                          onPlayNow={handlePlayNow}
+                          onPlayNext={handlePlayNext}
+                          onAddToQueue={handleAddToQueue}
+                        />
                       ))}
                     </div>
                   )}
@@ -822,9 +878,9 @@ export default function App() {
 
                 {/* Right: Master Albums */}
                 <div>
-                  <p className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Master Albums ({filteredAlbums.length})</p>
+                  <p className="text-xs font-mono font-bold search-results-meta uppercase tracking-wider mb-3">Master Albums ({filteredAlbums.length})</p>
                   {filteredAlbums.length === 0 ? (
-                    <p className="text-xs font-mono text-slate-400">No matching albums.</p>
+                    <p className="text-xs font-mono search-hit-meta">No matching albums.</p>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       {filteredAlbums.map(album => (
@@ -833,14 +889,14 @@ export default function App() {
                           onClick={() => { setIsSearchActive(false); setSearchQuery(""); handleSelectAlbum(album) }}
                           className="cursor-pointer group"
                         >
-                          <div className="rounded-xl overflow-hidden mb-2 border border-slate-100 shadow-sm aspect-square">
+                          <div className="rounded-xl overflow-hidden mb-2 search-hit-art aspect-square">
                             <img src={album.coverUrl} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                           </div>
-                          <p className="text-sm font-serif font-bold text-slate-900 leading-snug group-hover:text-blue-700 transition">{album.title}</p>
-                          <p className="text-xs font-mono text-slate-400">{album.artist} · {album.year}</p>
+                          <p className="text-sm font-serif font-bold search-hit-title leading-snug transition">{album.title}</p>
+                          <p className="text-xs font-mono search-hit-meta">{album.artist} · {album.year}</p>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full ${album.format.includes("DSD") ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200"}`}>{album.format.split(" ").slice(0, 3).join(" ")}</span>
-                            <span className={`text-[10px] font-mono border px-2 py-0.5 rounded-full ${album.dr === "DR 14" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>{album.dr}</span>
+                            <span className={`path-badge ${album.format.includes("DSD") ? "path-badge--hi" : "path-badge--format"}`}>{album.format.split(" ").slice(0, 3).join(" ")}</span>
+                            <span className={`path-badge ${album.dr === "DR 14" ? "path-badge--hi" : "path-badge--mid"}`}>{album.dr}</span>
                           </div>
                         </div>
                       ))}
@@ -853,30 +909,30 @@ export default function App() {
             {/* Live Lounges — 검색어와 맞는 실제 룸 */}
             {matchedLounges.length > 0 && (
               <div>
-                <p className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">Live Lounges</p>
+                <p className="text-xs font-mono font-bold search-results-meta uppercase tracking-wider mb-3">Live Lounges</p>
                 <div className="flex flex-col gap-3">
                   {matchedLounges.map(room => (
                     <div
                       key={room.id}
                       onClick={() => { setIsSearchActive(false); setSearchQuery(""); handleToggleJoinLounge(room.id) }}
-                      className="flex items-center gap-5 bg-slate-900 hover:bg-slate-800 rounded-2xl px-6 py-5 cursor-pointer transition group"
+                      className="flex items-center gap-5 search-results-card rounded-2xl px-6 py-5 cursor-pointer transition group"
                     >
                       {room.art ? (
-                        <img src={room.art} alt={room.title} className="w-14 h-14 rounded-xl object-cover border border-white/10 shrink-0" />
+                        <img src={room.art} alt={room.title} className="w-14 h-14 rounded-xl object-cover search-hit-art shrink-0" />
                       ) : (
-                        <div className="w-14 h-14 rounded-xl border border-white/10 shrink-0 bg-white/5" />
+                        <div className="w-14 h-14 rounded-xl search-hit-art shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block shrink-0" />
                           <span className="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">Live Now</span>
                         </div>
-                        <p className="text-base font-serif font-bold text-white leading-snug">{room.title}</p>
-                        <p className="text-xs font-mono text-slate-400 mt-0.5">
+                        <p className="text-base font-serif font-bold search-hit-title leading-snug">{room.title}</p>
+                        <p className="text-xs font-mono search-hit-meta mt-0.5">
                           {[`${room.listenerCount} Listening`, room.currentArtist ? `${room.currentArtist} — ${room.currentTrackTitle}` : room.currentTrackTitle, room.audioSpec].filter(Boolean).join(" · ")}
                         </p>
                       </div>
-                      <span className="text-xs font-mono text-blue-400 group-hover:text-blue-300 transition shrink-0">
+                      <span className="text-xs font-mono shrink-0" style={{ color: "var(--accent-violet)" }}>
                         {joinedLoungeId === room.id ? "Leave Lounge →" : "Join Lounge →"}
                       </span>
                     </div>
@@ -905,6 +961,7 @@ export default function App() {
             onPlayNow={handlePlayNow}
             onPlayNext={handlePlayNext}
             onAddToQueue={handleAddToQueue}
+            onPlayAlbumFrom={handlePlayAlbumFrom}
           />
         ) : selectedArtist ? (
           <ArtistDetailView

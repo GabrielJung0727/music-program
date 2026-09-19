@@ -109,7 +109,10 @@ public class RoomCommandTests
         Assert.NotNull(solo.InviteExpiresAt);
     }
 
-    /// <summary>세션을 끝내면 방이 사라진다. 나가기만 하면 호스트 없는 방이 목록에 남는다.</summary>
+    /// <summary>
+    /// 호스팅을 끝내면 라운지 목록에서는 빠지지만 듣던 방은 그대로다 —
+    /// 방을 지워 버리면 큐와 재생 위치까지 같이 날아간다.
+    /// </summary>
     [Fact]
     public void ClosingTheLoungeRemovesItFromTheDirectory()
     {
@@ -119,8 +122,8 @@ public class RoomCommandTests
 
         commands.Execute("host", new MonoMessage { Type = MessageTypes.CloseRoom, RoomId = room.Id }, "Host");
 
-        Assert.Empty(rooms.List());
         Assert.Empty(Listed(commands, "host"));
+        Assert.Equal(RoomMode.Solo, Assert.Single(rooms.List()).Mode);
     }
 
     /// <summary>호스트가 아니면 닫을 수 없다 — 남의 라운지를 지워 버리면 안 된다.</summary>
@@ -192,7 +195,7 @@ public class RoomCommandTests
         Assert.Equal(2, Listed(commands, "a").Count);
     }
 
-    /// <summary>닫고 나면 다시 열 수 있다.</summary>
+    /// <summary>닫고 나면 다시 열 수 있다 — 남아 있는 혼자 듣기 방이 슬롯을 물고 있지 않다.</summary>
     [Fact]
     public void ClosingFreesTheSlot()
     {
@@ -206,7 +209,7 @@ public class RoomCommandTests
         }, "Listener");
 
         Assert.NotEqual(MessageTypes.Error, again.Direct?.Type ?? "");
-        Assert.Single(rooms.List());
+        Assert.Single(Listed(commands, "me"));
     }
 
     /// <summary>이미 라운지가 열려 있으면 듣던 방을 또 공개로 올릴 수 없다.</summary>

@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useRef } from "react"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { useLiveSession } from "../state/useLiveSession"
 import { libAlbums, libArtists, libComposers, libPlaylists, libTracks, type LibTrack } from "../lib/libraryData"
-import TrackActionMenu, { type TrackActionTarget } from "./TrackActionMenu"
+import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./TrackActionMenu"
 import type { ShareData } from "./ShareModal"
 import { MonoIcon } from "./icons/MonoIcons"
 
@@ -63,7 +63,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
   const [libraryTab, setLibraryTab] = useState<"albums" | "artists" | "composers" | "playlists" | "tracks">(defaultTab)
   const { catalog, playlists: corePlaylists, catalogLoaded } = useMono()
   const cmd = useMonoCommands()
-  const { albums: liveAlbums } = useLiveSession()
+  const { albums: liveAlbums, currentTrack, playing } = useLiveSession()
 
   const LIB_ALBUMS = useMemo(() => libAlbums(liveAlbums, catalog), [liveAlbums, catalog])
   const LIB_ARTISTS = useMemo(() => libArtists(catalog), [catalog])
@@ -143,17 +143,18 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
 
   const TrackRow = ({ t, idx }: { t: LibTrack; idx: number }) => {
     const hovered = hoveredRow === idx
+    const menuRef = useRef<TrackActionHandle>(null)
     const trackPayload: TrackActionTarget = { id: t.id, title: t.title, artist: t.artist, album: t.album, duration: t.time, format: t.format, dr: String(t.dr), art: t.art }
-    const playTrack = (e: React.MouseEvent) => {
-      e.stopPropagation()
-      onPlayNow?.(trackPayload)
-    }
+    const isOtherPlaying = playing && currentTrack != null && currentTrack.title !== t.title && currentTrack.id !== t.id
     return (
       <div
         className="group"
         onMouseEnter={() => setHoveredRow(idx)}
         onMouseLeave={() => setHoveredRow(null)}
-        onClick={playTrack}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest(".track-more-btn, .track-dropdown-menu")) return
+          menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
+        }}
         style={{
           display: "grid", gridTemplateColumns: TRACK_COL, alignItems: "center",
           padding: "6px 10px", borderRadius: 8,
@@ -223,10 +224,12 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
         >
           {(onPlayNow || onPlayNext || onAddToQueue) && (
             <TrackActionMenu
+              ref={menuRef}
               track={trackPayload}
               onPlayNow={onPlayNow ?? (() => {})}
               onPlayNext={onPlayNext ?? (() => {})}
               onAddToQueue={onAddToQueue ?? (() => {})}
+              titleOpensMenu={isOtherPlaying}
             />
           )}
         </div>

@@ -88,3 +88,14 @@ public enum ZoneMode
     /// <summary>기기마다 각자 다른 음원을 독립적으로 재생한다.</summary>
     Independent
 }
+
+/// <summary>반복 재생 상태. 와이어에 숫자로 실리므로 새 값은 항상 뒤에 붙인다.</summary>
+public enum RepeatMode
+{
+    /// <summary>큐가 끝나면 멈춘다.</summary>
+    Off,
+    /// <summary>큐가 끝나면 처음으로 돌아간다.</summary>
+    All,
+    /// <summary>지금 곡만 반복한다.</summary>
+    One
+}

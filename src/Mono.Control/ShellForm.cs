@@ -28,6 +28,7 @@ public sealed class ShellForm : Form
 
     private readonly ProcessSupervisor _supervisor = new();
     private readonly AppUpdater _updater = new();
+    private readonly DiscordPresence _discord = new();
     private readonly NotifyIcon _tray;
     private readonly CancellationTokenSource _life = new();
     private bool _quitting;
@@ -245,6 +246,13 @@ public sealed class ShellForm : Form
               quit: () => call('app.quit'),
               minimizeToTray: () => call('app.minimizeToTray'),
             },
+            discord: {
+              set: (payload) => call('discord.set', payload),
+              clear: () => call('discord.clear'),
+              status: () => call('discord.status'),
+              setEnabled: (enabled) => call('discord.setEnabled', { enabled }),
+              setAppId: (appId) => call('discord.setAppId', { appId }),
+            },
           };
         })();
         """;
@@ -388,6 +396,47 @@ public sealed class ShellForm : Form
                 BeginInvoke(QuitFromTray);
                 return true;
 
+            case "discord.set":
+            {
+                bool Flag(string name) =>
+                    msg.TryGetProperty(name, out var el) && el.ValueKind is JsonValueKind.True;
+                long Num(string name) =>
+                    msg.TryGetProperty(name, out var el) && el.TryGetInt64(out var n) ? n : 0;
+                _discord.SetNowPlaying(
+                    Str("title"),
+                    Str("artist"),
+                    Str("album"),
+                    Str("artUrl"),
+                    Flag("playing"),
+                    Num("mediaOriginUnixMs"),
+                    Num("mediaTimeAtOriginMs"),
+                    Num("durationMs"));
+                return new { ok = true, connected = _discord.Connected };
+            }
+
+            case "discord.clear":
+                _discord.Clear();
+                return true;
+
+            case "discord.status":
+                return new
+                {
+                    enabled = _discord.Enabled,
+                    connected = _discord.Connected,
+                    hasAppId = !string.IsNullOrWhiteSpace(_discord.ApplicationId),
+                };
+
+            case "discord.setEnabled":
+            {
+                var on = msg.TryGetProperty("enabled", out var en) && en.ValueKind != JsonValueKind.False;
+                _discord.Enabled = on;
+                return new { enabled = _discord.Enabled };
+            }
+
+            case "discord.setAppId":
+                _discord.ApplicationId = Str("appId") ?? "";
+                return new { hasAppId = !string.IsNullOrWhiteSpace(_discord.ApplicationId) };
+
             default:
                 throw new NotSupportedException("알 수 없는 명령: " + op);
         }
@@ -483,6 +532,7 @@ public sealed class ShellForm : Form
         _life.Cancel();
         _tray.Visible = false;
         _tray.Dispose();
+        _discord.Dispose();
         _supervisor.StopAll();
         base.OnFormClosed(e);
     }

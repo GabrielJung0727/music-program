@@ -1,4 +1,5 @@
-import TrackActionMenu from "../TrackActionMenu"
+import { useRef } from "react"
+import TrackActionMenu, { type TrackActionHandle } from "../TrackActionMenu"
 import type { TrackActionTarget } from "../TrackActionMenu"
 import type { PlayerMode } from "../PlayerBar"
 import type { QueueTrack } from "../../data/types"
@@ -15,9 +16,11 @@ interface Props {
   onPlayNow: (t: TrackActionTarget) => void
   onPlayNext: (t: TrackActionTarget) => void
   onAddToQueue: (t: TrackActionTarget) => void
+  /** 앨범 전체를 큐에 걸고 고른 칸부터 재생한다. */
+  onPlayAlbumFrom: (tracks: TrackActionTarget[], startIndex: number) => void
 }
 
-export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLoungeRoom, playerMode, onReturnToLounge, onBack, onPlayNow, onPlayNext, onAddToQueue }: Props) {
+export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLoungeRoom, playerMode, onReturnToLounge, onBack, onPlayNow, onPlayNext, onAddToQueue, onPlayAlbumFrom }: Props) {
   const { findAlbum } = useLiveSession()
   const artSrc: string = selectedAlbum?.art || selectedAlbum?.coverUrl || ""
 
@@ -40,16 +43,24 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
       (track.id != null && currentTrack.id === track.id)
     )
 
-  const playTrack = (track: any) => {
-    onPlayNow({
-      title: track.title,
-      artist: track.artist ?? selectedAlbum?.artist,
-      album: selectedAlbum?.title,
-      duration: track.duration,
-      format: selectedAlbum?.format,
-      dr: track.dr,
-      art: artSrc,
-    })
+  const asTarget = (track: any): TrackActionTarget => ({
+    id: track.id,
+    title: track.title,
+    artist: track.artist ?? selectedAlbum?.artist,
+    album: selectedAlbum?.title,
+    duration: track.duration,
+    format: selectedAlbum?.format,
+    dr: track.dr,
+    art: artSrc,
+  })
+
+  /**
+   * 앨범 안에서 재생을 시작하면 앨범 전체가 큐가 되고, 고른 곡이 그 안의 시작점이 된다.
+   * 예전에는 고른 한 곡만 큐 끝에 붙어서, 가운데 곡을 누르면 순서가 뒤엉킨 것처럼 보였다.
+   */
+  const playFromIndex = (index: number) => {
+    if (resolvedTracks.length === 0) return
+    onPlayAlbumFrom(resolvedTracks.map(asTarget), index)
   }
 
   return (
@@ -116,7 +127,7 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => resolvedTracks[0] && playTrack(resolvedTracks[0])}
+              onClick={() => playFromIndex(0)}
               disabled={resolvedTracks.length === 0}
               className="btn-album-play"
             >
@@ -171,49 +182,21 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
               </thead>
               <tbody>
                 {resolvedTracks.map((track: any, tIdx: number) => (
-                  <tr
+                  <AlbumTrackRow
                     key={track.num ?? track.title ?? tIdx}
-                    className={`group album-track-row ${isTrackActive(track) ? "album-track-row-active" : ""}`}
-                  >
-                    <td className="px-5 py-3.5 w-12 text-center">
-                      {isTrackActive(track) ? (
-                        <MonoIcon.PlayMini size={11} color="var(--album-detail-active-accent)" />
-                      ) : (
-                        <span className="text-xs font-mono group-hover:hidden" style={{ color: "var(--text-muted)" }}>{tIdx + 1}</span>
-                      )}
-                      {!isTrackActive(track) && (
-                        <span className="hidden group-hover:inline"><MonoIcon.PlayMini size={11} color="var(--text-muted)" /></span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <button
-                        onClick={() => playTrack(track)}
-                        className="album-track-title-btn"
-                      >
-                        {track.title}
-                      </button>
-                    </td>
-                    <td className="px-3 py-3.5"><span className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>{track.artist ?? selectedAlbum?.artist}</span></td>
-                    <td className="px-3 py-3.5 text-center"><span className="badge-dr-meter">{track.dr}</span></td>
-                    <td className="px-5 py-3.5 text-right"><span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{track.duration}</span></td>
-                    <td className="pr-2 py-2 w-8">
-                      <TrackActionMenu
-                        track={{
-                          title: track.title,
-                          artist: track.artist ?? selectedAlbum?.artist,
-                          album: selectedAlbum?.title,
-                          duration: track.duration,
-                          format: selectedAlbum?.format,
-                          dr: track.dr,
-                          art: artSrc,
-                        }}
-                        onPlayNow={onPlayNow}
-                        onPlayNext={onPlayNext}
-                        onAddToQueue={onAddToQueue}
-                        isGuest={playerMode === "guest"}
-                      />
-                    </td>
-                  </tr>
+                    track={track}
+                    index={tIdx}
+                    artSrc={artSrc}
+                    albumTitle={selectedAlbum?.title}
+                    albumArtist={selectedAlbum?.artist}
+                    albumFormat={selectedAlbum?.format}
+                    active={isTrackActive(track)}
+                    opensMenu={currentTrack != null && !isTrackActive(track)}
+                    isGuest={playerMode === "guest"}
+                    onPlayNow={() => playFromIndex(tIdx)}
+                    onPlayNext={onPlayNext}
+                    onAddToQueue={onAddToQueue}
+                  />
                 ))}
               </tbody>
             </table>
@@ -222,5 +205,83 @@ export default function AlbumDetailView({ selectedAlbum, currentTrack, activeLou
       )}
 
     </div>
+  )
+}
+
+function AlbumTrackRow({
+  track,
+  index,
+  artSrc,
+  albumTitle,
+  albumArtist,
+  albumFormat,
+  active,
+  opensMenu,
+  isGuest,
+  onPlayNow,
+  onPlayNext,
+  onAddToQueue,
+}: {
+  track: any
+  index: number
+  artSrc: string
+  albumTitle?: string
+  albumArtist?: string
+  albumFormat?: string
+  active: boolean
+  opensMenu: boolean
+  isGuest: boolean
+  onPlayNow: (t: TrackActionTarget) => void
+  onPlayNext: (t: TrackActionTarget) => void
+  onAddToQueue: (t: TrackActionTarget) => void
+}) {
+  const menuRef = useRef<TrackActionHandle>(null)
+  const payload: TrackActionTarget = {
+    id: track.id,
+    title: track.title,
+    artist: track.artist ?? albumArtist,
+    album: albumTitle,
+    duration: track.duration,
+    format: albumFormat,
+    dr: track.dr,
+    art: artSrc,
+  }
+
+  return (
+    <tr
+      className={`group album-track-row ${active ? "album-track-row-active" : ""}`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest(".track-more-btn, .track-dropdown-menu")) return
+        menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
+      }}
+    >
+      <td className="px-5 py-3.5 w-12 text-center">
+        {active ? (
+          <MonoIcon.PlayMini size={11} color="var(--album-detail-active-accent)" />
+        ) : (
+          <>
+            <span className="text-xs font-mono group-hover:hidden" style={{ color: "var(--text-muted)" }}>{index + 1}</span>
+            <span className="hidden group-hover:inline"><MonoIcon.PlayMini size={11} color="var(--text-muted)" /></span>
+          </>
+        )}
+      </td>
+      <td className="px-3 py-3.5">
+        <span className="album-track-title-btn">{track.title}</span>
+      </td>
+      <td className="px-3 py-3.5"><span className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>{track.artist ?? albumArtist}</span></td>
+      <td className="px-3 py-3.5 text-center"><span className="badge-dr-meter">{track.dr}</span></td>
+      <td className="px-5 py-3.5 text-right"><span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{track.duration}</span></td>
+      <td className="pr-2 py-2 w-8">
+        <TrackActionMenu
+          ref={menuRef}
+          track={payload}
+          onPlayNow={onPlayNow}
+          onPlayNext={onPlayNext}
+          onAddToQueue={onAddToQueue}
+          isGuest={isGuest}
+          titleOpensMenu={opensMenu}
+        />
+      </td>
+    </tr>
   )
 }

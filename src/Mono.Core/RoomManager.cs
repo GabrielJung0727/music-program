@@ -51,7 +51,11 @@ public sealed class RoomManager
     }
 
     /// <summary>
-    /// 호스트가 라운지를 닫는다. 방은 그 자리에서 사라지고 남아 있던 사람은 나간 것이 된다.
+    /// 호스트가 라운지를 끝낸다. 목록에서는 빠지지만 혼자 듣기는 그대로다.
+    ///
+    /// 방을 지워 버리면 큐와 재생 위치와 출력 워커가 같이 날아간다 — 호스트 모드를
+    /// 껐을 뿐인데 플레이어가 빈 칸이 되는 이유가 그것이다. 게스트만 내보내고
+    /// 모드를 Solo 로 되돌린다.
     /// </summary>
     public (ListeningRoom? Room, string? Error) Close(string roomId, string peerId)
     {
@@ -67,7 +71,22 @@ public sealed class RoomManager
                 return (null, "호스트만 라운지를 닫을 수 있습니다.");
             }
 
-            _rooms.Remove(roomId);
+            var guests = room.ControlPeerIds.Where(id => id != peerId)
+                .Concat(room.SpectatorPeerIds.Where(id => id != peerId))
+                .Distinct()
+                .ToList();
+            foreach (var guest in guests)
+            {
+                room.ControlPeerIds.Remove(guest);
+                room.SpectatorPeerIds.Remove(guest);
+                room.Roles.Remove(guest);
+                room.Stats.Remove(guest);
+            }
+
+            room.Mode = RoomMode.Solo;
+            room.InviteCode = null;
+            room.InviteExpiresAt = null;
+            RefreshPath(room);
             return (room, null);
         }
     }
@@ -570,6 +589,20 @@ public sealed class RoomManager
                 return (null, "bad index");
             }
 
+            // 같은 곡이면 타임라인을 되감지 않는다. jump 가 Play Now 경로에 쓰이므로
+            // 지금 재생 중인 인덱스로 다시 오면 처음부터 다시 시작하는 것처럼 들린다.
+            if (room.QueueIndex == index)
+            {
+                if (!room.Playing)
+                {
+                    room.Playing = true;
+                    room.MediaOriginUnixMs = ClockSync.UnixMs();
+                    RefreshPath(room);
+                }
+
+                return (room, null);
+            }
+
             MarkComplete(room);
             room.QueueIndex = index;
             StartTrackTimeline(room, 0);
@@ -605,6 +638,13 @@ public sealed class RoomManager
                 {
                     return (null, "no bit-perfect capable output");
                 }
+            }
+
+            // 이미 재생 중이면 origin 을 건드리지 않는다. origin 을 지금으로 바꾸면
+            // MediaTimeAtOriginMs 가 0 인 채로 위치가 리셋되어 현재 곡이 처음부터 다시 시작한다.
+            if (room.Playing)
+            {
+                return (room, null);
             }
 
             room.Playing = true;
@@ -658,9 +698,13 @@ public sealed class RoomManager
                 return (null, "seeking is disabled");
             }
 
+            // 길이를 모르는 트랙에 추정치(3분)를 씌워 자르면 3분 뒤로는 탐색이 안 된다.
+            // 아는 길이가 있을 때만 자른다.
             var track = room.CurrentTrack(_catalog.Tracks);
-            var duration = EffectiveDuration(track);
-            room.MediaTimeAtOriginMs = Math.Clamp(mediaTimeMs, 0, duration);
+            var known = track?.DurationMs ?? 0;
+            room.MediaTimeAtOriginMs = known > 0
+                ? Math.Clamp(mediaTimeMs, 0, known)
+                : Math.Max(0, mediaTimeMs);
             room.MediaOriginUnixMs = ClockSync.UnixMs();
             room.ResyncEpoch++;
             return (room, null);
@@ -722,10 +766,88 @@ public sealed class RoomManager
             }
 
             MarkComplete(room);
-            room.QueueIndex = Math.Clamp(room.QueueIndex + delta, 0, Math.Max(0, room.Queue.Count - 1));
+            room.QueueIndex = delta > 0 && NextQueueIndex(room) is { } shuffled
+                ? shuffled
+                : Math.Clamp(room.QueueIndex + delta, 0, Math.Max(0, room.Queue.Count - 1));
             StartTrackTimeline(room, 0);
             return (room, null);
         }
+    }
+
+    /// <summary>셔플·반복 상태를 바꾼다. 호스트(또는 혼자 듣기)만 바꿀 수 있다.</summary>
+    public (ListeningRoom? Room, string? Error) SetShuffle(string roomId, string peerId, bool on)
+    {
+        lock (_gate)
+        {
+            if (!TryRoom(roomId, out var room, out var err))
+            {
+                return (null, err);
+            }
+
+            if (!room.CanDirect(peerId))
+            {
+                return (null, "only host may change shuffle");
+            }
+
+            room.Shuffle = on;
+            room.ShuffleHistory.Clear();
+            return (room, null);
+        }
+    }
+
+    public (ListeningRoom? Room, string? Error) SetRepeat(string roomId, string peerId, RepeatMode mode)
+    {
+        lock (_gate)
+        {
+            if (!TryRoom(roomId, out var room, out var err))
+            {
+                return (null, err);
+            }
+
+            if (!room.CanDirect(peerId))
+            {
+                return (null, "only host may change repeat");
+            }
+
+            room.Repeat = mode;
+            return (room, null);
+        }
+    }
+
+    /// <summary>
+    /// 셔플이 켜져 있을 때의 다음 칸. 큐 자체는 앨범 순서 그대로 두고 순회 순서만 바꾼다 —
+    /// 큐를 섞어 버리면 셔플을 끈 뒤에도 앨범이 원래 순서로 돌아오지 않는다.
+    /// 꺼져 있으면 null 을 돌려 호출부가 평소의 +1 을 쓰게 한다.
+    /// </summary>
+    private static int? NextQueueIndex(ListeningRoom room)
+    {
+        if (!room.Shuffle || room.Queue.Count <= 1)
+        {
+            return null;
+        }
+
+        room.ShuffleHistory.Add(room.QueueIndex);
+        var remaining = Enumerable.Range(0, room.Queue.Count)
+            .Where(i => !room.ShuffleHistory.Contains(i))
+            .ToList();
+
+        if (remaining.Count == 0)
+        {
+            // 한 바퀴 돌았다. 반복이 꺼져 있으면 여기서 멈춘다.
+            room.ShuffleHistory.Clear();
+            if (room.Repeat == RepeatMode.Off)
+            {
+                return null;
+            }
+
+            remaining = Enumerable.Range(0, room.Queue.Count).Where(i => i != room.QueueIndex).ToList();
+            if (remaining.Count == 0)
+            {
+                return null;
+            }
+        }
+
+        return remaining[Random.Shared.Next(remaining.Count)];
     }
 
     /// <summary>버퍼가 풀렸을 때의 명시적 재동기화. Output은 epoch가 바뀌면 버퍼를 비운다.</summary>
@@ -768,17 +890,52 @@ public sealed class RoomManager
                 }
 
                 var track = room.CurrentTrack(_catalog.Tracks);
-                var duration = EffectiveDuration(track);
-                if (track is null || room.CurrentMediaTimeMs() < duration)
+
+                // 길이를 모르는 트랙은 여기서 끝내지 않는다.
+                //
+                // 예전에는 추정치 3분을 썼다. 6분짜리 곡의 3분 뒤로 탐색하면 그 자리에서
+                // "다 들었다"가 되어 오토플레이가 같은 곡을 다시 큐에 넣었고, 탐색했더니
+                // 곡이 처음부터 다시 시작하는 것으로 보였다. 길이는 스캔에서 채운다.
+                if (track is null || track.DurationMs <= 0)
+                {
+                    continue;
+                }
+
+                var duration = track.DurationMs;
+                if (room.CurrentMediaTimeMs() < duration)
                 {
                     continue;
                 }
 
                 MarkComplete(room, forceComplete: true);
+
+                // 한 곡 반복은 큐를 건드리지 않는다 — 같은 칸을 처음부터 다시 연다.
+                if (room.Repeat == RepeatMode.One)
+                {
+                    StartTrackTimeline(room, 0);
+                    changed.Add(room);
+                    continue;
+                }
+
+                if (room.AutoAdvance && NextQueueIndex(room) is { } shuffled)
+                {
+                    room.QueueIndex = shuffled;
+                    StartTrackTimeline(room, 0);
+                    NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
+                    changed.Add(room);
+                    continue;
+                }
+
                 var isLastQueued = room.QueueIndex + 1 >= room.Queue.Count;
                 if (room.AutoAdvance && !isLastQueued)
                 {
                     room.QueueIndex++;
+                    StartTrackTimeline(room, 0);
+                    NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
+                }
+                else if (room.AutoAdvance && isLastQueued && room.Repeat == RepeatMode.All && room.Queue.Count > 0)
+                {
+                    room.QueueIndex = 0;
                     StartTrackTimeline(room, 0);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                 }
@@ -1387,6 +1544,51 @@ public sealed class RoomManager
         }
     }
 
+    /// <summary>
+    /// 앨범(또는 어떤 목록이든)을 통째로 큐에 걸고 고른 칸부터 재생한다.
+    ///
+    /// 예전에는 웹이 clear → enqueue × N → jump → play 를 따로 보냈다. 네 개의 명령 사이마다
+    /// 룸 상태가 방송되므로 큐에는 한 곡만 들어 있는 순간이 있었고, 앨범 가운데 곡을 고르면
+    /// 그 한 곡만 큐 끝에 붙어 순서가 뒤엉킨 것처럼 보였다(셔플이 켜진 것처럼). 한 번에 끝낸다.
+    /// </summary>
+    public (ListeningRoom? Room, string? Error) PlayList(string roomId, string peerId, IReadOnlyList<string> trackIds, int startIndex)
+    {
+        lock (_gate)
+        {
+            if (!CanEditQueue(roomId, peerId, out var room, out var err))
+            {
+                return (null, err);
+            }
+
+            var ids = trackIds
+                .Where(id => _catalog.Tracks.ContainsKey(id))
+                .Where(id => SourceUnavailable(_catalog.Tracks[id]) is null)
+                .ToList();
+            if (ids.Count == 0)
+            {
+                return (null, "nothing to play");
+            }
+
+            // 고른 곡이 재생 불가라 걸러졌더라도 위치는 최대한 지킨다.
+            var wanted = startIndex >= 0 && startIndex < trackIds.Count ? trackIds[startIndex] : ids[0];
+            var index = ids.IndexOf(wanted);
+
+            MarkComplete(room);
+            room.Queue.Clear();
+            foreach (var id in ids)
+            {
+                room.Queue.Add(new QueueItem { Id = Guid.NewGuid().ToString("n")[..8], TrackId = id, AddedByPeerId = peerId });
+            }
+
+            room.QueueIndex = Math.Clamp(index < 0 ? 0 : index, 0, room.Queue.Count - 1);
+            room.ShuffleHistory.Clear();
+            room.Playing = true;
+            StartTrackTimeline(room, 0);
+            NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
+            return (room, null);
+        }
+    }
+
     public (SessionArchive? Archive, UserPlaylist? Playlist, string? Error) EndAndMaybeArchive(string roomId, string peerId, bool consent)
     {
         lock (_gate)
@@ -1514,6 +1716,8 @@ public sealed class RoomManager
             room.QueueLocked,
             room.FollowHostView,
             room.AutoAdvance,
+            room.Shuffle,
+            room.Repeat,
             room.LinerPage,
             room.LinerScrollY,
             room.MaxMembers,

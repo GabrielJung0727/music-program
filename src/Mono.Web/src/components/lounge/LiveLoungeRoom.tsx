@@ -5,6 +5,7 @@ import { useMono, useMediaClock, useMonoCommands } from "../../state/MonoProvide
 import { useLiveSession } from "../../state/useLiveSession"
 import { initials as initialsOf } from "../../lib/adapters"
 import { MonoIcon } from "../icons/MonoIcons"
+import { albumArt, onArtError } from "../../lib/artwork"
 
 /**
  * 리액션 한 벌. key 는 Core 로 나가는 값이라 이모지 문자 그대로 두고(룸 전체가 이 값으로
@@ -180,7 +181,7 @@ export default function LiveLoungeRoom({
             <>
               <div className="w-[380px] md:w-[440px] aspect-square rounded-2xl border border-slate-100 shadow-2xl overflow-hidden mb-6">
                 {(currentTrack.art || (currentTrack as { coverUrl?: string }).coverUrl)
-                  ? <img src={currentTrack.art || (currentTrack as { coverUrl?: string }).coverUrl} alt={currentTrack.title} className="object-cover w-full h-full" />
+                  ? <img src={currentTrack.art || (currentTrack as { coverUrl?: string }).coverUrl} onError={onArtError} alt={currentTrack.title} className="object-cover w-full h-full" />
                   : <div className="w-full h-full bg-zinc-100 flex items-center justify-center">
                       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
                     </div>
@@ -256,7 +257,7 @@ export default function LiveLoungeRoom({
                             className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--surface-hover)] transition-colors text-left cursor-pointer border-b border-[var(--border-subtle)] last:border-0"
                             style={{ background: "none", fontFamily: "inherit" }}
                           >
-                            <img src={album.art} alt={album.title} className="w-8 h-8 rounded object-cover border border-zinc-200 shrink-0" />
+                            <img src={albumArt(album.art)} onError={onArtError} alt={album.title} className="w-8 h-8 rounded object-cover border border-zinc-200 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-medium text-zinc-900 truncate">{album.title}</div>
                               <div className="text-[11px] text-zinc-500 truncate">{album.artist}</div>
@@ -278,7 +279,7 @@ export default function LiveLoungeRoom({
                           className="bg-[var(--surface-card)] hover:bg-[var(--surface-hover)] dark:bg-[#1a1b22]/90 dark:hover:bg-[#22242c] border border-[var(--border-subtle)] dark:border-white/10 hover:dark:border-white/20 rounded-xl p-3 flex items-center gap-3 transition-all cursor-pointer text-left"
                           style={{ fontFamily: "inherit" }}
                         >
-                          <img src={album.art} alt={album.title} className="w-10 h-10 rounded-lg shrink-0 object-cover" />
+                          <img src={albumArt(album.art)} onError={onArtError} alt={album.title} className="w-10 h-10 rounded-lg shrink-0 object-cover" />
                           <div className="min-w-0 flex-1 flex flex-col justify-center">
                             <span className="text-xs font-semibold text-[var(--text-primary)] truncate block">{album.title}</span>
                             <span className="text-[11px] text-[var(--text-secondary)] truncate block">{album.artist}</span>
