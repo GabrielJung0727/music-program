@@ -27,18 +27,23 @@ public sealed class AppUpdater
             {
                 var manager = CreateManager();
                 if (manager.IsInstalled && manager.CurrentVersion is { } v)
-                    return v.ToString();
+                    return PublicVersion(v.ToString());
             }
             catch
             {
                 // 설치본이 아니거나 피드에 못 붙는 경우 — 어셈블리 버전으로 물러난다.
             }
 
-            return Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            return version?.ToString(version.Revision > 0 ? 4 : 3) ?? "0.0.0";
         }
     }
 
     public UpdateInfo? Pending { get; private set; }
+
+    internal static string PublicVersion(string packageVersion)
+        => packageVersion.Equals("0.5.10-rc.1", StringComparison.OrdinalIgnoreCase)
+            ? "0.5.9.1" : packageVersion;
 
     public bool IsInstalled
     {
@@ -75,7 +80,7 @@ public sealed class AppUpdater
         if (info is null)
             return "최신 버전입니다.";
 
-        return $"{info.TargetFullRelease.Version}을(를) 설치할 수 있습니다.";
+        return $"{PublicVersion(info.TargetFullRelease.Version.ToString())}을(를) 설치할 수 있습니다.";
     }
 
     public async Task DownloadAsync(IProgress<int>? progress = null, CancellationToken ct = default)

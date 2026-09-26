@@ -55,8 +55,8 @@ jobs:
           } else {
             '${{ github.ref_name }}' -replace '^v', ''
           }
-          if ($v -notmatch '^\d+\.\d+\.\d+$') {
-            throw "버전 형식이 x.y.z 가 아닙니다: '$v'"
+          if ($v -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            throw "버전 형식이 x.y.z 또는 x.y.z.revision 이어야 합니다: '$v'"
           }
           "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
           Write-Host "릴리스 버전: $v"

@@ -323,7 +323,7 @@ public sealed class ShellForm : Form
                 if (!string.IsNullOrWhiteSpace(backend)) _supervisor.Backend = backend;
                 var device = Str("device");
                 if (device is not null) _supervisor.DeviceHint = device;
-                var ok = _supervisor.StartOutput(Str("roomId"));
+                var ok = await Task.Run(() => _supervisor.StartOutput(Str("roomId")));
                 return new { ok, error = ok ? null : _supervisor.LastError };
             }
 
@@ -341,7 +341,7 @@ public sealed class ShellForm : Form
 
             case "output.restart":
             {
-                var ok = _supervisor.RestartOutput();
+                var ok = await Task.Run(() => _supervisor.RestartOutput());
                 return new { ok, error = ok ? null : _supervisor.LastError };
             }
 

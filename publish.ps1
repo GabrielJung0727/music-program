@@ -28,6 +28,11 @@ if (-not $Version) {
     $Version = $Version.Trim()
 }
 
+# Velopack 1.2.0 accepts only three-part SemVer. Keep the public hotfix
+# number as the assembly/GitHub version, and give the update feed a version
+# above 0.5.9 and below the future 0.5.10 release.
+$packVersion = if ($Version -eq '0.5.9.1') { '0.5.10-rc.1' } else { $Version }
+
 $outDir = "$PSScriptRoot\publish\mono-win-x64"
 $releasesDir = "$PSScriptRoot\publish\releases"
 $iconPath = "$PSScriptRoot\src\Mono.Control\Assets\icons\app\mono-app.ico"
@@ -244,7 +249,7 @@ New-Item -ItemType Directory -Path $releasesDir | Out-Null
 $vpkArgs = @(
     'pack',
     '--packId', 'Mono',
-    '--packVersion', $Version,
+    '--packVersion', $packVersion,
     '--packDir', $outDir,
     '--mainExe', 'Mono.Control.exe',
     '--packTitle', 'mono',
@@ -290,13 +295,17 @@ if ($GitHubRelease) {
     gh release view "v$Version" 2>$null | Out-Null
     $exists = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = 'Stop'
-    if ($exists) {
-        gh release delete "v$Version" --yes
-    }
     $notesFile = Join-Path $env:TEMP "mono-release-notes-$Version.md"
     Set-Content -Path $notesFile -Value $notes -Encoding UTF8
     try {
-        gh release create "v$Version" @assets --title "mono $Version" --notes-file $notesFile
+        if ($exists) {
+            gh release upload "v$Version" @assets --clobber
+            if ($LASTEXITCODE -ne 0) { throw "GitHub release upload failed" }
+            gh release edit "v$Version" --title "mono $Version" --notes-file $notesFile
+        } else {
+            gh release create "v$Version" @assets --title "mono $Version" --notes-file $notesFile
+        }
+        if ($LASTEXITCODE -ne 0) { throw "GitHub release failed" }
     } finally {
         Remove-Item $notesFile -Force -ErrorAction SilentlyContinue
     }

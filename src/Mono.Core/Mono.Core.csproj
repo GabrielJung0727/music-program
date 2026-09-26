@@ -27,5 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Mono.Tests" />
+    <Compile Include="..\Mono.Audio\PositionedMediaFoundationReader.cs" Link="Audio\PositionedMediaFoundationReader.cs" />
   </ItemGroup>
 </Project>

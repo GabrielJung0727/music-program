@@ -57,7 +57,8 @@ builder.Services.AddSingleton(sp => new CommandProcessor(
     sp.GetRequiredService<ZoneRegistry>(),
     sp.GetRequiredService<WikipediaService>(),
     sp.GetRequiredService<BackupService>(),
-    libraryRoots));
+    libraryRoots,
+    sp.GetRequiredService<SetupStore>()));
 builder.Services.AddSingleton<RoomBroadcaster>();
 builder.Services.AddSignalR().AddJsonProtocol(o =>
     o.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);

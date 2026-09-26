@@ -175,8 +175,8 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 _sta.Invoke(() =>
                 {
                     var driver = new AsioOut(_driverName);
-                    driver.Init(buffer);
                     _asio = driver;
+                    driver.Init(buffer);
                 });
 
                 // PlaybackLatency 는 "샘플" 단위다. 밀리초로 착각해서 쓰면 지연이 수백 ms 로
@@ -297,6 +297,12 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     {
         lock (_gate)
         {
+            if (_state == AudioDeviceState.DeviceBusyLocked)
+            {
+                TearDown();
+                _state = AudioDeviceState.Idle;
+                LastError = null;
+            }
             _buffer?.ClearBuffer();
             _aligner.Reset();
             // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
@@ -457,30 +463,20 @@ internal sealed class AsioStaHost : IDisposable
 
     public T Invoke<T>(Func<T> func)
     {
-        using var done = new ManualResetEventSlim(false);
-        Exception? failure = null;
-        var result = default(T);
-
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         _work.Add(() =>
         {
-            try { result = func(); }
-            catch (Exception ex) { failure = ex; }
-            finally { done.Set(); }
+            try { done.TrySetResult(func()); }
+            catch (Exception ex) { done.TrySetException(ex); }
         });
-
-        if (!done.Wait(TimeSpan.FromSeconds(15)))
-        {
-            throw new TimeoutException("ASIO 드라이버가 15초 안에 응답하지 않았습니다.");
-        }
-
-        if (failure is not null) throw failure;
-        return result!;
+        // A timed-out call may finish later. Its completion must not touch a
+        // disposed wait handle and crash the STA thread.
+        return done.Task.WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
     }
 
     public void Dispose()
     {
         _work.CompleteAdding();
-        _thread.Join(2000);
-        _work.Dispose();
+        if (_thread.Join(2000)) _work.Dispose();
     }
 }

@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <Compile Include="..\Mono.Audio\PositionedMediaFoundationReader.cs" Link="Audio\PositionedMediaFoundationReader.cs" />
     <ProjectReference Include="..\Mono.Protocol\Mono.Protocol.csproj" />
   </ItemGroup>
 </Project>

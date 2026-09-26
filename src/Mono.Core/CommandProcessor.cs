@@ -22,6 +22,7 @@ public sealed class CommandProcessor
     private readonly WikipediaService _wiki;
     private readonly BackupService _backups;
     private readonly IReadOnlyList<string> _libraryRoots;
+    private readonly SetupStore? _setup;
     private readonly ConcurrentDictionary<string, string> _peerRoom = new();
 
     public CommandProcessor(
@@ -35,7 +36,8 @@ public sealed class CommandProcessor
         ZoneRegistry zones,
         WikipediaService wiki,
         BackupService backups,
-        IReadOnlyList<string> libraryRoots)
+        IReadOnlyList<string> libraryRoots,
+        SetupStore? setup = null)
     {
         _rooms = rooms;
         _catalog = catalog;
@@ -48,6 +50,7 @@ public sealed class CommandProcessor
         _wiki = wiki;
         _backups = backups;
         _libraryRoots = libraryRoots;
+        _setup = setup;
     }
 
     public CommandResult Execute(string peerId, MonoMessage msg, string? displayName)
@@ -517,7 +520,7 @@ public sealed class CommandProcessor
             case MessageTypes.ScanLibrary:
             {
                 var scanned = string.IsNullOrWhiteSpace(msg.Path)
-                    ? _scanner.ScanAll(_libraryRoots)
+                    ? _scanner.ScanAll(_setup?.LibraryFolders(_libraryRoots) ?? _libraryRoots)
                     : _scanner.Scan(msg.Path);
                 return new CommandResult(null, new MonoMessage
                 {
@@ -552,7 +555,7 @@ public sealed class CommandProcessor
                 return Direct(new MonoMessage
                 {
                     Type = MessageTypes.Folders,
-                    Body = JsonSerializer.Serialize(_libraryRoots.Select(root => new
+                    Body = JsonSerializer.Serialize((_setup?.LibraryFolders(_libraryRoots) ?? _libraryRoots).Select(root => new
                     {
                         path = root,
                         exists = Directory.Exists(root),

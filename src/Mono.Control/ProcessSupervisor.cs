@@ -11,7 +11,8 @@ public sealed class ProcessSupervisor
 
     /// <summary>재기동 폭주 방지: 이 창 안에서 이 횟수를 넘기면 멈추고 사용자에게 알린다.</summary>
     private const int RestartBudget = 3;
-    private static readonly TimeSpan RestartWindow = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan RestartWindow = TimeSpan.FromMinutes(2);
+    private readonly object _outputGate = new();
 
     private Process? _core;
     private Process? _output;
@@ -129,6 +130,11 @@ public sealed class ProcessSupervisor
 
     public bool StartOutput(string? roomId, string host = "127.0.0.1")
     {
+        lock (_outputGate) return StartOutputCore(roomId, host);
+    }
+
+    private bool StartOutputCore(string? roomId, string host)
+    {
         var exe = FindExe("Mono.Output.exe", "Mono.Output");
         if (exe is null)
         {
@@ -153,9 +159,9 @@ public sealed class ProcessSupervisor
         var previous = _outputArgs ?? _lastOutputArgs;
         var wasAsio = previous?.Contains("--asio") == true;
         var willBeAsio = args.Contains("--asio");
-        if (OutputRunning) StopOutput();
+        if (_output is not null) StopOutput();
 
-        if (previous is not null && previous != args)
+        if (previous is not null)
         {
             // ASIO 는 프로세스를 Kill 해도 드라이버 핸들이 한동안 장치에 남아 있다.
             // Fireface 처럼 배타 잠금이 끈질긴 장치에서 그 상태로 WASAPI 를 열면
@@ -163,7 +169,7 @@ public sealed class ProcessSupervisor
             //
             // ASIO 가 끼지 않은 전환(배타 → 공유, 장치 변경)도 짧게 기다린다. 엔드포인트가
             // 완전히 풀리기 전에 다시 열면 같은 장치를 두 번 잡는 모양이 된다.
-            var waitMs = wasAsio || willBeAsio ? 2800 : 500;
+            var waitMs = wasAsio || willBeAsio ? 3000 : 500;
             AppLog.Write("control", $"output backend change: waiting {waitMs}ms for device release");
             Thread.Sleep(waitMs);
         }
@@ -200,10 +206,13 @@ public sealed class ProcessSupervisor
 
     public void StopOutput()
     {
+        lock (_outputGate)
+        {
         _outputIntentionallyStopped = true;
         OutputRoomId = null;
         _outputArgs = null;
-        TryKill(ref _output);
+        StopWorker(ref _output);
+        }
     }
 
     /// <summary>
@@ -213,14 +222,17 @@ public sealed class ProcessSupervisor
     /// </summary>
     public bool RestartOutput()
     {
+        lock (_outputGate)
+        {
         var room = OutputRoomId;
         var host = _outputHost ?? "127.0.0.1";
         lock (_restarts) _restarts.Clear();   // 사용자가 직접 누른 재시도는 예산을 새로 준다
         _outputIntentionallyStopped = true;
-        KillFast(ref _output);
+        StopWorker(ref _output);
         OutputRoomId = null;
         AppLog.Write("control", "restarting output worker");
         return StartOutput(room, host);
+        }
     }
 
     /// <summary>워커가 예기치 않게 죽으면 같은 룸으로 즉시 다시 세운다.</summary>
@@ -228,10 +240,11 @@ public sealed class ProcessSupervisor
     {
         try
         {
-            process.EnableRaisingEvents = true;
             process.Exited += (_, _) =>
             {
-                if (_outputIntentionallyStopped) return;
+                lock (_outputGate)
+                {
+                if (_outputIntentionallyStopped || !ReferenceEquals(_output, process)) return;
 
                 var code = TryExitCode(process);
 
@@ -247,7 +260,9 @@ public sealed class ProcessSupervisor
                 OutputFaulted?.Invoke("출력 워커가 예기치 않게 종료되어 다시 시작했습니다.");
                 try { StartOutput(OutputRoomId, _outputHost ?? "127.0.0.1"); }
                 catch (Exception ex) { LastError = ex.Message; }
+                }
             };
+            process.EnableRaisingEvents = true;
         }
         catch (Exception ex)
         {
@@ -296,8 +311,7 @@ public sealed class ProcessSupervisor
 
     public void StopAll()
     {
-        _outputIntentionallyStopped = true;
-        TryKill(ref _output);
+        StopOutput();
         TryKill(ref _core);
     }
 
@@ -312,6 +326,7 @@ public sealed class ProcessSupervisor
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
             RedirectStandardOutput = true,
+            RedirectStandardInput = true,
             RedirectStandardError = true
         };
         // Control이 오래된 환경으로 떠 있어도 User 범위 MONO_* 는 Core/Output에 다시 실어 준다.
@@ -411,5 +426,22 @@ public sealed class ProcessSupervisor
             process?.Dispose();
             process = null;
         }
+    }
+
+    private static void StopWorker(ref Process? process)
+    {
+        try
+        {
+            if (process is { HasExited: false })
+            {
+                process.StandardInput.WriteLine("stop");
+                process.StandardInput.Flush();
+                // Let ASIO Stop/Dispose run on its owning STA before killing
+                // the worker; a process kill alone can leave the DAC locked.
+                if (!process.WaitForExit(4000)) process.Kill(entireProcessTree: true);
+            }
+        }
+        catch { /* fall back to a bounded kill */ }
+        finally { KillFast(ref process); }
     }
 }

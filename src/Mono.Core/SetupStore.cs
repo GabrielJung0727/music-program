@@ -43,6 +43,15 @@ public sealed class SetupStore
         }
     }
 
+    public IReadOnlyList<string> LibraryFolders(IEnumerable<string> defaults)
+    {
+        var saved = Read()["folders"] as JsonArray;
+        return defaults.Concat(saved?.OfType<JsonValue>()
+                .Select(v => v.TryGetValue<string>(out var path) ? path : null)
+                .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!) ?? [])
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
     /// <summary>들어온 필드만 덮어쓴다. 보내지 않은 필드는 그대로 남는다.</summary>
     public JsonObject Merge(JsonObject patch)
     {

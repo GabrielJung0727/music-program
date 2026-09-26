@@ -112,13 +112,17 @@ public sealed class WavSlicer : ITrackSlicer
 /// </summary>
 public sealed class MediaFoundationSlicer : ITrackSlicer
 {
-    private readonly AudioFileReader _reader;
+    private readonly WaveStream _reader;
+    private readonly ISampleProvider _samples;
     private readonly object _gate = new();
     private long _cursorMs = -1;
 
     public MediaFoundationSlicer(string path)
     {
-        _reader = new AudioFileReader(path);
+        _reader = Path.GetExtension(path).ToLowerInvariant() is ".aiff" or ".aif" or ".wav"
+            ? new AudioFileReader(path)
+            : new Mono.Audio.PositionedMediaFoundationReader(path);
+        _samples = _reader is AudioFileReader afr ? afr : _reader.ToSampleProvider();
         Format = new AudioFormat(
             _reader.WaveFormat.SampleRate,
             24,
@@ -141,14 +145,13 @@ public sealed class MediaFoundationSlicer : ITrackSlicer
             // 연속 재생이면 seek 생략(디코더 재동기화 비용 절감)
             if (_cursorMs < 0 || Math.Abs(_cursorMs - target) > 80)
             {
-                try { _reader.CurrentTime = TimeSpan.FromMilliseconds(target); }
-                catch { /* 일부 포맷은 근사 seek */ }
+                _reader.CurrentTime = TimeSpan.FromMilliseconds(target);
             }
 
             var frames = Math.Max(1, durationMs * Format.SampleRate / 1000);
             var samplesNeeded = frames * Format.Channels;
             var floatBuf = new float[samplesNeeded];
-            var read = _reader.Read(floatBuf, 0, samplesNeeded);
+            var read = _samples.Read(floatBuf, 0, samplesNeeded);
             _cursorMs = target + durationMs;
             if (read <= 0)
                 return [];

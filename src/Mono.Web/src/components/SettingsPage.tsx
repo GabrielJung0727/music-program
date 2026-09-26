@@ -28,7 +28,6 @@ export default function SettingsPage({
   const [authService, setAuthService] = useState<"qobuz" | "tidal" | null>(null)
   const [exclusiveMode, setExclusiveMode] = useState<boolean>(true)
   const [memoryPlayback, setMemoryPlayback] = useState<boolean>(true)
-  const [dsdStrategy, setDsdStrategy] = useState<"native" | "dop" | "pcm">("dop")
   const [bufferSize, setBufferSize] = useState<number>(256)
   // ── 이 PC 에 달린 출력 하드웨어 ────────────────────────────────────────────
   //
@@ -410,37 +409,12 @@ export default function SettingsPage({
 
               <Divider />
 
-              {/* DSD strategy */}
+              {/* DSD status */}
               <div style={{ marginBottom: 28 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "var(--settings-row-label)", marginBottom: 12 }}>DSD Playback Strategy</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {([
-                    { val: "native", label: "Native DSD" },
-                    { val: "dop", label: "DoP — DSD over PCM" },
-                    { val: "pcm", label: "DSD to PCM" },
-                  ] as const).map(({ val, label }) => {
-                    const active = dsdStrategy === val
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => setDsdStrategy(val)}
-                        style={{
-                          fontFamily: "inherit", cursor: "pointer",
-                          fontSize: 12, fontWeight: active ? 600 : 400,
-                          color: active ? "var(--settings-dsd-active-text)" : "var(--settings-dsd-idle-text)",
-                          background: active ? "var(--settings-dsd-active-bg)" : "transparent",
-                          border: `1px solid ${active ? "var(--settings-dsd-active-border)" : "transparent"}`,
-                          borderRadius: 8, padding: "6px 14px",
-                          transition: "all 0.15s",
-                        }}
-                        onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = "var(--settings-nav-idle-hover)" }}
-                        onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = "var(--settings-dsd-idle-text)" }}
-                      >
-                        ( {label} )
-                      </button>
-                    )
-                  })}
-                </div>
+                <p style={{ fontSize: 12, lineHeight: 1.6, color: "var(--settings-row-sub)" }}>
+                  이 버전에서는 DSD 출력과 PCM 변환을 지원하지 않습니다. DSD 음원 재생을 시도하면 출력을 보류하고 사유를 표시합니다. 다른 PCM 음원을 선택하면 재생할 수 있습니다.
+                </p>
               </div>
 
               <Divider />

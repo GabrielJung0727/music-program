@@ -67,20 +67,21 @@ public sealed class FanOutService : BackgroundService
             _streams[room.Id] = state;
         }
 
-        var track = room.CurrentTrack(_catalog.Tracks);
-        if (!room.Playing || track is null || room.SourceMode != PlaybackSourceMode.FanOut)
+        var transport = _rooms.CaptureTransport(room);
+        var track = transport.Track;
+        if (!transport.Playing || track is null || transport.Mode != PlaybackSourceMode.FanOut)
         {
             state.Reset();
             return;
         }
 
-        if (state.TrackId != track.Id || state.Epoch != room.ResyncEpoch || state.Source is null)
+        if (state.TrackId != track.Id || state.Epoch != transport.Epoch || state.Source is null)
         {
             state.Reset();
-            state.Source = PlaybackSourceFactory.For(track, room.SourceMode);
+            state.Source = PlaybackSourceFactory.For(track, transport.Mode);
             state.TrackId = track.Id;
-            state.Epoch = room.ResyncEpoch;
-            state.CursorMs = room.CurrentMediaTimeMs();
+            state.Epoch = transport.Epoch;
+            state.CursorMs = transport.PositionMs;
         }
 
         var source = state.Source!;
@@ -90,7 +91,7 @@ public sealed class FanOutService : BackgroundService
             return;
         }
 
-        var now = room.CurrentMediaTimeMs();
+        var now = transport.PositionMs;
         if (state.CursorMs < now - BehindToleranceMs || state.CursorMs > now + LookaheadMs * 4)
         {
             state.CursorMs = now;
@@ -143,13 +144,13 @@ public sealed class FanOutService : BackgroundService
                 {
                     var attenuated = DspPipeline.ApplyGain(payload, depth, cap!.VolumePercent);
                     frame = MatpFrame.Encode(
-                        new MatpAudio(basePts, rate, depth, format.Channels, format.IsDsd, room.ResyncEpoch, attenuated),
+                        new MatpAudio(basePts, rate, depth, format.Channels, format.IsDsd, transport.Epoch, attenuated),
                         room.FanOutKey);
                 }
                 else
                 {
                     shared ??= MatpFrame.Encode(
-                        new MatpAudio(basePts, rate, depth, format.Channels, format.IsDsd, room.ResyncEpoch, payload),
+                        new MatpAudio(basePts, rate, depth, format.Channels, format.IsDsd, transport.Epoch, payload),
                         room.FanOutKey);
                     frame = shared;
                 }
@@ -163,7 +164,7 @@ public sealed class FanOutService : BackgroundService
                     BitDepth = depth,
                     Channels = format.Channels,
                     IsDsd = format.IsDsd,
-                    Epoch = room.ResyncEpoch,
+                    Epoch = transport.Epoch,
                     Body = Convert.ToBase64String(frame)
                 });
                 if (!await channel.SendAsync(line, ct))

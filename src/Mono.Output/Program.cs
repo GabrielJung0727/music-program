@@ -29,7 +29,9 @@ var displayName = Arg("--name=") ?? Environment.MachineName;
 // Exclusive 플래그가 내려가고 사유가 stats 로 올라간다. --strict-exclusive 는 강등 자체를 막는다.
 var deviceMode = args.Contains("--shared") ? DeviceMode.SystemShared : DeviceMode.BitPerfectExclusive;
 var allowSharedFallback = !args.Contains("--strict-exclusive");
-var claimDsd = args.Contains("--dsd");
+// Native DSD and DoP are not negotiated with the selected driver yet.
+// Do not advertise support based solely on a command-line flag.
+var claimDsd = false;
 var preferAsio = args.Contains("--asio");
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
 const int matpPort = 7701;
@@ -82,6 +84,32 @@ var stream = client.GetStream();
 var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 16384, leaveOpen: true);
 var writeGate = new SemaphoreSlim(1, 1);
 using var cts = new CancellationTokenSource();
+if (Console.IsInputRedirected)
+{
+    _ = Task.Run(async () =>
+    {
+        while (await Console.In.ReadLineAsync() is { } command)
+            if (command == "stop") { cts.Cancel(); break; }
+    });
+}
+long renderHeartbeat = Environment.TickCount64;
+long renderFailureSince = 0;
+// Independent of driver locks: a hung native call cannot stall this watchdog.
+_ = Task.Run(async () =>
+{
+    while (!cts.IsCancellationRequested)
+    {
+        await Task.Delay(1000);
+        var now = Environment.TickCount64;
+        var failedAt = Interlocked.Read(ref renderFailureSince);
+        if (now - Interlocked.Read(ref renderHeartbeat) > 20000
+            || (failedAt != 0 && now - failedAt > 10000))
+        {
+            Console.WriteLine("output watchdog: driver stalled — restarting worker");
+            Environment.Exit(2);
+        }
+    }
+});
 
 await Send(new MonoMessage
 {
@@ -224,6 +252,7 @@ catch (OperationCanceledException) { }
 finally
 {
     cts.Cancel();
+    renderThread.Join(1000);
     renderer.Dispose();
 }
 
@@ -252,7 +281,9 @@ async Task ClockLoopAsync(CancellationToken ct)
                     Resyncs = resyncs + drops,
                     Locked = renderer.Playing && Math.Abs(renderer.BufferedMs - clock.TargetBufferMs) < 40,
                     DeviceState = (int)renderer.GetCurrentState(),
-                    DeviceError = renderer.LastError
+                    DeviceError = timeline.IsDsd
+                        ? "이 출력 경로는 Native DSD/DoP 및 DSD→PCM 변환을 지원하지 않습니다. PCM 음원을 선택하세요."
+                        : renderer.LastError
                 });
             }
         }
@@ -279,6 +310,7 @@ void RenderLoop(CancellationToken ct)
     var lastEpoch = long.MinValue;
     while (!ct.IsCancellationRequested)
     {
+        Interlocked.Exchange(ref renderHeartbeat, Environment.TickCount64);
         try
         {
             if (timeline.Epoch != lastEpoch)
@@ -295,12 +327,21 @@ void RenderLoop(CancellationToken ct)
                 }
 
                 renderer.Flush();
+                Interlocked.Exchange(ref renderFailureSince, 0);
                 local?.Dispose();
                 local = null;
                 if (!firstLock)
                 {
                     resyncs++;
                 }
+            }
+
+            if (!timeline.Playing || timeline.IsDsd)
+            {
+                if (renderer.Playing) renderer.Flush();
+                Interlocked.Exchange(ref renderFailureSince, 0);
+                Thread.Sleep(10);
+                continue;
             }
 
             if (timeline.ClockSyncMode)
@@ -321,7 +362,7 @@ void RenderLoop(CancellationToken ct)
                             var chunk = local.Read(mediaNow, wantMs, out var fmt);
                             if (chunk.Length > 0)
                             {
-                                renderer.PushSamples(
+                                PushAudio(
                                     new AudioBuffer(chunk, 0, chunk.Length, fmt.rate, fmt.depth, fmt.channels, false),
                                     volumePercent);
                             }
@@ -386,7 +427,7 @@ void RenderLoop(CancellationToken ct)
 
                     var (dop, rate, depth, ch) = DopEncoder.Encode(frame.Payload, frame.SampleRate, frame.Channels);
                     if (dop.Length == 0) continue;
-                    renderer.PushSamples(new AudioBuffer(dop, 0, dop.Length, rate, depth, ch, false), volumePercent);
+                    PushAudio(new AudioBuffer(dop, 0, dop.Length, rate, depth, ch, false), volumePercent);
                     continue;
                 }
 
@@ -398,7 +439,7 @@ void RenderLoop(CancellationToken ct)
                     continue;
                 }
 
-                renderer.PushSamples(
+                PushAudio(
                     new AudioBuffer(frame.Payload, 0, frame.Payload.Length,
                         frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd),
                     volumePercent);
@@ -422,6 +463,7 @@ void RenderLoop(CancellationToken ct)
         catch (Exception ex)
         {
             Console.WriteLine("render: " + ex.Message);
+            Interlocked.CompareExchange(ref renderFailureSince, Environment.TickCount64, 0);
         }
 
         // 1ms 타이머 해상도를 올려 뒀으므로 이 대기는 실제로 ~1ms 다.
@@ -429,6 +471,12 @@ void RenderLoop(CancellationToken ct)
     }
 
     local?.Dispose();
+}
+
+void PushAudio(AudioBuffer buffer, int volume)
+{
+    if (renderer.PushSamples(buffer, volume)) Interlocked.Exchange(ref renderFailureSince, 0);
+    else Interlocked.CompareExchange(ref renderFailureSince, Environment.TickCount64, 0);
 }
 
 async Task Send(MonoMessage message)

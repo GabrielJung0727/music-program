@@ -254,7 +254,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           // 내가 속하지 않은 룸의 상태는 목록만 갱신하고 현재 룸은 건드리지 않는다.
           if (myRoomRef.current && snap.id !== myRoomRef.current) break
           myRoomRef.current = snap.id
-          setRoom(snap)
+          setRoom(previous => previous?.id === snap.id && previous.resyncEpoch > snap.resyncEpoch ? previous : snap)
           break
         }
 

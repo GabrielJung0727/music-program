@@ -34,6 +34,13 @@ public sealed class RoomManager
         lock (_gate) return _rooms.Values.ToList();
     }
 
+    public (Track? Track, bool Playing, PlaybackSourceMode Mode, long Epoch, long PositionMs) CaptureTransport(ListeningRoom room)
+    {
+        lock (_gate)
+            return (room.CurrentTrack(_catalog.Tracks), room.Playing, room.SourceMode,
+                room.ResyncEpoch, room.CurrentMediaTimeMs());
+    }
+
     /// <summary>라운지 목록에 내보낼 방만. 혼자 듣기용 방은 여기 들어오지 않는다.</summary>
     public IReadOnlyList<ListeningRoom> ListListed()
     {
@@ -1021,7 +1028,8 @@ public sealed class RoomManager
                 }
 
                 var exclude = room.PlayedTrackIds.Concat(room.Queue.Select(q => q.TrackId)).Append(track.Id);
-                var candidates = _catalog.Recommend(track.Id, exclude, 3);
+                var candidates = _catalog.Recommend(track.Id, exclude, _catalog.Tracks.Count)
+                    .Where(t => SourceUnavailable(t) is null).Take(3).ToList();
                 if (candidates.Count == 0)
                 {
                     continue;

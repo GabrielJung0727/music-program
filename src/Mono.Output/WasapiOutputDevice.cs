@@ -325,10 +325,10 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     {
         if (ex is COMException com && com.HResult == DeviceInUse)
         {
-            return "다른 응용프로그램이 이 장치를 점유하고 있어 비트퍼펙트 재생을 시작할 수 없습니다.";
+            return "다른 응용프로그램이 이 장치를 점유하고 있어 재생을 시작할 수 없습니다 (0x8889000A).";
         }
 
-        return $"{config.SampleRate}Hz/{config.BitDepth}bit/{config.Channels}ch 로 장치를 열지 못했습니다 — {ex.Message}";
+        return $"{config.SampleRate}Hz/{config.BitDepth}bit/{config.Channels}ch 로 장치를 열지 못했습니다 — 0x{ex.HResult:X8}: {ex.Message}";
     }
 
     public bool PushSamples(AudioBuffer buffer, int volumePercent)
@@ -406,6 +406,12 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     {
         lock (_gate)
         {
+            if (_state == AudioDeviceState.DeviceBusyLocked)
+            {
+                TearDown();
+                _state = AudioDeviceState.Idle;
+                LastError = null;
+            }
             _buffer?.ClearBuffer();
             _aligner.Reset();
             // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.

@@ -17,4 +17,7 @@
     <ProjectReference Include="..\..\src\Mono.Protocol\Mono.Protocol.csproj" />
     <ProjectReference Include="..\..\src\Mono.Shared\Mono.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Fixtures\seek-markers.flac" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

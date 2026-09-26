@@ -17,9 +17,12 @@ public sealed class Timeline
     public string? LocalPath { get; private set; }
     public long DurationMs { get; private set; }
     public bool ClockSyncMode { get; private set; }
+    public bool IsDsd { get; private set; }
 
     public void Apply(MonoMessage msg)
     {
+        // A slow broadcast from before a seek must not rewind the output.
+        if (msg.Epoch is { } epoch && epoch < Epoch) return;
         Playing = msg.Playing ?? Playing;
         _originUnixMs = msg.MediaOriginUnixMs ?? _originUnixMs;
         _timeAtOriginMs = msg.MediaTimeAtOriginMs ?? _timeAtOriginMs;
@@ -29,6 +32,7 @@ public sealed class Timeline
         {
             TrackId = msg.TrackId;
             LocalPath = msg.LocalPath;
+            IsDsd = msg.IsDsd ?? false;
         }
 
         if (msg.SourceMode is { } mode)
@@ -110,8 +114,10 @@ public sealed class LocalFileRenderer : ILocalChunkSource
         if (ext is ".flac" or ".mp3" or ".m4a" or ".aac" or ".aiff" or ".aif" or ".wma" or ".mp4" or ".alac")
             return MfStreamingLocalRenderer.TryOpen(path);
 
-        if (ext is ".dsf")
-            return DsfLocalRenderer.TryOpen(path);
+        // This reader returns ordinary PCM only. DoP is not decoded PCM and
+        // must never be sent through the PCM/float/volume conversion path.
+        if (ext is ".dsf" or ".dff")
+            return null;
 
         if (!ext.Equals(".wav", StringComparison.OrdinalIgnoreCase))
             return null;
@@ -184,12 +190,14 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
 
     public static MfStreamingLocalRenderer? TryOpen(string path)
     {
-        try { return new MfStreamingLocalRenderer(new AudioFileReader(path)); }
-        catch
+        try
         {
-            try { return new MfStreamingLocalRenderer(new MediaFoundationReader(path)); }
-            catch { return null; }
+            WaveStream reader = Path.GetExtension(path).ToLowerInvariant() is ".aiff" or ".aif" or ".wav"
+                ? new AudioFileReader(path)
+                : new Mono.Audio.PositionedMediaFoundationReader(path);
+            return new MfStreamingLocalRenderer(reader);
         }
+        catch { return null; }
     }
 
     public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
@@ -200,8 +208,7 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
             var target = Math.Max(0, mediaTimeMs);
             if (_cursorMs < 0 || Math.Abs(_cursorMs - target) > 80)
             {
-                try { _reader.CurrentTime = TimeSpan.FromMilliseconds(target); }
-                catch { /* approx */ }
+                _reader.CurrentTime = TimeSpan.FromMilliseconds(target);
             }
 
             var frames = Math.Max(1, durationMs * _rate / 1000);

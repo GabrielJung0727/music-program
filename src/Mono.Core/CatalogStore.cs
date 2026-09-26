@@ -227,7 +227,11 @@ public sealed class CatalogStore : IDisposable
                 .Where(t => !exclude.Contains(t.Id))
                 .OrderBy(_ => Random.Shared.Next()));
 
-            return picks.DistinctBy(t => t.Id).Take(Math.Max(0, count)).ToList();
+            return picks.DistinctBy(t => t.Id)
+                .Where(t => t.Source == StreamingProvider.Local
+                    ? !string.IsNullOrWhiteSpace(t.LocalPath) && File.Exists(t.LocalPath)
+                    : !string.IsNullOrWhiteSpace(t.StreamingId))
+                .Take(Math.Max(0, count)).ToList();
         }
     }
 

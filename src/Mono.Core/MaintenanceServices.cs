@@ -18,6 +18,8 @@ public sealed class ScanScheduler : BackgroundService
     private readonly ILogger<ScanScheduler> _log;
     private readonly IReadOnlyList<string> _roots;
     private readonly TimeSpan _interval;
+    private readonly SetupStore? _setup;
+    private readonly RoomManager? _rooms;
 
     public ScanScheduler(
         LibraryScanner scanner,
@@ -25,13 +27,17 @@ public sealed class ScanScheduler : BackgroundService
         RoomBroadcaster broadcaster,
         IConfiguration config,
         ILogger<ScanScheduler> log,
-        IReadOnlyList<string> roots)
+        IReadOnlyList<string> roots,
+        SetupStore? setup = null,
+        RoomManager? rooms = null)
     {
         _scanner = scanner;
         _catalog = catalog;
         _broadcaster = broadcaster;
         _log = log;
         _roots = roots;
+        _setup = setup;
+        _rooms = rooms;
         var minutes = config.GetValue<int?>("Mono:ScanIntervalMinutes") ?? 30;
         _interval = TimeSpan.FromMinutes(Math.Max(1, minutes));
     }
@@ -43,8 +49,8 @@ public sealed class ScanScheduler : BackgroundService
             try
             {
                 var before = _catalog.Tracks.Count;
-                var count = _scanner.ScanAll(_roots);
-                if (_catalog.Tracks.Count != before)
+                var count = _scanner.ScanAll(_setup?.LibraryFolders(_roots) ?? _roots);
+                if (count > 0 || _catalog.Tracks.Count != before)
                 {
                     _log.LogInformation("라이브러리 스캔: 파일 {Count}개, 카탈로그 {Tracks}곡", count, _catalog.Tracks.Count);
                     await _broadcaster.PushCatalogAsync(new MonoMessage
@@ -54,6 +60,10 @@ public sealed class ScanScheduler : BackgroundService
                         Index = _catalog.Tracks.Count,
                         Body = JsonSerializer.Serialize(_catalog.CatalogView(), LineFraming.JsonOptions)
                     });
+                    // Track artist changes also affect the now-playing card.
+                    if (_rooms is not null)
+                        foreach (var room in _rooms.List())
+                            await _broadcaster.PublishAsync(room, stoppingToken);
                 }
             }
             catch (Exception ex)

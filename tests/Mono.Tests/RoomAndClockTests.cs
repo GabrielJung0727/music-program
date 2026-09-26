@@ -127,7 +127,13 @@ public class RoomAndClockTests
     [Fact]
     public void SmartAutoplayProposesCandidatesAndAutoAdvancesOnDeadline()
     {
-        var (rooms, _, _, _) = NewStack();
+        var (rooms, catalog, _, _) = NewStack();
+        var path = Path.Combine(Path.GetTempPath(), "mono-autoplay-" + Guid.NewGuid() + ".wav");
+        TestAudio.WriteSilentWav(path);
+        var artist = catalog.Artists.Values.First();
+        var album = catalog.Albums.Values.First();
+        catalog.UpsertTrack(new Track { Id = "real-candidate", Title = "Actual local audio",
+            ArtistId = artist.Id, AlbumId = album.Id, LocalPath = path, DurationMs = 60000 }, album, artist);
         var room = rooms.Create("host", "Solo", RoomMode.OpenLounge, "H");
         rooms.Enqueue(room.Id, "host", "tr-blue-train"); // duration 180_000ms, only queue item
         rooms.Play(room.Id, "host");
@@ -140,6 +146,7 @@ public class RoomAndClockTests
         Assert.DoesNotContain("tr-blue-train", afterPropose.AutoplayCandidateIds);
 
         var chosenId = afterPropose.AutoplayCandidateIds[0];
+        Assert.Equal("real-candidate", chosenId);
         Assert.Null(rooms.ChooseAutoplay(room.Id, "host", chosenId).Error);
 
         rooms.Seek(room.Id, "host", 180_000); // track finished
