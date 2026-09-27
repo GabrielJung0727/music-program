@@ -106,6 +106,7 @@ public static class MessageTypes
     public const string History = "history";
     public const string Playlists = "playlists";
     public const string CreatePlaylist = "create_playlist";
+    public const string AddPlaylistTrack = "add_playlist_track";
     public const string LoadPlaylist = "load_playlist";
     public const string ExportM3u = "export_m3u";
     public const string ShareSession = "share_session";

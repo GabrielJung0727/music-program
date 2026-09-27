@@ -134,12 +134,29 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     }
 
     public Capabilities GetSupportedFormats()
-        => new(DeviceName,
-            [44100, 48000, 88200, 96000, 176400, 192000],
-            [16, 24],
-            2,
-            SupportsExclusive: true,
-            HardwareVolume: false);
+    {
+        int[] rates;
+        try
+        {
+            rates = _sta.Invoke(() =>
+            {
+                var driver = _asio ?? new AsioOut(_driverName);
+                try
+                {
+                    return new[] { 44100, 48000, 88200, 96000, 176400, 192000 }
+                        .Where(rate => driver.IsSampleRateSupported(rate)).ToArray();
+                }
+                finally { if (!ReferenceEquals(driver, _asio)) driver.Dispose(); }
+            });
+        }
+        catch (Exception ex)
+        {
+            LastError = $"ASIO 지원 샘플레이트 조회 실패: {ex.Message}";
+            rates = [];
+        }
+        return new(DeviceName, rates, [16, 24], 2,
+            SupportsExclusive: rates.Length > 0, HardwareVolume: false);
+    }
 
     public bool OpenDevice(DeviceConfig config)
     {
@@ -176,6 +193,8 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 {
                     var driver = new AsioOut(_driverName);
                     _asio = driver;
+                    if (!driver.IsSampleRateSupported(config.SampleRate))
+                        throw new NotSupportedException($"ASIO 드라이버가 {config.SampleRate}Hz를 지원하지 않습니다.");
                     driver.Init(buffer);
                 });
 

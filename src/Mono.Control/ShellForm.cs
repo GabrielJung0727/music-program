@@ -503,6 +503,7 @@ public sealed class ShellForm : Form
         {
             RestoreWindow();
             BringToFront();
+            Program.AcknowledgeActivation();
         }
 
         base.WndProc(ref m);

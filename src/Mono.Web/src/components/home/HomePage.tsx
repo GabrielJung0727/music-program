@@ -208,7 +208,7 @@ function fidelityRank(fmt: string): number {
 }
 
 // ── Repertoire Section ────────────────────────────────────────────────────────
-function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, albums, chips }: { onNavigateToTracks: () => void; onPlayAlbum?: (album: HomeAlbum) => void; onSelectAlbum?: (album: HomeAlbum) => void; albums: HomeAlbum[]; chips: string[] }) {
+function RecentlyAddedSection({ onNavigateToAlbums, onPlayAlbum, onSelectAlbum, albums, chips }: { onNavigateToAlbums: () => void; onPlayAlbum?: (album: HomeAlbum) => void; onSelectAlbum?: (album: HomeAlbum) => void; albums: HomeAlbum[]; chips: string[] }) {
   const [activeChip, setActiveChip] = useState(chips[0] ?? "All")
   const [sortKey, setSortKey] = useState<RepertoireSort>("rotation")
   const [menuOpen, setMenuOpen] = useState(false)
@@ -241,7 +241,9 @@ function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, 
   return (
     <section>
       <div className="flex items-center justify-between mb-5">
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>Repertoire</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>Repertoire <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text-muted)" }}>· showing {Math.min(sorted.length, 10)} of {sorted.length}</span></h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {sorted.length > 10 && <button type="button" onClick={onNavigateToAlbums} style={{ color: "var(--text-secondary)", background: "none", border: 0, cursor: "pointer" }}>View all</button>}
         <div className="relative" ref={menuRef}>
           <button
             type="button"
@@ -270,6 +272,7 @@ function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, 
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
 
@@ -305,7 +308,7 @@ function RecentlyAddedSection({ onNavigateToTracks, onPlayAlbum, onSelectAlbum, 
         <div style={{ padding: "48px 0", textAlign: "center", color: "#9CA3AF", fontSize: 13, fontStyle: "italic" }}>No albums found in this repertoire filter.</div>
       ) : (
         <div className="grid grid-cols-5 gap-6 w-full">
-          {sorted.map((album, i) => (
+          {sorted.slice(0, 10).map((album, i) => (
             <AlbumCard key={i} album={album} onPlay={onPlayAlbum} onSelect={onSelectAlbum} />
           ))}
         </div>
@@ -415,13 +418,13 @@ function LabelArchivesSection({ labels }: { labels: LabelTile[] }) {
 
 // ── Home Page ────────────────────────────────────────────────────────────────
 export default function HomePage({
-  joinedLoungeId, onToggleJoin, onLeaveLounge, onNavigateToTracks, onPlayAlbum, onSelectAlbum,
+  joinedLoungeId, onToggleJoin, onLeaveLounge, onNavigateToAlbums, onPlayAlbum, onSelectAlbum,
   displayName, loungeCards, archiveCount, albums, chips, insights, labels,
 }: {
   joinedLoungeId: string | null
   onToggleJoin: (id: string, e: React.MouseEvent) => void
   onLeaveLounge: (e: React.MouseEvent) => void
-  onNavigateToTracks: () => void
+  onNavigateToAlbums: () => void
   onPlayAlbum?: (album: HomeAlbum) => void
   onSelectAlbum?: (album: HomeAlbum) => void
   displayName: string
@@ -439,7 +442,7 @@ export default function HomePage({
         <SocialLoungesSection joinedLoungeId={joinedLoungeId} onToggleJoin={onToggleJoin} onLeaveLounge={onLeaveLounge} cards={loungeCards} archiveCount={archiveCount} />
       </div>
       <div style={{ marginBottom: 56 }}>
-        <RecentlyAddedSection onNavigateToTracks={onNavigateToTracks} onPlayAlbum={onPlayAlbum} onSelectAlbum={onSelectAlbum} albums={albums} chips={chips} />
+        <RecentlyAddedSection onNavigateToAlbums={onNavigateToAlbums} onPlayAlbum={onPlayAlbum} onSelectAlbum={onSelectAlbum} albums={albums} chips={chips} />
       </div>
       <div style={{ marginBottom: 56 }}>
         <ListeningInsightsSection cards={insights} />

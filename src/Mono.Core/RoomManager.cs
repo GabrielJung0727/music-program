@@ -785,6 +785,26 @@ public sealed class RoomManager
             }
 
             MarkComplete(room);
+            if (delta > 0 && room.QueueIndex + delta >= room.Queue.Count)
+            {
+                if (room.SmartAutoplay && PickAutoplayNext(room) is { } nextTrackId)
+                {
+                    room.Queue.Add(new QueueItem { Id = Guid.NewGuid().ToString("n")[..8], TrackId = nextTrackId, AddedByPeerId = "autoplay" });
+                    room.QueueIndex = room.Queue.Count - 1;
+                    StartTrackTimeline(room, 0);
+                    return (room, null);
+                }
+
+                if (room.Repeat == RepeatMode.All && room.Queue.Count > 0)
+                {
+                    room.QueueIndex = 0;
+                    StartTrackTimeline(room, 0);
+                    return (room, null);
+                }
+
+                room.Playing = false;
+                return (room, null);
+            }
             room.QueueIndex = delta > 0 && NextQueueIndex(room) is { } shuffled
                 ? shuffled
                 : Math.Clamp(room.QueueIndex + delta, 0, Math.Max(0, room.Queue.Count - 1));
@@ -958,7 +978,7 @@ public sealed class RoomManager
                     StartTrackTimeline(room, 0);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                 }
-                else if (room.AutoAdvance && isLastQueued && PickAutoplayNext(room) is { } nextTrackId)
+                else if (room.AutoAdvance && isLastQueued && room.SmartAutoplay && PickAutoplayNext(room) is { } nextTrackId)
                 {
                     room.Queue.Add(new QueueItem { Id = Guid.NewGuid().ToString("n")[..8], TrackId = nextTrackId, AddedByPeerId = "autoplay" });
                     room.QueueIndex++;
@@ -979,11 +999,16 @@ public sealed class RoomManager
         }
     }
 
-    private static string? PickAutoplayNext(ListeningRoom room)
+    private string? PickAutoplayNext(ListeningRoom room)
     {
         if (room.AutoplayCandidateIds.Count == 0)
         {
-            return null;
+            var track = room.CurrentTrack(_catalog.Tracks);
+            if (track is null) return null;
+            var exclude = room.PlayedTrackIds.Concat(room.Queue.Select(q => q.TrackId)).Append(track.Id);
+            room.AutoplayCandidateIds.AddRange(_catalog.Recommend(track.Id, exclude, _catalog.Tracks.Count)
+                .Where(t => SourceUnavailable(t) is null).Take(3).Select(t => t.Id));
+            if (room.AutoplayCandidateIds.Count == 0) return null;
         }
 
         return room.AutoplayChosenId is { } chosen && room.AutoplayCandidateIds.Contains(chosen)
@@ -995,7 +1020,7 @@ public sealed class RoomManager
     /// 스마트 선택형 오토플레이 — 곡이 끝나기 40초 전, 큐의 마지막 곡이면 후보 3곡을 제시한다.
     /// 무응답이면 1번 후보가 자동 재생되고, 선택하면 그 곡이 재생된다. 변경된 룸만 돌려준다.
     /// </summary>
-    public const long AutoplayLeadTimeMs = 40_000;
+    public const long AutoplayLeadTimeMs = 30_000;
 
     public IReadOnlyList<ListeningRoom> ProposeAutoplayCandidates()
     {
@@ -1055,6 +1080,8 @@ public sealed class RoomManager
             {
                 return (null, err);
             }
+
+            if (!room.CanDirect(peerId)) return (null, "only host may choose autoplay");
 
             if (!room.AutoplayCandidateIds.Contains(trackId))
             {
@@ -1880,6 +1907,7 @@ public sealed class RoomManager
         t.StreamingQuality,
         t.MergedLocalAndStreaming,
         hasLocal = t.LocalPath is not null,
+        fileExtension = t.LocalPath is null ? null : Path.GetExtension(t.LocalPath).TrimStart('.').ToUpperInvariant(),
         badge = QualityPolicyEngine.Badge(t, false),
         artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}"
     };

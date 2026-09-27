@@ -39,6 +39,19 @@ public class WasapiFormatTests
         Assert.Equal(4, format.BlockAlign);
     }
 
+    [Fact]
+    public void ExclusiveFormatRejectsFloatOrDifferentContainerWithSameRateDepthAndChannels()
+    {
+        var requested = WasapiOutputDevice.BuildFormat(96000, 24, 2);
+        var floatFormat = WaveFormat.CreateIeeeFloatWaveFormat(96000, 2);
+        var pcm32 = new WaveFormat(96000, 32, 2);
+
+        Assert.False(WasapiOutputDevice.MatchesExclusiveFormat(floatFormat, requested));
+        Assert.False(WasapiOutputDevice.MatchesExclusiveFormat(pcm32, requested));
+        Assert.True(WasapiOutputDevice.MatchesExclusiveFormat(
+            new ExtensiblePcmWaveFormat(96000, 32, 24, 2), requested));
+    }
+
     /// <summary>
     /// WAVEFORMATEXTENSIBLE 은 네이티브로 마샬링돼 드라이버에 그대로 전달된다.
     /// 구조체 크기가 어긋나면 cbSize 뒤의 필드가 쓰레기로 읽혀 조용히 잘못된 규격이 열린다.

@@ -13,30 +13,17 @@ interface Props {
   onSelectAlbum?: (title: string) => void
 }
 
-const DISCOGRAPHY = [
-  { art: "https://images.unsplash.com/photo-1618172842918-3eabce30c912?w=400&h=400&fit=crop&auto=format", title: "Kind of Blue", year: "1959", format: "FLAC 192kHz", dr: "DR 14" },
-  { art: "https://images.unsplash.com/photo-1619983081593-e2ba5b543168?w=400&h=400&fit=crop&auto=format", title: "Somethin' Else", year: "1958", format: "FLAC 192kHz", dr: "DR 14" },
-  { art: "https://images.unsplash.com/photo-1669801158950-f663cf15298c?w=400&h=400&fit=crop&auto=format", title: "Bitches Brew", year: "1970", format: "DSD 2.8MHz", dr: "DR 12" },
-  { art: "https://images.unsplash.com/photo-1552847340-1e26a6af19d4?w=400&h=400&fit=crop&auto=format", title: "'Round About Midnight", year: "1957", format: "FLAC 96kHz", dr: "DR 13" },
-]
-
-const COLLABORATIONS = [
-  { art: "https://images.unsplash.com/photo-1618172842918-3eabce30c912?w=80&h=80&fit=crop&auto=format", albumTitle: "Somethin' Else", albumArtist: "Cannonball Adderley", year: "1958", role: "Featured Trumpet" },
-  { art: "https://images.unsplash.com/photo-1736882178500-f99bbe22d77d?w=80&h=80&fit=crop&auto=format", albumTitle: "The Complete Savoy Sessions", albumArtist: "Charlie Parker", year: "1945", role: "Trumpet" },
-]
-
-const FALLBACK_BIO = "Miles Dewey Davis III was an American trumpeter, bandleader, and composer. Widely considered one of the most influential and acclaimed figures in the history of jazz and 20th-century music, Davis adopted a variety of musical directions in a five-decade career that kept him at the forefront of major stylistic developments in jazz."
-
 export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, playerMode, onReturnToLounge, onBack, onSelectSomethinElse, onSelectAlbum }: Props) {
   const [avatarError, setAvatarError] = useState(false)
 
   const handleAlbumClick = (title: string) => {
     if (onSelectAlbum) {
       onSelectAlbum(title)
-    } else if (title === "Somethin' Else") {
-      onSelectSomethinElse()
     }
   }
+
+  const albums: Array<{ id: string; title: string; artUrl?: string | null; year?: number | null; trackCount: number }> = selectedArtist.albums ?? []
+  const tracks: Array<{ id: string; title: string; album?: string | null; albumId: string; badge?: string | null }> = selectedArtist.tracks ?? []
 
   const initials = (selectedArtist.name ?? "")
     .split(" ")
@@ -112,10 +99,6 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
             ))}
           </div>
           <div className="flex items-center gap-3 mt-5">
-            <button className="artist-play-btn">
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
-              Play Artist Radio
-            </button>
             {selectedArtist.wikiUrl && (
               <a href={selectedArtist.wikiUrl} target="_blank" rel="noopener noreferrer" className="artist-wiki-btn inline-flex items-center gap-1.5">
                 <span style={{ fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 13, lineHeight: 1 }}>W</span>
@@ -128,7 +111,7 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
       </div>
 
       {/* Biography Card */}
-      <div className="artist-bio-card">
+      {selectedArtist.wikiSummary && <div className="artist-bio-card">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span
@@ -155,19 +138,19 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
           )}
         </div>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)", fontFamily: "Georgia, 'Times New Roman', serif" }}>
-          {selectedArtist.wikiSummary || FALLBACK_BIO}
+          {selectedArtist.wikiSummary}
         </p>
-      </div>
+      </div>}
 
       {/* Discography Grid */}
       <div>
         <p className="text-[11px] font-mono font-bold uppercase tracking-wider mb-4" style={{ color: "var(--text-muted)" }}>
-          Studio Recordings & Master Tape Editions
+          Albums in Library
         </p>
-        <div className="grid grid-cols-4 gap-6">
-          {DISCOGRAPHY.map((album) => (
+        {albums.length === 0 ? <p style={{ color: "var(--text-muted)" }}>No albums in this library.</p> : <div className="grid grid-cols-4 gap-6">
+          {albums.map((album) => (
             <div
-              key={album.title}
+              key={album.id}
               className="cursor-pointer group"
               onClick={() => handleAlbumClick(album.title)}
             >
@@ -176,52 +159,33 @@ export default function ArtistDetailView({ selectedArtist, activeLoungeRoom, pla
                 style={{ border: "1px solid var(--artist-art-border)" }}
               >
                 <img
-                  src={albumArt(album.art)}
+                  src={albumArt(album.artUrl ?? "")}
                   alt={album.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
               <p className="text-sm font-semibold leading-snug mb-0.5" style={{ color: "var(--text-primary)" }}>{album.title}</p>
-              <p className="text-[11px] font-mono mb-2" style={{ color: "var(--text-muted)" }}>{album.year}</p>
+              <p className="text-[11px] font-mono mb-2" style={{ color: "var(--text-muted)" }}>{album.year ?? ""} · {album.trackCount} tracks</p>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="artist-disco-badge">{album.format}</span>
-                <span className="artist-disco-badge">{album.dr}</span>
               </div>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
 
-      {/* Appears On & Session Work */}
+      {/* Artist's actual catalog tracks, including compilation appearances. */}
       <div>
         <p className="text-[11px] font-mono font-bold uppercase tracking-wider mb-4" style={{ color: "var(--text-muted)" }}>
-          Appears On & Session Work
+          Tracks in Library
         </p>
-        <div className="flex flex-col gap-2.5">
-          {COLLABORATIONS.map((entry) => (
-            <div
-              key={entry.albumTitle}
-              className="artist-collab-row group"
-              onClick={() => handleAlbumClick(entry.albumTitle)}
-            >
-              <img
-                src={albumArt(entry.art)}
-                alt={entry.albumTitle}
-                className="w-12 h-12 rounded-lg object-cover shrink-0"
-                style={{ border: "1px solid var(--artist-art-border)" }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate transition-colors" style={{ color: "var(--text-primary)" }}>
-                  {entry.albumTitle}
-                </p>
-                <p className="text-xs font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                  {entry.albumArtist} · {entry.year}
-                </p>
-              </div>
-              <span className="artist-collab-role-pill">{entry.role}</span>
-            </div>
-          ))}
-        </div>
+        {tracks.length === 0 ? <p style={{ color: "var(--text-muted)" }}>No tracks in this library.</p> :
+          <div className="flex flex-col gap-2.5">{tracks.map(track => (
+            <button key={track.id} className="artist-collab-row group" style={{ textAlign: "left", color: "var(--text-primary)" }} onClick={() => handleAlbumClick(track.album ?? albums.find(a => a.id === track.albumId)?.title ?? "") }>
+              <span style={{ flex: 1 }}>{track.title}</span>
+              <span style={{ color: "var(--text-secondary)" }}>{track.album ?? ""}</span>
+              {track.badge && <span className="artist-collab-role-pill">{track.badge}</span>}
+            </button>
+          ))}</div>}
       </div>
 
     </div>

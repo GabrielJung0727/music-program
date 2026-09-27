@@ -212,6 +212,17 @@ public sealed class HistoryStore
             OwnerPeerId = ownerPeerId
         });
 
+    public UserPlaylist? AddPlaylistTrack(string playlistId, string trackId, string peerId)
+    {
+        lock (_gate)
+        {
+            var playlist = Playlist(playlistId);
+            if (playlist is null || playlist.OwnerPeerId != peerId) return null;
+            if (!playlist.TrackIds.Contains(trackId)) playlist.TrackIds.Add(trackId);
+            return SavePlaylist(playlist);
+        }
+    }
+
     public UserPlaylist? Playlist(string id) => Playlists.FirstOrDefault(p => p.Id == id);
 
     /// <summary>보존 기간이 지난 코멘트를 아카이브에서 지운다(룸 보존 정책).</summary>

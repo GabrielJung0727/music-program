@@ -150,13 +150,6 @@ public sealed class StreamingHub
             _ => throw Unexpected(provider)
         };
 
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(authUrl) && !InTestHost())
-                Process.Start(new ProcessStartInfo(authUrl) { UseShellExecute = true });
-        }
-        catch { /* headless / CI */ }
-
         return new
         {
             provider,

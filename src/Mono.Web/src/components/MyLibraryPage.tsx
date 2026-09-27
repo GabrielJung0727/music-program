@@ -38,7 +38,7 @@ type PlaylistEntry = {
   duration: string
   art: string
   arts?: string[]
-  tracks: unknown[]
+  tracks: { id: string; title: string }[]
   dr?: string
   spec?: string
 }
@@ -60,98 +60,21 @@ const SHARE_ICON = (
   </svg>
 )
 
-export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, defaultTab = "albums", onOpenShare, onSelectAlbum, onSelectArtist }: LibraryPageProps = {}) {
-  const [libraryTab, setLibraryTab] = useState<"albums" | "artists" | "composers" | "playlists" | "tracks">(defaultTab)
-  const { catalog, playlists: corePlaylists, catalogLoaded } = useMono()
-  const cmd = useMonoCommands()
-  const { albums: liveAlbums, currentTrack, playing } = useLiveSession()
+const TRACK_COL = "32px 1fr 1fr 1fr 120px 56px 52px 28px"
 
-  const LIB_ALBUMS = useMemo(() => libAlbums(liveAlbums, catalog), [liveAlbums, catalog])
-  const LIB_ARTISTS = useMemo(() => libArtists(catalog), [catalog])
-  const LIB_COMPOSERS = useMemo(() => libComposers(catalog), [catalog])
-  const LIB_TRACKS = useMemo(() => libTracks(catalog), [catalog])
-
-  // 플레이리스트는 Core 가 소유한다. 새로 만들면 Core 가 목록을 다시 밀어 준다.
-  const playlists: PlaylistEntry[] = useMemo(
-    () => libPlaylists(corePlaylists, catalog) as unknown as PlaylistEntry[],
-    [corePlaylists, catalog],
-  )
-  const [isNewPlaylistModalOpen, setIsNewPlaylistModalOpen] = useState(false)
-  const [newTitle, setNewTitle] = useState("")
-  const [newDesc, setNewDesc] = useState("")
-  const [formatFilter, setFormatFilter] = useState<"all" | "hires" | "dsd" | "vinyl">("all")
-  const [sortField, setSortField] = useState<"album" | "title" | "artist" | "format" | "dr">("album")
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
-  const [hoveredRow, setHoveredRow] = useState<number | null>(null)
-
-  const CATEGORY_TABS: Array<{ id: typeof libraryTab; label: string }> = [
-    { id: "albums", label: "Albums" },
-    { id: "artists", label: "Artists" },
-    { id: "composers", label: "Composers" },
-    { id: "playlists", label: "Playlists" },
-    { id: "tracks", label: "Tracks" },
-  ]
-
-  const FORMAT_PILLS: Array<{ id: typeof formatFilter; label: string }> = [
-    { id: "all", label: "All" },
-    { id: "hires", label: "Hi-Res 24-Bit" },
-    { id: "dsd", label: "DSD / SACD" },
-    { id: "vinyl", label: "Vinyl Rips" },
-  ]
-
-  const filteredAlbums = formatFilter === "all" ? LIB_ALBUMS : LIB_ALBUMS.filter((a) => a.format === formatFilter)
-
-  const handleHeaderClick = (field: "album" | "title" | "artist" | "format" | "dr") => {
-    if (field === sortField) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortOrder(field === "format" ? "desc" : "asc")
-    }
-  }
-
-  const sortArrow = (field: "album" | "title" | "artist" | "format" | "dr") =>
-    sortField === field ? (sortOrder === "asc" ? " ↑" : " ↓") : ""
-
-  const formatHeaderTooltip = sortField === "format"
-    ? (sortOrder === "desc" ? "Highest Quality First (DSD / 24-Bit)" : "Standard Quality First (16-Bit / CD)")
-    : "Sort by audio fidelity"
-
-  const TRACK_COL = "32px 1fr 1fr 1fr 120px 56px 52px 28px"
-
-  const sortedTracks = [...LIB_TRACKS].sort((a, b) => {
-    if (sortField === "format") {
-      const rankA = getAudioFidelityRank(a.format ?? "")
-      const rankB = getAudioFidelityRank(b.format ?? "")
-      if (rankA !== rankB) return sortOrder === "desc" ? rankB - rankA : rankA - rankB
-      const ac = (a.artist ?? "").localeCompare(b.artist ?? "")
-      if (ac !== 0) return ac
-      return (a.title ?? "").localeCompare(b.title ?? "")
-    }
-    let cmp = 0
-    if (sortField === "title")       cmp = a.title.localeCompare(b.title)
-    else if (sortField === "artist") cmp = a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title)
-    else if (sortField === "dr")     cmp = b.dr - a.dr
-    return sortOrder === "desc" && sortField !== "dr" ? -cmp : cmp
-  })
-
-  const albumGroups: Array<{ album: string; artist: string; year: number; format: string; dr: number; art: string; tracks: LibTrack[] }> = []
-  for (const t of LIB_TRACKS) {
-    const g = albumGroups.find((g) => g.album === t.album)
-    if (g) g.tracks.push(t)
-    else albumGroups.push({ album: t.album, artist: t.artist, year: t.year, format: t.format, dr: t.dr, art: t.art, tracks: [t] })
-  }
-
-  const TrackRow = ({ t, idx }: { t: LibTrack; idx: number }) => {
-    const hovered = hoveredRow === idx
+function TrackRow({ t, idx, sortField, onSelectAlbum, onSelectArtist, onPlayNow, onPlayNext, onAddToQueue }: {
+  t: LibTrack; idx: number; sortField: "album" | "title" | "artist" | "format" | "dr"
+  onSelectAlbum?: LibraryPageProps["onSelectAlbum"]; onSelectArtist?: LibraryPageProps["onSelectArtist"]
+  onPlayNow?: LibraryPageProps["onPlayNow"]; onPlayNext?: LibraryPageProps["onPlayNext"]
+  onAddToQueue?: LibraryPageProps["onAddToQueue"]
+}) {
     const menuRef = useRef<TrackActionHandle>(null)
     const trackPayload: TrackActionTarget = { id: t.id, title: t.title, artist: t.artist, album: t.album, duration: t.time, format: t.format, dr: String(t.dr), art: t.art }
-    const isOtherPlaying = playing && currentTrack != null && currentTrack.title !== t.title && currentTrack.id !== t.id
     return (
       <div
         className="group"
-        onMouseEnter={() => setHoveredRow(idx)}
-        onMouseLeave={() => setHoveredRow(null)}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--lib-track-hover-bg)" }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest(".track-more-btn, .track-dropdown-menu")) return
           menuRef.current?.activate(e.currentTarget.getBoundingClientRect())
@@ -159,12 +82,13 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
         style={{
           display: "grid", gridTemplateColumns: TRACK_COL, alignItems: "center",
           padding: "6px 10px", borderRadius: 8,
-          background: hovered ? "var(--lib-track-hover-bg)" : "transparent",
+          background: "transparent",
           transition: "background 0.1s", cursor: "pointer",
         }}
       >
         <div className="library-track-num">
-          {hovered ? <span className="library-track-play flex items-center justify-center"><MonoIcon.PlayMini size={10} /></span> : idx + 1}
+          <span className="group-hover:hidden">{idx + 1}</span>
+          <span className="library-track-play hidden group-hover:flex items-center justify-center"><MonoIcon.PlayMini size={10} /></span>
         </div>
         {/* Title — clicking navigates to album; row click plays */}
         <div
@@ -230,13 +154,97 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
               onPlayNow={onPlayNow ?? (() => {})}
               onPlayNext={onPlayNext ?? (() => {})}
               onAddToQueue={onAddToQueue ?? (() => {})}
-              titleOpensMenu={isOtherPlaying}
+              titleOpensMenu
             />
           )}
         </div>
       </div>
     )
+}
+
+export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, defaultTab = "albums", onOpenShare, onSelectAlbum, onSelectArtist }: LibraryPageProps = {}) {
+  const [libraryTab, setLibraryTab] = useState<"albums" | "artists" | "composers" | "playlists" | "tracks">(defaultTab)
+  const { catalog, playlists: corePlaylists, catalogLoaded } = useMono()
+  const cmd = useMonoCommands()
+  const { albums: liveAlbums, currentTrack, playing } = useLiveSession()
+
+  const LIB_ALBUMS = useMemo(() => libAlbums(liveAlbums, catalog), [liveAlbums, catalog])
+  const LIB_ARTISTS = useMemo(() => libArtists(catalog), [catalog])
+  const LIB_COMPOSERS = useMemo(() => libComposers(catalog), [catalog])
+  const LIB_TRACKS = useMemo(() => libTracks(catalog), [catalog])
+
+  // 플레이리스트는 Core 가 소유한다. 새로 만들면 Core 가 목록을 다시 밀어 준다.
+  const playlists: PlaylistEntry[] = useMemo(
+    () => libPlaylists(corePlaylists, catalog) as unknown as PlaylistEntry[],
+    [corePlaylists, catalog],
+  )
+  const [isNewPlaylistModalOpen, setIsNewPlaylistModalOpen] = useState(false)
+  const [newTitle, setNewTitle] = useState("")
+  const [playlistError, setPlaylistError] = useState("")
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false)
+  const [addingToPlaylist, setAddingToPlaylist] = useState<string | null>(null)
+  const [playlistTrackQuery, setPlaylistTrackQuery] = useState("")
+  const [formatFilter, setFormatFilter] = useState<"all" | "hires" | "dsd" | "vinyl">("all")
+  const [sortField, setSortField] = useState<"album" | "title" | "artist" | "format" | "dr">("album")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+
+  const CATEGORY_TABS: Array<{ id: typeof libraryTab; label: string }> = [
+    { id: "albums", label: "Albums" },
+    { id: "artists", label: "Artists" },
+    { id: "composers", label: "Composers" },
+    { id: "playlists", label: "Playlists" },
+    { id: "tracks", label: "Tracks" },
+  ]
+
+  const FORMAT_PILLS: Array<{ id: typeof formatFilter; label: string }> = [
+    { id: "all", label: "All" },
+    { id: "hires", label: "Hi-Res 24-Bit" },
+    { id: "dsd", label: "DSD / SACD" },
+    { id: "vinyl", label: "Vinyl Rips" },
+  ]
+
+  const filteredAlbums = formatFilter === "all" ? LIB_ALBUMS : LIB_ALBUMS.filter((a) => a.format === formatFilter)
+
+  const handleHeaderClick = (field: "album" | "title" | "artist" | "format" | "dr") => {
+    if (field === sortField) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortOrder(field === "format" ? "desc" : "asc")
+    }
   }
+
+  const sortArrow = (field: "album" | "title" | "artist" | "format" | "dr") =>
+    sortField === field ? (sortOrder === "asc" ? " ↑" : " ↓") : ""
+
+  const formatHeaderTooltip = sortField === "format"
+    ? (sortOrder === "desc" ? "Highest Quality First (DSD / 24-Bit)" : "Standard Quality First (16-Bit / CD)")
+    : "Sort by audio fidelity"
+
+
+  const sortedTracks = [...LIB_TRACKS].sort((a, b) => {
+    if (sortField === "format") {
+      const rankA = getAudioFidelityRank(a.format ?? "")
+      const rankB = getAudioFidelityRank(b.format ?? "")
+      if (rankA !== rankB) return sortOrder === "desc" ? rankB - rankA : rankA - rankB
+      const ac = (a.artist ?? "").localeCompare(b.artist ?? "")
+      if (ac !== 0) return ac
+      return (a.title ?? "").localeCompare(b.title ?? "")
+    }
+    let cmp = 0
+    if (sortField === "title")       cmp = a.title.localeCompare(b.title)
+    else if (sortField === "artist") cmp = a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title)
+    else if (sortField === "dr")     cmp = b.dr - a.dr
+    return sortOrder === "desc" && sortField !== "dr" ? -cmp : cmp
+  })
+
+  const albumGroups: Array<{ album: string; artist: string; year: number; format: string; dr: number; art: string; tracks: LibTrack[] }> = []
+  for (const t of LIB_TRACKS) {
+    const g = albumGroups.find((g) => g.album === t.album)
+    if (g) g.tracks.push(t)
+    else albumGroups.push({ album: t.album, artist: t.artist, year: t.year, format: t.format, dr: t.dr, art: t.art, tracks: [t] })
+  }
+
 
   return (
     <div style={{ maxWidth: 1260, margin: "0 auto", padding: "40px 64px" }}>
@@ -410,7 +418,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
           <div className="library-playlist-count">
             <span className="library-playlist-count-num">{playlists.length}</span> Curated Playlist{playlists.length !== 1 ? "s" : ""} in Library
           </div>
-          <div className="grid grid-cols-3 gap-5" style={{ gridAutoRows: "160px" }}>
+          <div className="grid grid-cols-3 gap-5" style={{ gridAutoRows: "minmax(160px, auto)" }}>
             {/* New Playlist creation card */}
             <button
               onClick={() => setIsNewPlaylistModalOpen(true)}
@@ -422,7 +430,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
             </button>
 
             {playlists.map((pl) => (
-              <div key={pl.id} className="playlist-card-surface">
+              <div key={pl.id} className="playlist-card-surface" style={{ display: "flex", gap: 14, minHeight: 160, padding: 16, borderRadius: 12, background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
                 {/* Art mosaic or single cover */}
                 {pl.arts && pl.arts.length >= 4 ? (
                   <div style={{ width: 104, height: 104, borderRadius: 10, overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 1fr", flexShrink: 0 }}>
@@ -460,6 +468,12 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                     )}
                   </div>
                   <div className="playlist-card-meta">{pl.description}</div>
+                  <button
+                    type="button"
+                    onClick={() => { setAddingToPlaylist(pl.id); setPlaylistTrackQuery(""); setPlaylistError("") }}
+                    style={{ marginTop: 8, color: "var(--text-primary)", background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "5px 9px", cursor: "pointer" }}
+                  >Add track</button>
+                  {pl.tracks.length > 0 && <button type="button" onClick={() => void cmd.playFrom(pl.tracks.map(t => t.id), 0)} style={{ marginLeft: 6, color: "var(--text-primary)", background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", borderRadius: 6, padding: "5px 9px", cursor: "pointer" }}>Play</button>}
                   {pl.spec && (
                     <div className="playlist-card-spec">{pl.spec}</div>
                   )}
@@ -477,61 +491,53 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
           {isNewPlaylistModalOpen && (
             <div
               style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center" }}
-              onClick={(e) => { if (e.target === e.currentTarget) { setIsNewPlaylistModalOpen(false); setNewTitle(""); setNewDesc("") } }}
+              onClick={(e) => { if (e.target === e.currentTarget) { setIsNewPlaylistModalOpen(false); setNewTitle("") } }}
             >
-              <div style={{ width: 420, background: "#FFFFFF", borderRadius: 18, boxShadow: "0 24px 60px rgba(0,0,0,0.2)", border: "1px solid #E2E8F0", overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
-                <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ width: 420, background: "var(--surface-card)", color: "var(--text-primary)", borderRadius: 18, boxShadow: "0 24px 60px rgba(0,0,0,0.2)", border: "1px solid var(--border-subtle)", overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", marginBottom: 2 }}>New Playlist</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "#94A3B8" }}>Audiophile Master Curation</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>New Playlist</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: "var(--text-muted)" }}>Audiophile Master Curation</div>
                   </div>
-                  <button onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle(""); setNewDesc("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 4, display: "flex", alignItems: "center" }} aria-label="Close">
+                  <button onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle("") }} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, display: "flex", alignItems: "center" }} aria-label="Close">
                     <MonoIcon.Close size={16} />
                   </button>
                 </div>
                 <div style={{ padding: "20px 24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
                   <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748B", fontFamily: "'DM Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Playlist Title</label>
+                    <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", fontFamily: "'DM Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Playlist Title</label>
                     <input
                       type="text"
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       placeholder="e.g. Late Night Reference Jazz"
                       autoFocus
-                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 9, border: "1px solid #E2E8F0", fontSize: 13, color: "#0F172A", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s" }}
+                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 9, border: "1px solid var(--border-subtle)", background: "var(--surface-elevated)", fontSize: 13, color: "var(--text-primary)", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s" }}
                       onFocus={(e) => (e.currentTarget.style.borderColor = "#7C3AED")}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = "#E2E8F0")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
                     />
                   </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#64748B", fontFamily: "'DM Mono', monospace", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 6 }}>Curator Note <span style={{ fontWeight: 400, color: "#94A3B8" }}>(optional)</span></label>
-                    <input
-                      type="text"
-                      value={newDesc}
-                      onChange={(e) => setNewDesc(e.target.value)}
-                      placeholder="e.g. DR13+ only, no limiting"
-                      style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 9, border: "1px solid #E2E8F0", fontSize: 13, color: "#0F172A", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s" }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = "#7C3AED")}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = "#E2E8F0")}
-                      onKeyDown={(e) => { if (e.key === "Enter" && newTitle.trim()) { /* submit below */ } }}
-                    />
-                  </div>
+                  {playlistError && <div role="alert" style={{ color: "#EF4444", fontSize: 12 }}>{playlistError}</div>}
                   <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                     <button
-                      onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle(""); setNewDesc("") }}
-                      style={{ flex: 1, padding: "10px 14px", borderRadius: 9, border: "1px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#475569", fontFamily: "inherit" }}
+                      onClick={() => { setIsNewPlaylistModalOpen(false); setNewTitle("") }}
+                      style={{ flex: 1, padding: "10px 14px", borderRadius: 9, border: "1px solid var(--border-subtle)", background: "var(--surface-elevated)", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "var(--text-primary)", fontFamily: "inherit" }}
                     >
                       Cancel
                     </button>
                     <button
-                      disabled={!newTitle.trim()}
-                      onClick={() => {
-                        if (!newTitle.trim()) return
-                        // Core 가 만들고 목록을 다시 밀어 준다. 로컬 상태를 따로 두지 않는다.
-                        void cmd.createPlaylist(newTitle.trim(), [])
-                        setIsNewPlaylistModalOpen(false)
-                        setNewTitle("")
-                        setNewDesc("")
+                      disabled={!newTitle.trim() || creatingPlaylist}
+                      onClick={async () => {
+                        if (!newTitle.trim() || creatingPlaylist) return
+                        setCreatingPlaylist(true)
+                        setPlaylistError("")
+                        try {
+                          await cmd.createPlaylist(newTitle.trim(), [])
+                          setIsNewPlaylistModalOpen(false)
+                          setNewTitle("")
+                        } catch (error) {
+                          setPlaylistError(error instanceof Error ? error.message : String(error))
+                        } finally { setCreatingPlaylist(false) }
                       }}
                       style={{ flex: 1, padding: "10px 14px", borderRadius: 9, border: "none", background: newTitle.trim() ? "#7C3AED" : "#E2E8F0", cursor: newTitle.trim() ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700, color: newTitle.trim() ? "#FFFFFF" : "#94A3B8", fontFamily: "inherit", transition: "background 0.15s" }}
                     >
@@ -542,6 +548,29 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
               </div>
             </div>
           )}
+          {addingToPlaylist && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 501, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setAddingToPlaylist(null)}>
+              <div role="dialog" aria-label="Add track to playlist" onClick={(e) => e.stopPropagation()} style={{ width: 460, maxHeight: "75vh", overflow: "auto", padding: 20, borderRadius: 16, color: "var(--text-primary)", background: "var(--surface-card)", border: "1px solid var(--border-subtle)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong>Add track to {playlists.find(p => p.id === addingToPlaylist)?.name}</strong>
+                  <button onClick={() => setAddingToPlaylist(null)} aria-label="Close">✕</button>
+                </div>
+                <input autoFocus value={playlistTrackQuery} onChange={(e) => setPlaylistTrackQuery(e.target.value)} placeholder="Search tracks or artists" style={{ width: "100%", margin: "16px 0", padding: 10, color: "var(--text-primary)", background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", borderRadius: 8 }} />
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>
+                  Current tracks: {playlists.find(p => p.id === addingToPlaylist)?.tracks.map(t => t.title).join(" · ") || "none"}
+                </div>
+                {playlistError && <div role="alert" style={{ color: "#EF4444" }}>{playlistError}</div>}
+                {LIB_TRACKS.filter(t => `${t.title} ${t.artist}`.toLowerCase().includes(playlistTrackQuery.toLowerCase())).slice(0, 50).map(t => (
+                  <button key={t.id} type="button" onClick={async () => {
+                    try { await cmd.addPlaylistTrack(addingToPlaylist, t.id); setAddingToPlaylist(null) }
+                    catch (error) { setPlaylistError(error instanceof Error ? error.message : String(error)) }
+                  }} style={{ display: "block", width: "100%", padding: 9, textAlign: "left", color: "var(--text-primary)", background: "transparent", border: 0, borderBottom: "1px solid var(--border-subtle)", cursor: "pointer" }}>
+                    {t.title} · {t.artist}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -549,7 +578,7 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
       {libraryTab === "tracks" && (
         <div>
           <div className="library-track-count" style={{ marginBottom: 16 }}>
-            <span className="library-track-count-num">420</span> Tracks in Library
+            <span className="library-track-count-num">{LIB_TRACKS.length}</span> Tracks in Library
           </div>
 
           {/* Table header */}
@@ -594,13 +623,13 @@ export default function MyLibraryPage({ onPlayNow, onPlayNext, onAddToQueue, def
                     <span className="library-dr-badge">DR{group.dr}</span>
                   </div>
                 </div>
-                {group.tracks.map((t) => <TrackRow key={seq} t={t} idx={seq++} />)}
+                {group.tracks.map((t) => <TrackRow key={seq} t={t} idx={seq++} sortField={sortField} onSelectAlbum={onSelectAlbum} onSelectArtist={onSelectArtist} onPlayNow={onPlayNow} onPlayNext={onPlayNext} onAddToQueue={onAddToQueue} />)}
               </div>
             ))
           })()}
 
           {/* Flat sorted view */}
-          {sortField !== "album" && sortedTracks.map((t, i) => <TrackRow key={i} t={t} idx={i} />)}
+          {sortField !== "album" && sortedTracks.map((t, i) => <TrackRow key={i} t={t} idx={i} sortField={sortField} onSelectAlbum={onSelectAlbum} onSelectArtist={onSelectArtist} onPlayNow={onPlayNow} onPlayNext={onPlayNext} onAddToQueue={onAddToQueue} />)}
         </div>
       )}
 

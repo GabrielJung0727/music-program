@@ -82,6 +82,7 @@ export const MSG = {
   history: "history",
   playlists: "playlists",
   createPlaylist: "create_playlist",
+  addPlaylistTrack: "add_playlist_track",
   loadPlaylist: "load_playlist",
   exportM3u: "export_m3u",
   shareSession: "share_session",
@@ -184,6 +185,7 @@ export interface SnapshotTrack {
   streamingQuality: number
   mergedLocalAndStreaming: boolean
   hasLocal: boolean
+  fileExtension?: string | null
   badge?: string | null
   artUrl?: string | null
 }
@@ -405,6 +407,7 @@ export interface CatalogTrack {
   workTitle?: string | null
   hasLyrics: boolean
   hasLocal: boolean
+  fileExtension?: string | null
   artUrl?: string | null
   /** 라이브러리에 처음 들어온 시각(ISO 8601). 홈의 "최근 추가" 정렬 근거. */
   addedAt?: string | null
@@ -470,7 +473,7 @@ export interface PlaylistView {
   title: string
   createdAt: string
   fromArchiveId?: string | null
-  tracks: { id: string; title: string; artist?: string | null; durationMs: number; artUrl?: string | null }[]
+  tracks: { id: string; title: string; artist?: string | null; durationMs?: number; artUrl?: string | null }[]
 }
 
 /** history 명령의 body. */

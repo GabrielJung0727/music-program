@@ -15,6 +15,34 @@ namespace Mono.Tests;
 /// </summary>
 public class RoomCommandTests
 {
+    [Fact]
+    public void CreateEmptyPlaylistThenAddTrackReturnsUpdatedList()
+    {
+        var (commands, _) = NewStack();
+        var created = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.CreatePlaylist,
+            Text = "New playlist",
+            TrackIds = []
+        }, "Listener").Direct;
+        Assert.NotNull(created);
+        Assert.True(created.Ok);
+        Assert.NotNull(created.PlaylistId);
+
+        var added = commands.Execute("me", new MonoMessage
+        {
+            Type = MessageTypes.AddPlaylistTrack,
+            PlaylistId = created.PlaylistId,
+            TrackId = "tr-blue-train"
+        }, "Listener").Direct;
+        Assert.True(added?.Ok);
+
+        var list = commands.Execute("me", new MonoMessage { Type = MessageTypes.Playlists }, "Listener").Direct;
+        var playlists = JsonSerializer.Deserialize<List<JsonElement>>(list!.Body!, LineFraming.JsonOptions)!;
+        Assert.Contains(playlists, p => p.GetProperty("id").GetString() == created.PlaylistId
+            && p.GetProperty("tracks").GetArrayLength() == 1);
+    }
+
     private static (CommandProcessor Commands, RoomManager Rooms) NewStack()
     {
         var dir = Path.Combine(Path.GetTempPath(), "mono-" + Guid.NewGuid().ToString("n"));

@@ -160,6 +160,77 @@ public class RoomAndClockTests
     }
 
     [Fact]
+    public void SkippingLastTrackUsesAutoplayEvenBeforeProposalWindow()
+    {
+        var (rooms, catalog, _, _) = NewStack();
+        var path = Path.Combine(Path.GetTempPath(), "mono-skip-" + Guid.NewGuid() + ".wav");
+        TestAudio.WriteSilentWav(path);
+        var artist = catalog.Artists.Values.First();
+        var album = catalog.Albums.Values.First();
+        catalog.UpsertTrack(new Track { Id = "skip-candidate", Title = "Playable next track",
+            ArtistId = artist.Id, AlbumId = album.Id, LocalPath = path, DurationMs = 60000 }, album, artist);
+        var room = rooms.Create("host", "Solo", RoomMode.OpenLounge, "H");
+        room.SmartAutoplay = true;
+        rooms.Enqueue(room.Id, "host", "tr-blue-train");
+        rooms.Play(room.Id, "host");
+
+        var result = rooms.Skip(room.Id, "host", 1);
+
+        Assert.Null(result.Error);
+        Assert.Equal("skip-candidate", room.Queue[room.QueueIndex].TrackId);
+        Assert.True(room.Playing);
+    }
+
+    [Fact]
+    public void SkippingPastLastTrackWithoutAutoplayStopsInsteadOfRestarting()
+    {
+        var (rooms, _, _, _) = NewStack();
+        var room = rooms.Create("host", "Solo", RoomMode.OpenLounge, "H");
+        room.SmartAutoplay = false;
+        room.Repeat = RepeatMode.Off;
+        rooms.Enqueue(room.Id, "host", "tr-blue-train");
+        rooms.Play(room.Id, "host");
+
+        rooms.Skip(room.Id, "host", 1);
+
+        Assert.False(room.Playing);
+        Assert.Single(room.Queue);
+    }
+
+    [Fact]
+    public void EmptyPlaylistCanBeCreatedAndOwnedTracksAdded()
+    {
+        var (_, _, history, _) = NewStack();
+        var playlist = history.CreatePlaylist("New playlist", [], "host");
+
+        Assert.Empty(history.Playlist(playlist.Id)!.TrackIds);
+        Assert.Null(history.AddPlaylistTrack(playlist.Id, "tr-blue-train", "another"));
+        history.AddPlaylistTrack(playlist.Id, "tr-blue-train", "host");
+        history.AddPlaylistTrack(playlist.Id, "tr-blue-train", "host");
+
+        Assert.Equal(["tr-blue-train"], history.Playlist(playlist.Id)!.TrackIds);
+    }
+
+    [Fact]
+    public void CatalogReportsLocalFileExtensionAndArtistGraphIncludesCompilationTrack()
+    {
+        var (_, catalog, _, _) = NewStack();
+        var artist = catalog.Artists.Values.First();
+        var otherArtist = catalog.Artists.Values.First(a => a.Id != artist.Id);
+        var compilation = new Album { Id = "compilation-test", Title = "Compilation", ArtistId = otherArtist.Id };
+        catalog.UpsertTrack(new Track { Id = "compilation-mp3", Title = "Guest track",
+            ArtistId = artist.Id, AlbumId = compilation.Id, LocalPath = @"C:\Music\guest.mp3" }, compilation, artist);
+
+        var tracks = JsonSerializer.SerializeToElement(catalog.CatalogView(), LineFraming.JsonOptions);
+        var track = tracks.EnumerateArray().First(t => t.GetProperty("id").GetString() == "compilation-mp3");
+        Assert.Equal("MP3", track.GetProperty("fileExtension").GetString());
+
+        var graph = JsonSerializer.SerializeToElement(catalog.Graph(artist.Id), LineFraming.JsonOptions);
+        Assert.Contains(graph.GetProperty("albums").EnumerateArray(), a => a.GetProperty("id").GetString() == compilation.Id);
+        Assert.Contains(graph.GetProperty("tracks").EnumerateArray(), t => t.GetProperty("id").GetString() == "compilation-mp3");
+    }
+
+    [Fact]
     public void ZoneMembershipMovesConnectedOutputIntoSyncRoom()
     {
         var (rooms, catalog, history, streaming) = NewStack();

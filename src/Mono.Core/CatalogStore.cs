@@ -268,6 +268,7 @@ public sealed class CatalogStore : IDisposable
             workTitle = work?.Title,
             hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
             hasLocal = t.LocalPath is not null,
+            fileExtension = t.LocalPath is null ? null : Path.GetExtension(t.LocalPath).TrimStart('.').ToUpperInvariant(),
             artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
             addedAt = t.AddedAt,
             badge = QualityPolicyEngine.Badge(t, false)
@@ -322,7 +323,8 @@ public sealed class CatalogStore : IDisposable
                 return new { error = "unknown artist" };
             }
 
-            var albums = _albums.Values.Where(a => a.ArtistId == artistId)
+            var artistTracks = _tracks.Values.Where(t => t.ArtistId == artistId).ToList();
+            var albums = _albums.Values.Where(a => a.ArtistId == artistId || artistTracks.Any(t => t.AlbumId == a.Id))
                 .Select(a => new
                 {
                     a.Id,
@@ -337,9 +339,9 @@ public sealed class CatalogStore : IDisposable
                     trackCount = _tracks.Values.Count(t => t.AlbumId == a.Id)
                 })
                 .ToList();
-            var tracks = _tracks.Values.Where(t => t.ArtistId == artistId)
+            var tracks = artistTracks
                 .OrderBy(t => t.TrackNumber)
-                .Select(t => new { t.Id, t.Title, t.AlbumId, t.DurationMs, badge = QualityPolicyEngine.Badge(t, false) })
+                .Select(TrackView)
                 .ToList();
             var related = artist.RelatedArtistIds
                 .Select(id => _artists.GetValueOrDefault(id))

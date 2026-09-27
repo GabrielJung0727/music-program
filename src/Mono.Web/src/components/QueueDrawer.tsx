@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import type { QueueTrack } from "../data/types"
 import { MonoIcon } from "./icons/MonoIcons"
 import { albumArt, FALLBACK_ART } from "../lib/artwork"
+import { useMono, useMonoCommands } from "../state/MonoProvider"
 
 interface Props {
   isOpen: boolean
@@ -46,7 +47,10 @@ export default function QueueDrawer({
   onRemoveFromQueue, onReorderQueue, onClearQueue, onFlushSession, onPlayTrackNow,
   isGuest, hostName,
 }: Props) {
-  const [autoPlay, setAutoPlay] = useState(true)
+  const { room } = useMono()
+  const cmd = useMonoCommands()
+  const autoPlay = room?.smartAutoplay ?? false
+  const [now, setNow] = useState(Date.now())
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
   useEffect(() => {
@@ -55,6 +59,12 @@ export default function QueueDrawer({
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [isOpen, onClose])
+
+  useEffect(() => {
+    if (!isOpen || !room?.autoplay) return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [isOpen, room?.autoplay])
 
   const canControl = !isGuest
   const title = isGuest ? "Host Setlist" : "Play Queue"
@@ -452,7 +462,7 @@ export default function QueueDrawer({
             </div>
             {/* Toggle switch */}
             <div
-              onClick={() => canControl && setAutoPlay(v => !v)}
+              onClick={() => canControl && cmd.setRoomFlag("smart_autoplay", !autoPlay)}
               className={`queue-toggle-track${autoPlay ? " is-active" : ""}`}
               style={{
                 width: 34, height: 19, borderRadius: 10,
@@ -472,6 +482,20 @@ export default function QueueDrawer({
               }} />
             </div>
           </label>
+          {autoPlay && room?.autoplay && room.autoplay.candidates.length > 0 && (
+            <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "var(--surface-elevated)", color: "var(--text-primary)" }}>
+              <div style={{ fontSize: 11, marginBottom: 8 }}>
+                Up next in {Math.max(0, Math.ceil((room.autoplay.deadlineUnixMs - now) / 1000))}s · choose a track
+              </div>
+              {room.autoplay.candidates.map(candidate => (
+                <button key={candidate.id} type="button" disabled={!canControl}
+                  onClick={() => cmd.chooseAutoplay(candidate.id)}
+                  style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 9px", marginTop: 4, borderRadius: 7, cursor: canControl ? "pointer" : "default", color: "var(--text-primary)", border: candidate.id === room.autoplay?.chosenId ? "1px solid var(--accent-violet)" : "1px solid var(--border-subtle)", background: "var(--surface-card)" }}>
+                  {candidate.title} · {candidate.artistName ?? "Unknown Artist"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>

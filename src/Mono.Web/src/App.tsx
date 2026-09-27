@@ -10,6 +10,7 @@ import StreamingLoginModal from "./components/StreamingLoginModal"
 import OnboardingWizard from "./components/onboarding/OnboardingWizard"
 import type { ListenerProfile } from "./components/onboarding/Step3AudiophileRig"
 import QueueDrawer from "./components/QueueDrawer"
+import AutoplayPreview from "./components/AutoplayPreview"
 import TrackActionMenu, { type TrackActionTarget, type TrackActionHandle } from "./components/TrackActionMenu"
 import FullscreenPlayer from "./components/FullscreenPlayer"
 import SettingsPage from "./components/SettingsPage"
@@ -67,7 +68,7 @@ function toQueueTrack(t: TrackActionTarget): import("./data/types").QueueTrack {
     artist: t.artist ?? "Unknown",
     album: t.album ?? "",
     duration: t.duration ?? "0:00",
-    format: t.format ?? "Hi-Res FLAC",
+    format: t.format ?? "Audio",
     dr: t.dr,
     art: t.art || (t as any).coverUrl,
     source: t.source,
@@ -206,6 +207,7 @@ export default function App() {
         name: graph.artist.name,
         wikiSummary: graph.artist.bio ?? "",
         albums: graph.albums ?? [],
+        tracks: graph.tracks ?? [],
         related: graph.related ?? [],
       })
     })
@@ -230,7 +232,7 @@ export default function App() {
       studio: "",
       art: currentTrack?.art ?? (currentTrack as any)?.coverUrl ?? "",
       coverUrl: currentTrack?.art ?? (currentTrack as any)?.coverUrl ?? "",
-      format: currentTrack?.format ?? "Hi-Res FLAC",
+      format: currentTrack?.format ?? "Audio",
       dr: currentTrack?.dr ?? "",
       wikiUrl: "",
       wikiSummary: "",
@@ -509,8 +511,8 @@ export default function App() {
     setJoinedLoungeId(null)
   }
 
-  const handleGoToLibraryTracks = () => {
-    setLibraryDefaultTab("tracks")
+  const handleGoToLibraryAlbums = () => {
+    setLibraryDefaultTab("albums")
     setCurrentTab("library")
   }
 
@@ -1028,7 +1030,10 @@ export default function App() {
             />
           )
         ) : currentTab === "library" ? (
-          <MyLibraryPage onPlayNow={handlePlayNow} onPlayNext={handlePlayNext} onAddToQueue={handleAddToQueue} defaultTab={libraryDefaultTab} onOpenShare={handleOpenShare} onSelectAlbum={handleSelectAlbumAny} onSelectArtist={(artist) => setSelectedArtist(artist)} />
+          <MyLibraryPage onPlayNow={handlePlayNow} onPlayNext={handlePlayNext} onAddToQueue={handleAddToQueue} defaultTab={libraryDefaultTab} onOpenShare={handleOpenShare} onSelectAlbum={handleSelectAlbumAny} onSelectArtist={(artist) => {
+            const id = artist.id ?? libArtists(live.catalog).find(a => a.name === artist.name)?.id
+            if (id) openArtist(id)
+          }} />
         ) : currentTab === "explore" ? (
           <ExplorePage onPlayNow={handlePlayNow} onPlayNext={handlePlayNext} onAddToQueue={handleAddToQueue} onSelectAlbum={handleSelectAlbumAny} connectedServices={connectedServices} onConnectService={(service) => { setAuthServiceForGate(service); }} />
         ) : currentTab === "settings" ? (
@@ -1045,7 +1050,7 @@ export default function App() {
             joinedLoungeId={joinedLoungeId}
             onToggleJoin={handleToggleJoinLounge}
             onLeaveLounge={handleLeaveLoungeSilent}
-            onNavigateToTracks={handleGoToLibraryTracks}
+            onNavigateToAlbums={handleGoToLibraryAlbums}
             onPlayAlbum={(album) => { void cmd.playAlbum(album.trackIds) }}
             onSelectAlbum={(album) => {
               const match = live.findAlbum(album.title)
@@ -1162,6 +1167,7 @@ export default function App() {
         isHost={playerMode === "host"}
         hostName={playerMode === "guest" ? (lounges.find(r => r.id === joinedLoungeId)?.hostName ?? "Host") : undefined}
       />
+      <AutoplayPreview />
 
       {/* ── Account Required Gate ───────────────────────────────────────── */}
       <AccountRequiredGateModal

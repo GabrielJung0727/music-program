@@ -4,6 +4,7 @@ import { useMono, useMediaClock } from "../state/MonoProvider"
 import { useLiveSession } from "../state/useLiveSession"
 import { MonoIcon } from "./icons/MonoIcons"
 import { albumArt } from "../lib/artwork"
+import { formatSpec } from "../lib/adapters"
 
 export interface FullscreenPlayerProps {
   isOpen: boolean
@@ -66,7 +67,7 @@ export default function FullscreenPlayer({
     title: t.title,
     artist: t.artist ?? "Unknown Artist",
     album: t.album ?? "",
-    format: t.isDsd ? `DSD ${t.dsdRate ?? 64}` : `FLAC ${t.bitDepth}-Bit / ${Math.round(t.sampleRate / 1000)}kHz`,
+    format: formatSpec(t),
     dr: t.badge ?? "",
     art: t.artUrl ?? "",
     source: (t.hasLocal ? "local" : "qobuz") as "local" | "qobuz",
@@ -351,7 +352,7 @@ export default function FullscreenPlayer({
                       <span>Studio Master Recording</span>
                     </span>
                     <p className="text-sm font-serif italic" style={{ color: "var(--text-secondary)" }}>Instrumental performance · No vocal lyrics for this track</p>
-                    <span className="text-[10px] font-mono" style={{ color: "var(--nowplaying-credits-role)" }}>{currentTrack?.format || "Hi-Res Audio"} · Bit-Perfect Stream</span>
+                    <span className="text-[10px] font-mono" style={{ color: "var(--nowplaying-credits-role)" }}>{currentTrack?.format || "Audio"}</span>
                   </div>
                 )}
               </div>

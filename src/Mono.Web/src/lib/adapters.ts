@@ -30,11 +30,14 @@ export function formatSpec(t: {
   bitDepth?: number
   sampleRate?: number
   hasLocal?: boolean
+  fileExtension?: string | null
   source?: StreamingProvider
 }): string {
   if (t.isDsd) return `DSD ${t.dsdRate ?? 64}`
   const khz = t.sampleRate ? (t.sampleRate / 1000).toFixed(t.sampleRate % 1000 === 0 ? 0 : 1) : null
-  const container = t.source === StreamingProvider.Local || t.hasLocal ? "FLAC" : "Hi-Res"
+  const container = t.hasLocal || t.source === StreamingProvider.Local
+    ? (t.fileExtension?.toUpperCase() || "Local Audio")
+    : "Streaming Audio"
   if (!t.bitDepth || !khz) return container
   return `${container} ${t.bitDepth}-Bit / ${khz}kHz`
 }
@@ -158,7 +161,7 @@ export function groupIntoAlbums(tracks: CatalogTrack[], currentTrackId?: string 
       label: first.label ?? "",
       studio: "",
       coverUrl: art(withArt.artUrl, withArt.id),
-      format: formatSpec(first),
+      format: new Set(group.map(formatSpec)).size === 1 ? formatSpec(first) : "Mixed formats",
       dr: first.badge ?? "",
       wikiUrl: "",
       wikiSummary: "",

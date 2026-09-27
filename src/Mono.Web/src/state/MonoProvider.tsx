@@ -144,7 +144,9 @@ export interface MonoCommands {
   albumDetail(albumId: string): Promise<AlbumDetail | null>
   artistGraph(artistId: string): Promise<ArtistGraph | null>
   createPlaylist(title: string, trackIds: string[]): Promise<void>
+  addPlaylistTrack(playlistId: string, trackId: string): Promise<void>
   loadPlaylist(playlistId: string): void
+  chooseAutoplay(trackId: string): void
 
   // 설정
   setQualityPolicy(policy: QualityPolicy): void
@@ -630,13 +632,25 @@ export function MonoProvider({ children }: { children: ReactNode }) {
 
       async createPlaylist(title, trackIds) {
         try {
-          await client.request({ type: MSG.createPlaylist, text: title, trackIds }, MSG.playlists)
+          await client.request({ type: MSG.createPlaylist, text: title, trackIds }, MSG.createPlaylist)
+          client.send({ type: MSG.playlists })
         } catch (err) {
           setLastError(err instanceof Error ? err.message : String(err))
+          throw err
+        }
+      },
+      async addPlaylistTrack(playlistId, trackId) {
+        try {
+          await client.request({ type: MSG.addPlaylistTrack, playlistId, trackId }, MSG.addPlaylistTrack)
+          client.send({ type: MSG.playlists })
+        } catch (err) {
+          setLastError(err instanceof Error ? err.message : String(err))
+          throw err
         }
       },
 
       loadPlaylist: (playlistId) => withRoom({ type: MSG.loadPlaylist, playlistId }),
+      chooseAutoplay: (trackId) => withRoom({ type: MSG.chooseAutoplay, trackId }),
 
       setQualityPolicy: (policy) => withRoom({ type: MSG.setPolicy, policy }),
       setDsp: (preset, enabled) => withRoom({ type: MSG.setDsp, dsp: preset, flag: enabled }),

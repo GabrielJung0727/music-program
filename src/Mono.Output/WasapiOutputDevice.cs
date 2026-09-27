@@ -250,7 +250,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 $"device open: 요청 {config.SampleRate}/{config.BitDepth}/{config.Channels} → " +
                 $"실제 {actual.SampleRate}/{actual.BitsPerSample}/{actual.Channels} ({share})");
 
-            if (share == AudioClientShareMode.Exclusive && !Matches(actual, requested))
+            if (share == AudioClientShareMode.Exclusive && !MatchesExclusiveFormat(actual, requested))
             {
                 refusal = DescribeFormatMismatch(config, actual);
                 try { attempt.Dispose(); } catch { /* 이미 닫혔으면 무시 */ }
@@ -306,10 +306,16 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
            || refusal.Contains("AUDCLNT_E_DEVICE_IN_USE", StringComparison.OrdinalIgnoreCase)
            || refusal.Contains("AUDCLNT_E_DEVICE_INVALIDATED", StringComparison.OrdinalIgnoreCase);
 
-    private static bool Matches(WaveFormat actual, WaveFormat requested)
+    public static bool MatchesExclusiveFormat(WaveFormat actual, WaveFormat requested)
         => actual.SampleRate == requested.SampleRate
            && actual.BitsPerSample == requested.BitsPerSample
-           && actual.Channels == requested.Channels;
+           && actual.Channels == requested.Channels
+           && actual.BlockAlign == requested.BlockAlign
+           && actual.Encoding == requested.Encoding
+           && (requested is not ExtensiblePcmWaveFormat
+               || actual is ExtensiblePcmWaveFormat own && own.ValidBitsPerSample == 24
+               || actual is WaveFormatExtensible extensible
+                  && extensible.SubFormat == new Guid("00000001-0000-0010-8000-00aa00389b71"));
 
     private string DescribeFormatMismatch(DeviceConfig config, WaveFormat actual)
     {

@@ -694,7 +694,11 @@ public sealed class CommandProcessor
                         tracks = p.TrackIds.Select(id => new
                         {
                             id,
-                            title = _catalog.Tracks.GetValueOrDefault(id)?.Title ?? id
+                            title = _catalog.Tracks.GetValueOrDefault(id)?.Title ?? id,
+                            artist = _catalog.Tracks.GetValueOrDefault(id) is { } track
+                                ? _catalog.Artists.GetValueOrDefault(track.ArtistId)?.Name : null,
+                            durationMs = _catalog.Tracks.GetValueOrDefault(id)?.DurationMs ?? 0,
+                            artUrl = _catalog.Tracks.GetValueOrDefault(id)?.ArtworkPath is null ? null : $"/api/art/{id}"
                         })
                     }), LineFraming.JsonOptions)
                 });
@@ -714,13 +718,20 @@ public sealed class CommandProcessor
                     return Direct(new MonoMessage { Type = MessageTypes.CreatePlaylist, Ok = true, PlaylistId = created.Id, Body = created.Title });
                 }
 
-                if (ids.Count == 0)
-                {
-                    return Fail("no tracks");
-                }
-
                 var playlist = _history.CreatePlaylist(msg.Text ?? "Playlist", ids, peerId);
                 return Direct(new MonoMessage { Type = MessageTypes.CreatePlaylist, Ok = true, PlaylistId = playlist.Id, Body = playlist.Title });
+            }
+
+            case MessageTypes.AddPlaylistTrack:
+            {
+                if (string.IsNullOrWhiteSpace(msg.PlaylistId) || string.IsNullOrWhiteSpace(msg.TrackId))
+                    return Fail("playlist and track are required");
+                if (!_catalog.Tracks.ContainsKey(msg.TrackId))
+                    return Fail("track not found");
+                var updated = _history.AddPlaylistTrack(msg.PlaylistId, msg.TrackId, peerId);
+                return updated is null
+                    ? Fail("playlist not found or owned by another listener")
+                    : Direct(new MonoMessage { Type = MessageTypes.AddPlaylistTrack, Ok = true, PlaylistId = updated.Id });
             }
 
             case MessageTypes.LoadPlaylist:

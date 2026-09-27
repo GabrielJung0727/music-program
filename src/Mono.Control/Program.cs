@@ -23,13 +23,26 @@ internal static class Program
         // 나중 것은 앞선 인스턴스의 Core 에 붙고, 같은 PC 가 두 사람처럼 보인다 —
         // 같은 이름의 라운지가 둘씩 생기고, 두 워커가 같은 DAC 를 배타로 열려고 다툰다.
         // 무엇이 잘못됐는지 화면에는 아무것도 안 나온다.
-        using var single = new Mutex(true, SingleInstanceName, out var isFirst);
-        if (!isFirst)
+        using var single = new Mutex(false, SingleInstanceName);
+        using var activated = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationName);
+        bool ownsMutex;
+        try { ownsMutex = single.WaitOne(0); }
+        catch (AbandonedMutexException) { ownsMutex = true; }
+        if (!ownsMutex)
         {
-            // 이미 떠 있는 창을 앞으로 부르고 조용히 물러난다. 사용자는 아이콘을 한 번 더
-            // 눌렀을 뿐이므로 오류창을 띄울 일이 아니다.
+            // 닫히는 중인 첫 인스턴스는 이미 창 핸들을 버렸지만 워커 정리 동안 뮤텍스는
+            // 잡고 있다. 응답을 기다린 뒤, 창이 없으면 종료 완료 후 새로 시작한다.
+            activated.Reset();
             NativeMethods.PostMessage(NativeMethods.HWND_BROADCAST, ShowExistingMessage, IntPtr.Zero, IntPtr.Zero);
-            return;
+            if (activated.WaitOne(TimeSpan.FromSeconds(1))) return;
+            try { ownsMutex = single.WaitOne(TimeSpan.FromSeconds(6)); }
+            catch (AbandonedMutexException) { ownsMutex = true; }
+            if (!ownsMutex)
+            {
+                MessageBox.Show("기존 Mono 창이 응답하지 않습니다. 작업 관리자에서 Mono.Control을 종료한 뒤 다시 실행해 주세요.",
+                    "Mono 시작 불가", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
         }
 
         ApplicationConfiguration.Initialize();
@@ -40,7 +53,8 @@ internal static class Program
         };
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-        Application.Run(new ShellForm());
+        try { Application.Run(new ShellForm()); }
+        finally { single.ReleaseMutex(); }
     }
 
     /// <summary>
@@ -48,6 +62,17 @@ internal static class Program
     /// 한 PC 에 두 사람이 로그인해 각자 Mono 를 쓰는 건 막을 이유가 없다.
     /// </summary>
     private const string SingleInstanceName = @"Local\Mono.Control.SingleInstance";
+    private const string ActivationName = @"Local\Mono.Control.Activated";
+
+    public static void AcknowledgeActivation()
+    {
+        try
+        {
+            using var activated = EventWaitHandle.OpenExisting(ActivationName);
+            activated.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException) { /* 요청자가 이미 종료됨 */ }
+    }
 
     /// <summary>이미 떠 있는 창을 앞으로 부르는 신호. 이름으로 등록해 값이 겹치지 않게 한다.</summary>
     public static readonly uint ShowExistingMessage =
