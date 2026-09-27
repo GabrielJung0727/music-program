@@ -31,7 +31,11 @@ if (-not $Version) {
 # Velopack 1.2.0 accepts only three-part SemVer. Keep the public hotfix
 # number as the assembly/GitHub version, and give the update feed a version
 # above 0.5.9 and below the future 0.5.10 release.
-$packVersion = if ($Version -eq '0.5.9.1') { '0.5.10-rc.1' } else { $Version }
+$packVersion = switch ($Version) {
+    '0.5.9.1' { '0.5.10-rc.1' }
+    '0.5.9.2' { '0.5.10-rc.2' }
+    default { $Version }
+}
 
 $outDir = "$PSScriptRoot\publish\mono-win-x64"
 $releasesDir = "$PSScriptRoot\publish\releases"

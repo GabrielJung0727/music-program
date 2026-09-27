@@ -42,8 +42,12 @@ public sealed class AppUpdater
     public UpdateInfo? Pending { get; private set; }
 
     internal static string PublicVersion(string packageVersion)
-        => packageVersion.Equals("0.5.10-rc.1", StringComparison.OrdinalIgnoreCase)
-            ? "0.5.9.1" : packageVersion;
+        => packageVersion.ToLowerInvariant() switch
+        {
+            "0.5.10-rc.1" => "0.5.9.1",
+            "0.5.10-rc.2" => "0.5.9.2",
+            _ => packageVersion
+        };
 
     public bool IsInstalled
     {
