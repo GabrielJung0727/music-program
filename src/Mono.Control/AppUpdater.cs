@@ -46,6 +46,7 @@ public sealed class AppUpdater
         {
             "0.5.10-rc.1" => "0.5.9.1",
             "0.5.10-rc.2" => "0.5.9.2",
+            "0.5.10-rc.3" => "0.5.9.3",
             _ => packageVersion
         };
 

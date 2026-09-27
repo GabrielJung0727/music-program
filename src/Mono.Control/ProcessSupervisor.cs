@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Threading;
 
 namespace Mono.Control;
@@ -42,28 +43,46 @@ public sealed class ProcessSupervisor
 
     public async Task<bool> EnsureCoreAsync(CancellationToken ct = default)
     {
-        if (CoreRunning) return true;
-        if (await WaitForPortAsync(7700, TimeSpan.FromMilliseconds(400), ct)) return true;
-
-        var exe = FindExe("Mono.Core.exe", "Mono.Core");
-        if (exe is null)
+        if (!CoreRunning)
         {
-            LastError = "Mono.Core.exe를 찾을 수 없습니다. Control과 같은 폴더에 두세요.";
-            return false;
+            if (await WaitForPortAsync(7700, TimeSpan.FromMilliseconds(400), ct)) return true;
+
+            var exe = FindExe("Mono.Core.exe", "Mono.Core");
+            if (exe is null)
+            {
+                LastError = "Mono.Core.exe를 찾을 수 없습니다. Control과 같은 폴더에 두세요.";
+                return false;
+            }
+
+            try { _core = StartSilent(exe); }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                return false;
+            }
         }
 
         try
         {
-            _core = StartSilent(exe);
-            for (var i = 0; i < 40; i++)
+            // DB 마이그레이션과 라이브러리 로딩은 첫 실행에서 오래 걸릴 수 있다.
+            // 연결 거절은 즉시 돌아오므로 횟수만 세면 40번을 순식간에 소진한다.
+            var startup = Stopwatch.StartNew();
+            while (startup.Elapsed < TimeSpan.FromSeconds(60))
             {
                 ct.ThrowIfCancellationRequested();
                 if (await WaitForPortAsync(7700, TimeSpan.FromMilliseconds(250), ct)) return true;
+                if (_core is { HasExited: true })
+                {
+                    LastError = $"Core가 시작 중 종료됐습니다 (코드 {TryExitCode(_core)}). 로그: {AppLog.FilePath}";
+                    return false;
+                }
+                await Task.Delay(250, ct);
             }
 
-            LastError = "Core가 시작됐지만 포트 7700에 응답하지 않습니다.";
+            LastError = $"Core가 60초 동안 포트 7700에 응답하지 않습니다. 로그: {AppLog.FilePath}";
             return false;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             LastError = ex.Message;
@@ -397,17 +416,16 @@ public sealed class ProcessSupervisor
 
     private static async Task<bool> WaitForPortAsync(int port, TimeSpan timeout, CancellationToken ct)
     {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(timeout);
         try
         {
-            using var client = new System.Net.Sockets.TcpClient();
-            var connect = client.ConnectAsync("127.0.0.1", port);
-            var completed = await Task.WhenAny(connect, Task.Delay(timeout, ct));
-            return completed == connect && client.Connected;
+            using var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", port, deadline.Token);
+            return client.Connected;
         }
-        catch
-        {
-            return false;
-        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return false; }
+        catch (SocketException) { return false; }
     }
 
     private static void TryKill(ref Process? process)

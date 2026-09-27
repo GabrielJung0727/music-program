@@ -32,6 +32,8 @@ public sealed class ShellForm : Form
     private readonly NotifyIcon _tray;
     private readonly CancellationTokenSource _life = new();
     private bool _quitting;
+    private bool _booting;
+    private bool _bootFailed;
 
     public ShellForm()
     {
@@ -45,6 +47,14 @@ public sealed class ShellForm : Form
         Controls.Add(_web);
         Controls.Add(_splash);
         _web.Visible = false;
+        _splash.Click += async (_, _) =>
+        {
+            if (!_bootFailed || _booting) return;
+            _bootFailed = false;
+            _splash.Cursor = Cursors.Default;
+            _splash.Text = "Mono 다시 시작 중…";
+            await BootAsync();
+        };
 
         _tray = new NotifyIcon
         {
@@ -66,6 +76,8 @@ public sealed class ShellForm : Form
 
     private async Task BootAsync()
     {
+        if (_booting) return;
+        _booting = true;
         try
         {
             if (!await _supervisor.EnsureCoreAsync(_life.Token))
@@ -89,6 +101,7 @@ public sealed class ShellForm : Form
             Program.LogDiagnostic("boot", ex);
             ShowFatal("시작 중 오류가 발생했습니다.\n\n" + ex.Message);
         }
+        finally { _booting = false; }
     }
 
     private static async Task<bool> WaitForHttpAsync(CancellationToken ct)
@@ -482,7 +495,9 @@ public sealed class ShellForm : Form
     {
         _web.Visible = false;
         _splash.Visible = true;
-        _splash.Text = message;
+        _bootFailed = true;
+        _splash.Cursor = Cursors.Hand;
+        _splash.Text = message + "\n\n클릭하여 다시 시도";
     }
 
     private void RestoreWindow()
