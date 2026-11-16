@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mono QA 체크리스트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,450;0,9..144,560;0,9..144,650;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#FFFFFF; --surface:#F7F7FA; --accent:#6D6DF6; --accent-ink:#FFFFFF;
+    --text:#1A1A1E; --muted:#6B6F7A; --line:#E6E7EC; --warn:#D9762F; --bad:#CC4444; --good:#3F9A6B;
+    --shadow: 0 1px 2px rgba(20,20,30,.04), 0 6px 18px -8px rgba(20,20,30,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#121317; --surface:#1A1C22; --accent:#8F8FF8; --accent-ink:#121317;
+      --text:#F2F2F5; --muted:#9AA0AB; --line:#2B2E36; --warn:#E39A5C; --bad:#EE8888; --good:#6FBF93;
+      --shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 24px -10px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#121317; --surface:#1A1C22; --accent:#8F8FF8; --accent-ink:#121317;
+    --text:#F2F2F5; --muted:#9AA0AB; --line:#2B2E36; --warn:#E39A5C; --bad:#EE8888; --good:#6FBF93;
+    --shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 24px -10px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg); color:var(--text); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  a{color:inherit;}
+  button, select, textarea, input{font-family:inherit;}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:6px;}
+  .wrap{max-width:860px; margin:0 auto; padding:28px 20px 80px;}
+  .topbar{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-bottom:18px; border-bottom:1px solid var(--line); margin-bottom:22px;}
+  .brand{display:flex; flex-direction:column; gap:6px;}
+  .brand-row{display:flex; align-items:baseline; gap:10px;}
+  .brand-mark{font-family:Fraunces,serif; font-weight:650; font-size:clamp(26px,3vw,32px); letter-spacing:-0.01em;}
+  .brand-chip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; letter-spacing:.06em; text-transform:uppercase; background:var(--accent); color:var(--accent-ink); padding:3px 8px; border-radius:100px; font-weight:600;}
+  .brand-sub{color:var(--muted); font-size:13.5px;}
+  .role-switch{display:flex; flex-direction:column; align-items:flex-end; gap:6px;}
+  .segmented{display:flex; background:var(--surface); border:1px solid var(--line); border-radius:100px; padding:3px; gap:2px;}
+  .segmented button{appearance:none; border:none; background:transparent; color:var(--muted); font-size:13px; font-weight:600; padding:7px 14px; border-radius:100px; cursor:pointer;}
+  .segmented button.active{background:var(--accent); color:var(--accent-ink);}
+  .role-desc{color:var(--muted); font-size:12.5px; max-width:300px; text-align:right;}
+  .stats{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px;}
+  .stat{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 14px 12px; border-left:3px solid var(--line);}
+  .stat[data-k="ok"]{border-left-color:var(--good);}
+  .stat[data-k="warn"]{border-left-color:var(--warn);}
+  .stat[data-k="bad"]{border-left-color:var(--bad);}
+  .stat[data-k="unknown"]{border-left-color:var(--muted);}
+  .stat[data-k="total"]{border-left-color:var(--accent);}
+  .stat-num{font-family:Fraunces,serif; font-weight:560; font-size:26px; font-variant-numeric:tabular-nums; line-height:1;}
+  .stat-label{color:var(--muted); font-size:11.5px; margin-top:5px; letter-spacing:.02em;}
+  .filterbar{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap;}
+  .filterbar input[type="text"], .filterbar select{background:var(--surface); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 12px; font-size:13.5px;}
+  .filterbar input[type="text"]{flex:1; min-width:160px;}
+  .feed{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:26px;}
+  .feed h2{margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600;}
+  .feed-row{display:flex; gap:10px; align-items:baseline; padding:6px 0; border-top:1px solid var(--line); font-size:13px; flex-wrap:wrap;}
+  .feed-row:first-of-type{border-top:none;}
+  .feed-empty{color:var(--muted); font-size:13px;}
+  .feed-time{color:var(--muted); font-size:11.5px; margin-left:auto; white-space:nowrap;}
+  .area-section{margin-bottom:30px;}
+  .eyebrow{display:flex; align-items:baseline; gap:8px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 6px; font-weight:600;}
+  .eyebrow .count{color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:100px; padding:1px 8px; font-size:11px;}
+  .section-note{color:var(--muted); font-size:12px; margin:0 0 12px;}
+  .item-list{display:flex; flex-direction:column; gap:10px;}
+  .item-card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow);}
+  .item-card.priority{border-color:var(--accent);}
+  .item-head{display:flex; justify-content:space-between; gap:14px; align-items:flex-start;}
+  .item-title{font-size:16px; font-weight:600; margin:0 0 4px;}
+  .item-tags{display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;}
+  .tag{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10.5px; color:var(--muted); border:1px solid var(--line); border-radius:5px; padding:1px 6px;}
+  .tag.flag{color:var(--warn); border-color:var(--warn);}
+  .tag.p0{color:var(--accent); border-color:var(--accent); font-weight:700;}
+  .tag.role{color:var(--text); background:var(--bg);}
+  .item-detail{color:var(--muted); font-size:14px; line-height:1.6; max-width:64ch; margin:0;}
+  .pill{display:inline-flex; align-items:center; gap:5px; flex-shrink:0; font-size:12px; font-weight:600; padding:5px 10px; border-radius:100px; white-space:nowrap;}
+  .pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+  .pill.ok{background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good);}
+  .pill.warn{background:color-mix(in srgb, var(--warn) 16%, transparent); color:var(--warn);}
+  .pill.bad{background:color-mix(in srgb, var(--bad) 16%, transparent); color:var(--bad);}
+  .pill.unknown{background:transparent; color:var(--muted); border:1px solid var(--line);}
+  .item-meta-row{display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:10px; flex-wrap:wrap;}
+  .last-update{color:var(--muted); font-size:11.5px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .toggle-btn{background:none; border:none; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer; padding:4px 0;}
+  .media-panel{margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);}
+  .media-head{display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px;}
+  .media-row{display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-size:13px; padding:6px 0; border-top:1px solid var(--line);}
+  .media-row:first-of-type{border-top:none;}
+  .media-row a{color:var(--accent); font-weight:600; text-decoration:none;}
+  .media-row a:hover{text-decoration:underline;}
+  .media-meta{color:var(--muted); font-size:11.5px;}
+  .media-empty{color:var(--muted); font-size:12.5px; font-style:italic;}
+  .media-form{display:none; flex-direction:column; gap:8px; margin-top:10px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px;}
+  .media-form.open{display:flex;}
+  .media-form-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .media-form input{background:var(--surface); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font-size:13px; flex:1; min-width:130px;}
+  .media-form-submit{align-self:flex-end; background:var(--text); color:var(--bg); border:none; font-size:12.5px; font-weight:700; padding:6px 12px; border-radius:7px; cursor:pointer;}
+  .thread{margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); display:none; flex-direction:column; gap:10px;}
+  .thread.open{display:flex;}
+  .thread-entry{background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px;}
+  .thread-entry-head{display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:4px; flex-wrap:wrap;}
+  .thread-entry-author{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;}
+  .thread-entry-time{font-size:11px; color:var(--muted); font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .thread-entry-note{font-size:13px; color:var(--text); line-height:1.5; margin:6px 0 0;}
+  .thread-entry-media{margin-top:6px;}
+  .thread-empty{color:var(--muted); font-size:12.5px; font-style:italic;}
+  .qform{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+  .qform-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .qform input[type="text"], .qform select{background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:7px 10px; font-size:13px; flex:1; min-width:120px;}
+  .status-picker{display:flex; gap:6px;}
+  .status-picker button{appearance:none; border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:12.5px; font-weight:600; padding:6px 10px; border-radius:7px; cursor:pointer;}
+  .status-picker button[data-s="ok"].sel{background:color-mix(in srgb, var(--good) 20%, var(--bg)); border-color:var(--good); color:var(--good);}
+  .status-picker button[data-s="warn"].sel{background:color-mix(in srgb, var(--warn) 20%, var(--bg)); border-color:var(--warn); color:var(--warn);}
+  .status-picker button[data-s="bad"].sel{background:color-mix(in srgb, var(--bad) 20%, var(--bg)); border-color:var(--bad); color:var(--bad);}
+  .qform textarea{background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:8px 10px; font-size:13px; resize:vertical; min-height:56px;}
+  .qform-submit{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border:none; font-size:13px; font-weight:700; padding:8px 16px; border-radius:8px; cursor:pointer;}
+  .qform-submit:disabled{opacity:.5; cursor:not-allowed;}
+  .db-banner{background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid var(--warn); color:var(--text); font-size:13px; border-radius:10px; padding:10px 14px; margin-bottom:20px;}
+  .newitem-bar{margin-bottom:16px;}
+  .newitem-toggle{background:var(--surface); border:1px dashed var(--line); color:var(--text); font-size:13px; font-weight:600; padding:10px 14px; border-radius:10px; cursor:pointer; width:100%; text-align:left;}
+  .newitem-form{display:none; flex-direction:column; gap:8px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:8px;}
+  .newitem-form.open{display:flex;}
+  .newitem-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .newitem-form input, .newitem-form select, .newitem-form textarea{background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:7px; padding:8px 10px; font-size:13.5px; flex:1; min-width:140px;}
+  .newitem-form textarea{min-height:56px; resize:vertical; flex-basis:100%;}
+  .newitem-submit{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border:none; font-size:13px; font-weight:700; padding:8px 16px; border-radius:8px; cursor:pointer;}
+  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  footer .mono{font-size:11.5px;}
+  @media (max-width:640px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    .topbar{align-items:flex-start;}
+    .role-switch{align-items:flex-start;}
+    .role-desc{text-align:left;}
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-row">
+        <span class="brand-mark">Mono</span>
+        <span class="brand-chip">QA</span>
+      </div>
+      <div class="brand-sub">Control · Core · Output 청음 &amp; 기능 체크리스트</div>
+    </div>
+    <div class="role-switch">
+      <div class="segmented" id="roleSwitch">
+        <button data-role="audio" id="btnRoleAudio">정민석 · 청음</button>
+        <button data-role="devir" id="btnRoleDevir">DEvir · 전체 QA</button>
+      </div>
+      <div class="role-desc" id="roleDesc"></div>
+    </div>
+  </div>
+
+  <div id="dbBanner"></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="filterbar">
+    <input type="text" id="searchInput" placeholder="항목 검색…">
+    <select id="statusFilter">
+      <option value="all">전체 상태</option>
+      <option value="unknown">미확인만</option>
+      <option value="ok">정상만</option>
+      <option value="warn">이상함만</option>
+      <option value="bad">문제있음만</option>
+    </select>
+  </div>
+
+  <div class="feed" id="feed">
+    <h2>최근 업데이트</h2>
+    <div id="feedBody" class="feed-empty">불러오는 중…</div>
+  </div>
+
+  <div class="newitem-bar" id="newitemBar"></div>
+  <main id="checklist"></main>
+
+  <footer>
+    <span>Mono Control↔Core <span class="mono">:7700</span> · MATP <span class="mono">:7701</span></span>
+    <span class="mono">문서 기준: 03-구현현황.md · 04-UIUX기획서.md (2026-09-06 감사)</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var AREA_LABEL = {
+    AUDIO:"오디오 청음", INSTALL:"설치 · 최초 실행", ONBOARDING:"온보딩",
+    HOME_LIBRARY:"Home · 라이브러리", NOWPLAYING:"Now Playing", LOUNGE:"라운지",
+    SETTINGS:"설정", VISUAL:"화면 육안 검증", NEW_FEATURE:"신규 기능"
+  };
+  var AREA_ORDER = ["AUDIO","INSTALL","ONBOARDING","HOME_LIBRARY","NOWPLAYING","LOUNGE","SETTINGS","VISUAL","NEW_FEATURE"];
+  var ADDABLE_AREAS = ["INSTALL","ONBOARDING","HOME_LIBRARY","NOWPLAYING","LOUNGE","SETTINGS","VISUAL","NEW_FEATURE"];
+  var STATUS_LABEL = {ok:"정상", warn:"이상함", bad:"문제있음", unknown:"미확인"};
+  var ROLE_LABEL = {audio:"정민석", devir:"DEvir"};
+  var POLL_MS = 8000;
+
+  var state = {
+    role: localStorage.getItem("mono-qa-role") || "audio",
+    author: localStorage.getItem("mono-qa-author") || "",
+    search: "",
+    statusFilter: "all",
+    items: [],
+    feedbackByItem: {},
+    mediaByItem: {},
+    recent: [],
+    apiReady: false,
+    draft: {},
+    pending: {items:[], feedback:[], media:[]}
+  };
+
+  // Blob storage is eventually consistent: a fresh write can take a couple seconds to
+  // show up in a subsequent read. Keep unconfirmed submissions here so the submitter sees
+  // them instantly and they don't flicker away before the server catches up.
+  function mergePending(kind, serverArr, idKey){
+    var serverIds = {};
+    serverArr.forEach(function(e){ serverIds[e[idKey]] = true; });
+    state.pending[kind] = state.pending[kind].filter(function(e){ return !serverIds[e[idKey]]; });
+    return serverArr.concat(state.pending[kind]);
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; });
+  }
+  function fmtTime(iso){
+    try{ var d=new Date(iso); return d.toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+    catch(e){ return ""; }
+  }
+  function safeUrl(u){
+    try{ var p = new URL(u); if(p.protocol==="http:"||p.protocol==="https:") return p.href; }catch(e){}
+    return null;
+  }
+  function groupByDesc(arr, key, timeKey){
+    var byKey = {};
+    arr.slice().sort(function(a,b){ return new Date(b[timeKey]) - new Date(a[timeKey]); })
+      .forEach(function(f){ (byKey[f[key]] = byKey[f[key]] || []).push(f); });
+    return byKey;
+  }
+
+  function latestStatus(itemId){
+    var arr = state.feedbackByItem[itemId];
+    if(!arr || !arr.length) return "unknown";
+    return arr[0].status || "unknown";
+  }
+  function itemsForRole(role){ return state.items.filter(function(it){ return it.forRoles.indexOf(role) !== -1; }); }
+  function filteredItems(){
+    var q = state.search.trim().toLowerCase();
+    return itemsForRole(state.role).filter(function(it){
+      if(state.statusFilter !== "all" && latestStatus(it.id) !== state.statusFilter) return false;
+      if(!q) return true;
+      return (it.title + " " + it.detail).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  function renderRoleSwitch(){
+    document.getElementById("btnRoleAudio").className = state.role==="audio" ? "active":"";
+    document.getElementById("btnRoleDevir").className = state.role==="devir" ? "active":"";
+    document.getElementById("roleDesc").textContent = state.role==="audio"
+      ? "청음 · 체감 테스트 위주 — 정민석 전용 뷰. 항목은 고정, 음원 자료는 자유롭게 추가"
+      : "설치부터 라운지까지 앱 전체 QA + 청음 테스트 — DEvir 팀 뷰. 새 항목 추가 가능";
+    document.getElementById("newitemBar").style.display = state.role==="devir" ? "block" : "none";
+  }
+
+  function renderStats(){
+    var items = itemsForRole(state.role);
+    var counts = {ok:0,warn:0,bad:0,unknown:0};
+    items.forEach(function(it){ counts[latestStatus(it.id)]++; });
+    var tiles = [["total","전체",items.length],["ok",STATUS_LABEL.ok,counts.ok],["warn",STATUS_LABEL.warn,counts.warn],["bad",STATUS_LABEL.bad,counts.bad],["unknown",STATUS_LABEL.unknown,counts.unknown]];
+    document.getElementById("stats").innerHTML = tiles.map(function(t){
+      return '<div class="stat" data-k="'+t[0]+'"><div class="stat-num">'+t[2]+'</div><div class="stat-label">'+t[1]+'</div></div>';
+    }).join("");
+  }
+
+  function renderFeed(){
+    var body = document.getElementById("feedBody");
+    if(!state.recent.length){ body.className="feed-empty"; body.textContent="아직 기록이 없습니다."; return; }
+    body.className = "";
+    body.innerHTML = state.recent.slice(0,6).map(function(f){
+      var item = state.items.find(function(it){ return it.id===f.itemId; });
+      return '<div class="feed-row">'+
+        '<span class="pill '+f.status+'">'+STATUS_LABEL[f.status]+'</span>'+
+        '<span class="tag role mono">'+(ROLE_LABEL[f.role]||f.role)+'</span>'+
+        '<span>'+escapeHtml(f.author||"익명")+' · '+escapeHtml(item?item.title:f.itemId)+'</span>'+
+        '<span class="feed-time mono">'+fmtTime(f.submittedAt)+'</span>'+
+      '</div>';
+    }).join("");
+  }
+
+  function mediaPanelHtml(it){
+    if(it.area !== "AUDIO") return "";
+    var list = state.mediaByItem[it.id] || [];
+    var rows = list.length ? list.map(function(m){
+      var safe = safeUrl(m.url);
+      return '<div class="media-row">'+
+        (safe ? '<a href="'+escapeHtml(safe)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(m.filename||"파일")+'</a>' : '<span>'+escapeHtml(m.filename||"파일")+' (링크 형식 오류)</span>')+
+        '<span class="media-meta">'+escapeHtml(m.note||"")+' · '+escapeHtml(m.uploader||"익명")+' · '+fmtTime(m.submittedAt)+'</span>'+
+      '</div>';
+    }).join("") : '<div class="media-empty">공유된 테스트 음원이 없습니다. 링크를 추가해 다른 사람도 같은 파일로 테스트할 수 있게 하세요.</div>';
+
+    return '<div class="media-panel">'+
+      '<div class="media-head">테스트 음원 <span class="tag mono">'+list.length+'</span> <button type="button" class="toggle-btn" data-media-toggle="'+it.id+'" style="margin-left:auto;">+ 링크 추가</button></div>'+
+      rows+
+      '<form class="media-form" id="mediaform-'+it.id+'" data-media-submit="'+it.id+'">'+
+        '<div class="media-form-row">'+
+          '<input type="text" name="filename" placeholder="파일명 (예: reference_24-96.flac)" required>'+
+          '<input type="text" name="url" placeholder="다운로드 링크 (드라이브/드롭박스 등)" required>'+
+        '</div>'+
+        '<div class="media-form-row">'+
+          '<input type="text" name="note" placeholder="스펙/메모 (예: 24bit 96kHz, 보컬 트랙)">'+
+          '<input type="text" name="uploader" placeholder="이름" value="'+escapeHtml(state.author)+'" required>'+
+        '</div>'+
+        '<button type="submit" class="media-form-submit" '+(state.apiReady?'':'disabled')+'>음원 링크 등록</button>'+
+      '</form>'+
+    '</div>';
+  }
+
+  function itemCardHtml(it){
+    var status = latestStatus(it.id);
+    var arr = state.feedbackByItem[it.id] || [];
+    var lastText = arr.length ? (fmtTime(arr[0].submittedAt)+" · "+escapeHtml(arr[0].author||"익명")) : "기록 없음";
+    var draftStatus = (state.draft[it.id]&&state.draft[it.id].status) || "ok";
+    var mediaOptions = it.area==="AUDIO" ? (state.mediaByItem[it.id]||[]) : [];
+
+    var tags = it.doc ? '<span class="tag mono">'+escapeHtml(it.doc)+'</span>' : '<span class="tag mono">직접 작성</span>';
+    if(it.flag) tags += '<span class="tag flag mono">'+escapeHtml(it.flag)+'</span>';
+    if(it.priority) tags += '<span class="tag p0 mono">우선</span>';
+    if(!it.fixed) tags += '<span class="tag mono">신규</span>';
+
+    var threadHtml = arr.length ? arr.map(function(f){
+      return '<div class="thread-entry">'+
+        '<div class="thread-entry-head">'+
+          '<span class="thread-entry-author"><span class="tag role mono">'+(ROLE_LABEL[f.role]||f.role)+'</span>'+escapeHtml(f.author||"익명")+'</span>'+
+          '<span class="pill '+f.status+'">'+STATUS_LABEL[f.status]+'</span>'+
+        '</div>'+
+        (f.note ? '<p class="thread-entry-note">'+escapeHtml(f.note)+'</p>' : '')+
+        (f.mediaLabel ? '<div class="thread-entry-media tag mono">사용 음원: '+escapeHtml(f.mediaLabel)+'</div>' : '')+
+        '<div class="thread-entry-time mono">'+fmtTime(f.submittedAt)+'</div>'+
+      '</div>';
+    }).join("") : '<div class="thread-empty">아직 남긴 기록이 없습니다. 첫 피드백을 남겨보세요.</div>';
+
+    var mediaSelectHtml = it.area==="AUDIO" ? (
+      '<select name="mediaLabel">'+
+        '<option value="">사용한 음원 선택 (선택)</option>'+
+        mediaOptions.map(function(m){ return '<option value="'+escapeHtml(m.filename)+'">'+escapeHtml(m.filename)+'</option>'; }).join("")+
+      '</select>'
+    ) : "";
+
+    return '<div class="item-card'+(it.priority?' priority':'')+'" data-item-id="'+it.id+'">'+
+      '<div class="item-head">'+
+        '<div><div class="item-tags">'+tags+'</div><h3 class="item-title">'+escapeHtml(it.title)+'</h3></div>'+
+        '<span class="pill '+status+'">'+STATUS_LABEL[status]+'</span>'+
+      '</div>'+
+      '<p class="item-detail">'+escapeHtml(it.detail)+'</p>'+
+      mediaPanelHtml(it)+
+      '<div class="item-meta-row">'+
+        '<span class="last-update">최근: '+lastText+'</span>'+
+        '<button type="button" class="toggle-btn" data-toggle="'+it.id+'">피드백 '+arr.length+'건 보기</button>'+
+      '</div>'+
+      '<div class="thread" id="thread-'+it.id+'">'+
+        threadHtml+
+        '<form class="qform" data-submit="'+it.id+'">'+
+          '<div class="qform-row">'+
+            '<input type="text" name="author" placeholder="이름" value="'+escapeHtml(state.author)+'" required>'+
+            '<div class="status-picker" data-picker="'+it.id+'">'+
+              '<button type="button" data-s="ok" class="'+(draftStatus==='ok'?'sel':'')+'">정상</button>'+
+              '<button type="button" data-s="warn" class="'+(draftStatus==='warn'?'sel':'')+'">이상함</button>'+
+              '<button type="button" data-s="bad" class="'+(draftStatus==='bad'?'sel':'')+'">문제있음</button>'+
+            '</div>'+
+          '</div>'+
+          (mediaSelectHtml ? '<div class="qform-row">'+mediaSelectHtml+'</div>' : '')+
+          '<textarea name="note" placeholder="들은 내용, 재현 방법, 사용 장비 등을 적어주세요"></textarea>'+
+          '<button type="submit" class="qform-submit" '+(state.apiReady?'':'disabled')+'>기록 남기기</button>'+
+        '</form>'+
+      '</div>'+
+    '</div>';
+  }
+
+  function renderNewItemBar(){
+    var el = document.getElementById("newitemBar");
+    if(state.role !== "devir"){ el.innerHTML=""; return; }
+    var wasOpen = !!document.getElementById("newitemForm") && document.getElementById("newitemForm").classList.contains("open");
+    el.innerHTML =
+      '<button type="button" class="newitem-toggle" id="newitemToggle">+ 새 QA 항목 추가 — 새 기능·UI가 생기면 여기서 바로 등록</button>'+
+      '<form class="newitem-form'+(wasOpen?' open':'')+'" id="newitemForm">'+
+        '<div class="newitem-row">'+
+          '<select name="area">'+ADDABLE_AREAS.map(function(a){ return '<option value="'+a+'">'+AREA_LABEL[a]+'</option>'; }).join("")+'</select>'+
+          '<input type="text" name="title" placeholder="항목 제목" required>'+
+        '</div>'+
+        '<textarea name="detail" placeholder="무엇을 어떻게 확인해야 하는지" required></textarea>'+
+        '<div class="newitem-row">'+
+          '<input type="text" name="doc" placeholder="참고 (선택, 예: 관련 PR/문서)">'+
+          '<input type="text" name="author" placeholder="작성자" value="'+escapeHtml(state.author)+'" required>'+
+        '</div>'+
+        '<button type="submit" class="newitem-submit" '+(state.apiReady?'':'disabled')+'>항목 추가</button>'+
+      '</form>';
+    document.getElementById("newitemToggle").addEventListener("click", function(){
+      document.getElementById("newitemForm").classList.toggle("open");
+    });
+    document.getElementById("newitemForm").addEventListener("submit", function(ev){
+      ev.preventDefault();
+      var f = ev.target;
+      var author = f.author.value.trim();
+      var title = f.title.value.trim();
+      var detail = f.detail.value.trim();
+      if(!author || !title || !detail) return;
+      localStorage.setItem("mono-qa-author", author); state.author = author;
+      postJson("/api/items", {area:f.area.value, title:title, detail:detail, doc:f.doc.value.trim(), author:author})
+        .then(function(res){
+          state.pending.items.push(res.item);
+          f.reset(); document.getElementById("newitemForm").classList.remove("open");
+          return loadState();
+        })
+        .catch(function(e){ alert("항목 추가 실패: "+e.message); });
+    });
+  }
+
+  function renderChecklist(){
+    var items = filteredItems();
+    var byArea = {};
+    items.forEach(function(it){ (byArea[it.area]=byArea[it.area]||[]).push(it); });
+    Object.keys(byArea).forEach(function(a){ byArea[a].sort(function(x,y){ return (x.order||0)-(y.order||0); }); });
+    var order = state.role==="audio" ? ["AUDIO"] : AREA_ORDER;
+    var html = order.filter(function(a){ return byArea[a] && byArea[a].length; }).map(function(area){
+      var note = area==="AUDIO" ? '<p class="section-note">고정 리스트입니다 — 새 항목은 DEvir 화면에서 추가하세요. 테스트 음원 링크는 자유롭게 추가할 수 있습니다.</p>' : "";
+      return '<section class="area-section"><h2 class="eyebrow">'+AREA_LABEL[area]+' <span class="count">'+byArea[area].length+'</span></h2>'+note+
+        '<div class="item-list">'+byArea[area].map(itemCardHtml).join("")+'</div></section>';
+    }).join("");
+    document.getElementById("checklist").innerHTML = html || '<p style="color:var(--muted)">'+(state.apiReady?"조건에 맞는 항목이 없습니다.":"불러오는 중…")+'</p>';
+    attachCardHandlers();
+  }
+
+  function attachCardHandlers(){
+    document.querySelectorAll("[data-toggle]").forEach(function(btn){
+      btn.addEventListener("click", function(){ document.getElementById("thread-"+btn.getAttribute("data-toggle")).classList.toggle("open"); });
+    });
+    document.querySelectorAll("[data-media-toggle]").forEach(function(btn){
+      btn.addEventListener("click", function(){ document.getElementById("mediaform-"+btn.getAttribute("data-media-toggle")).classList.toggle("open"); });
+    });
+    document.querySelectorAll("[data-picker]").forEach(function(picker){
+      picker.querySelectorAll("button").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = picker.getAttribute("data-picker");
+          state.draft[id] = {status:b.getAttribute("data-s")};
+          picker.querySelectorAll("button").forEach(function(x){ x.classList.remove("sel"); });
+          b.classList.add("sel");
+        });
+      });
+    });
+    document.querySelectorAll("[data-submit]").forEach(function(form){
+      form.addEventListener("submit", function(ev){
+        ev.preventDefault();
+        var id = form.getAttribute("data-submit");
+        var author = form.author.value.trim();
+        var note = form.note.value.trim();
+        var mediaLabel = form.mediaLabel ? form.mediaLabel.value : "";
+        var status = (state.draft[id]&&state.draft[id].status) || "ok";
+        if(!author) return;
+        var item = state.items.find(function(it){ return it.id===id; });
+        var submitBtn = form.querySelector(".qform-submit");
+        submitBtn.disabled = true;
+        localStorage.setItem("mono-qa-author", author); state.author = author;
+        postJson("/api/feedback", {itemId:id, area:item?item.area:"", role:state.role, author:author, status:status, note:note, mediaLabel:mediaLabel})
+          .then(function(res){
+            state.pending.feedback.push(res.entry);
+            form.note.value="";
+            return loadState();
+          })
+          .catch(function(e){ alert("기록 저장 실패: "+e.message); })
+          .then(function(){ submitBtn.disabled = !state.apiReady; });
+      });
+    });
+    document.querySelectorAll("[data-media-submit]").forEach(function(form){
+      form.addEventListener("submit", function(ev){
+        ev.preventDefault();
+        var itemId = form.getAttribute("data-media-submit");
+        var filename = form.filename.value.trim();
+        var url = form.url.value.trim();
+        var uploader = form.uploader.value.trim();
+        var note = form.note.value.trim();
+        if(!filename || !url || !uploader) return;
+        if(!safeUrl(url)){ alert("http(s) 링크만 등록할 수 있어요."); return; }
+        localStorage.setItem("mono-qa-author", uploader); state.author = uploader;
+        postJson("/api/media", {itemId:itemId, filename:filename, url:url, note:note, uploader:uploader})
+          .then(function(res){
+            state.pending.media.push(res.entry);
+            form.reset(); form.classList.remove("open");
+            return loadState();
+          })
+          .catch(function(e){ alert("음원 등록 실패: "+e.message); });
+      });
+    });
+  }
+
+  function renderAll(){ renderRoleSwitch(); renderStats(); renderFeed(); renderNewItemBar(); renderChecklist(); }
+
+  document.getElementById("btnRoleAudio").addEventListener("click", function(){ state.role="audio"; localStorage.setItem("mono-qa-role","audio"); renderAll(); });
+  document.getElementById("btnRoleDevir").addEventListener("click", function(){ state.role="devir"; localStorage.setItem("mono-qa-role","devir"); renderAll(); });
+  document.getElementById("searchInput").addEventListener("input", function(e){ state.search=e.target.value; renderChecklist(); });
+  document.getElementById("statusFilter").addEventListener("change", function(e){ state.statusFilter=e.target.value; renderChecklist(); });
+
+  function showBanner(msg){ document.getElementById("dbBanner").innerHTML = msg ? '<div class="db-banner">'+msg+'</div>' : ""; }
+
+  function postJson(url, body){
+    return fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)})
+      .then(function(r){ if(!r.ok) return r.json().then(function(e){ throw new Error(e.error||("HTTP "+r.status)); }); return r.json(); });
+  }
+
+  function loadState(){
+    return fetch("/api/state", {cache:"no-store"})
+      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(d){
+        state.items = mergePending("items", d.items || [], "id");
+        var feedback = mergePending("feedback", d.feedback || [], "id");
+        var media = mergePending("media", d.media || [], "id");
+        state.feedbackByItem = groupByDesc(feedback, "itemId", "submittedAt");
+        state.mediaByItem = groupByDesc(media, "itemId", "submittedAt");
+        state.recent = feedback.slice().sort(function(a,b){ return new Date(b.submittedAt)-new Date(a.submittedAt); });
+        state.apiReady = true;
+        showBanner("");
+        renderAll();
+      })
+      .catch(function(e){
+        state.apiReady = false;
+        showBanner("서버에 연결하지 못했습니다. 잠시 후 자동으로 다시 시도합니다. ("+e.message+")");
+        renderAll();
+      });
+  }
+
+  renderAll();
+  loadState();
+  setInterval(loadState, POLL_MS);
+})();
+</script>
+</body>
+</html>
