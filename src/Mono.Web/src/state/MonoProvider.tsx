@@ -199,11 +199,8 @@ export function MonoProvider({ children }: { children: ReactNode }) {
   /** 내가 들어와 있는 룸 id. room_state 는 내가 없는 룸의 것도 올 수 있다. */
   const myRoomRef = useRef<string | null>(null)
 
-  /** 그 방에 들어갈 때 낸 초대 코드. 초대 전용 방은 다시 들어갈 때도 코드를 확인한다. */
-  const myInviteRef = useRef<string | undefined>(undefined)
-
-  /** 한 번이라도 붙었는가. 첫 연결과 다시 붙은 것을 가른다. */
-  const wasOpenRef = useRef(false)
+  /** 다시 붙은 뒤 방에 다시 들어가는 중. 그 사이 오는 거절은 사용자에게 띄우지 않는다. */
+  const rejoiningRef = useRef(false)
 
   /**
    * 마지막 스냅샷의 거울. 명령 클로저가 최신 방 상태를 보려면 ref 여야 한다 —
@@ -310,15 +307,42 @@ export function MonoProvider({ children }: { children: ReactNode }) {
         }
 
         case MSG.error:
-          if (msg.error) setLastError(msg.error)
+          if (msg.error && !rejoiningRef.current) setLastError(msg.error)
           break
       }
     })
+
+    // 다시 붙었으면 있던 방에 다시 들어간다.
+    //
+    // Core 는 끊긴 연결을 먼저 알아채면 그 사람을 방에서 뺀다. 그래야 아무도 없는 방이 남지 않는다.
+    // peer id 는 비밀값으로 되찾지만 방의 멤버 자리는 되찾지 않는다. 다시 들어가지 않으면 방의 상태를
+    // 더는 받지 못하고 멈춘 화면이 남는다. 성공하면 오는 room_state 는 위의 핸들러가 받는다.
+    //
+    // 초대 코드는 마지막 스냅샷의 것을 낸다. 멤버는 모두 지금 코드를 받으므로, 코드가 바뀌었거나
+    // 끊긴 사이 호스트 자리가 남에게 넘어가 내가 호스트가 아니게 된 경우에도 들어갈 수 있다.
+    // 방이 사라졌으면(Core 재시작, 호스트가 닫음) 조용히 비운다. 다음에 곡을 틀 때 새 방을 만든다.
+    // 다시 끊겨서 실패한 것이면 그대로 둔다. 다음에 붙을 때 다시 들어간다.
+    client.onReconnected = () => {
+      const id = myRoomRef.current
+      if (!id) return
+      rejoiningRef.current = true
+      client
+        .request({ type: MSG.joinRoom, roomId: id, inviteCode: roomRef.current?.inviteCode ?? undefined }, MSG.roomState)
+        .catch(() => {
+          if (client.state !== "open" || myRoomRef.current !== id) return
+          myRoomRef.current = null
+          setRoom(null)
+        })
+        .finally(() => {
+          rejoiningRef.current = false
+        })
+    }
 
     client.connect()
     return () => {
       off()
       offState()
+      client.onReconnected = null
       client.close()
     }
   }, [client])
@@ -332,34 +356,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
     client.send({ type: MSG.history })
     client.send({ type: MSG.archives })
     client.send({ type: MSG.streamingAccounts })
-  }, [connection, client])
-
-  // 다시 붙었으면 있던 방에 다시 들어간다.
-  //
-  // Core 는 끊긴 연결을 먼저 알아채면 그 사람을 방에서 뺀다. 그래야 아무도 없는 방이 남지 않는다.
-  // peer id 는 비밀값으로 되찾지만 방의 멤버 자리는 되찾지 않는다. 그래서 화면이 다시 들어가지
-  // 않으면 방의 상태를 더는 받지 못하고, 멈춘 화면을 보게 된다. 그 사이에 방이 사라졌으면
-  // (Core 재시작, 호스트가 닫음) 비워 둔다. 다음에 곡을 틀 때 ensureRoom 이 새 방을 만든다.
-  useEffect(() => {
-    if (connection !== "open") return
-    if (!wasOpenRef.current) {
-      wasOpenRef.current = true
-      return
-    }
-    const id = myRoomRef.current
-    if (!id) return
-    client
-      .request({ type: MSG.joinRoom, roomId: id, inviteCode: myInviteRef.current }, MSG.roomState)
-      .then((res) => {
-        const snap = parseBody<RoomSnapshot>(res)
-        if (snap && myRoomRef.current === id) setRoom(snap)
-      })
-      .catch(() => {
-        if (myRoomRef.current !== id) return
-        myRoomRef.current = null
-        myInviteRef.current = undefined
-        setRoom(null)
-      })
   }, [connection, client])
 
   const albums = useMemo(
@@ -393,7 +389,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       const snap = parseBody<RoomSnapshot>(res)
       if (snap) {
         myRoomRef.current = snap.id
-        myInviteRef.current = undefined
         setRoom(snap)
         return snap.id
       }
@@ -435,7 +430,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (!snap) return null
           myRoomRef.current = snap.id
-          myInviteRef.current = undefined
           setRoom(snap)
           return snap.id
         } catch (err) {
@@ -464,7 +458,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (!snap) return null
           myRoomRef.current = snap.id
-          myInviteRef.current = undefined
           setRoom(snap)
           return snap.id
         } catch (err) {
@@ -500,7 +493,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (snap) {
             myRoomRef.current = snap.id
-            myInviteRef.current = inviteCode
             setRoom(snap)
           }
         } catch (err) {
@@ -512,7 +504,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
         if (!myRoomRef.current) return
         client.send({ type: MSG.leaveRoom, roomId: myRoomRef.current })
         myRoomRef.current = null
-        myInviteRef.current = undefined
         setRoom(null)
         client.send({ type: MSG.listRooms })
       },
