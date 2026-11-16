@@ -199,6 +199,12 @@ export function MonoProvider({ children }: { children: ReactNode }) {
   /** 내가 들어와 있는 룸 id. room_state 는 내가 없는 룸의 것도 올 수 있다. */
   const myRoomRef = useRef<string | null>(null)
 
+  /** 그 방에 들어갈 때 낸 초대 코드. 초대 전용 방은 다시 들어갈 때도 코드를 확인한다. */
+  const myInviteRef = useRef<string | undefined>(undefined)
+
+  /** 한 번이라도 붙었는가. 첫 연결과 다시 붙은 것을 가른다. */
+  const wasOpenRef = useRef(false)
+
   /**
    * 마지막 스냅샷의 거울. 명령 클로저가 최신 방 상태를 보려면 ref 여야 한다 —
    * room 을 직접 잡으면 방이 갱신될 때마다 명령 묶음이 통째로 다시 만들어진다.
@@ -328,6 +334,34 @@ export function MonoProvider({ children }: { children: ReactNode }) {
     client.send({ type: MSG.streamingAccounts })
   }, [connection, client])
 
+  // 다시 붙었으면 있던 방에 다시 들어간다.
+  //
+  // Core 는 끊긴 연결을 먼저 알아채면 그 사람을 방에서 뺀다. 그래야 아무도 없는 방이 남지 않는다.
+  // peer id 는 비밀값으로 되찾지만 방의 멤버 자리는 되찾지 않는다. 그래서 화면이 다시 들어가지
+  // 않으면 방의 상태를 더는 받지 못하고, 멈춘 화면을 보게 된다. 그 사이에 방이 사라졌으면
+  // (Core 재시작, 호스트가 닫음) 비워 둔다. 다음에 곡을 틀 때 ensureRoom 이 새 방을 만든다.
+  useEffect(() => {
+    if (connection !== "open") return
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true
+      return
+    }
+    const id = myRoomRef.current
+    if (!id) return
+    client
+      .request({ type: MSG.joinRoom, roomId: id, inviteCode: myInviteRef.current }, MSG.roomState)
+      .then((res) => {
+        const snap = parseBody<RoomSnapshot>(res)
+        if (snap && myRoomRef.current === id) setRoom(snap)
+      })
+      .catch(() => {
+        if (myRoomRef.current !== id) return
+        myRoomRef.current = null
+        myInviteRef.current = undefined
+        setRoom(null)
+      })
+  }, [connection, client])
+
   const albums = useMemo(
     () => groupIntoAlbums(catalog, room?.currentTrack?.id),
     [catalog, room?.currentTrack?.id],
@@ -359,6 +393,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       const snap = parseBody<RoomSnapshot>(res)
       if (snap) {
         myRoomRef.current = snap.id
+        myInviteRef.current = undefined
         setRoom(snap)
         return snap.id
       }
@@ -400,6 +435,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (!snap) return null
           myRoomRef.current = snap.id
+          myInviteRef.current = undefined
           setRoom(snap)
           return snap.id
         } catch (err) {
@@ -428,6 +464,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (!snap) return null
           myRoomRef.current = snap.id
+          myInviteRef.current = undefined
           setRoom(snap)
           return snap.id
         } catch (err) {
@@ -463,6 +500,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           const snap = parseBody<RoomSnapshot>(res)
           if (snap) {
             myRoomRef.current = snap.id
+            myInviteRef.current = inviteCode
             setRoom(snap)
           }
         } catch (err) {
@@ -474,6 +512,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
         if (!myRoomRef.current) return
         client.send({ type: MSG.leaveRoom, roomId: myRoomRef.current })
         myRoomRef.current = null
+        myInviteRef.current = undefined
         setRoom(null)
         client.send({ type: MSG.listRooms })
       },
