@@ -59,6 +59,19 @@ public class StreamingTokenStoreTests
     }
 
     [Fact]
+    public void APlainFileWithNoAccountsIsLeftAlone()
+    {
+        // 감쌀 비밀이 없으면 고쳐 쓸 이유도 없다. 고쳐 쓰면 모르는 필드가 사라진다.
+        var (catalog, path) = NewStore();
+        const string content = """{"country":"KR","accounts":[],"note":"kept"}""";
+        File.WriteAllText(path, content);
+
+        _ = new StreamingHub(catalog, path);
+
+        Assert.Equal(content, File.ReadAllText(path));
+    }
+
+    [Fact]
     public void AFileThatCannotBeUnwrappedMeansSigningInAgainNotACrash()
     {
         // 백업을 다른 PC 나 다른 사용자로 되살린 경우다. 풀 수 없으면 연결이 없는 상태로 뜬다.

@@ -31,11 +31,11 @@ public sealed class StreamingHub
         _storePath = storePath;
         _streamBaseUrl = (streamBaseUrl ?? "http://127.0.0.1:7702").TrimEnd('/');
         Load();
-        // 예전 평문 파일이었으면 계정이 하나도 없어도 감싼 파일로 바꿔 둔다.
+        // 예전 평문 파일에서 토큰을 읽었으면 감싼 파일로 바꿔 둔다.
         if (_rewrapAfterLoad) Save();
     }
 
-    /// <summary>읽은 파일이 감싸지 않은 평문이었다. 생성자가 감싸서 다시 쓴다.</summary>
+    /// <summary>토큰이 든 평문 파일을 읽었다. 생성자가 감싸서 다시 쓴다.</summary>
     private bool _rewrapAfterLoad;
 
     public bool HasLiveCredentials(StreamingProvider provider) => provider switch
@@ -725,12 +725,12 @@ public sealed class StreamingHub
         if (string.IsNullOrWhiteSpace(_storePath) || !File.Exists(_storePath)) return;
         try
         {
-            // 토큰은 이 사용자만 풀 수 있게 감싸 둔다(SecretFile). 예전 Mono 가 남긴 평문이면
-            // 읽은 뒤 바로 감싸서 다시 쓴다. 풀 수 없으면 연결이 없는 상태로 뜬다 — 다시 로그인하면 된다.
+            // 토큰은 이 사용자만 풀 수 있게 감싸 둔다(SecretFile). 예전 Mono 가 남긴 평문에 토큰이 있으면
+            // 읽은 뒤 감싸서 다시 쓴다. 토큰이 없으면 감쌀 것이 없으니 그대로 둔다.
+            // 풀 수 없으면 연결이 없는 상태로 뜬다 — 다시 로그인하면 된다.
             var (json, wasPlain) = SecretFile.Read(_storePath);
             if (json is null) return;
             using var doc = JsonDocument.Parse(json);
-            if (wasPlain) _rewrapAfterLoad = true;
             if (!doc.RootElement.TryGetProperty("accounts", out var accounts)) return;
             foreach (var el in accounts.EnumerateArray())
             {
@@ -747,6 +747,7 @@ public sealed class StreamingHub
                 if (el.TryGetProperty("country", out var c) && provider == StreamingProvider.Tidal)
                     _tidalCountry = c.GetString() ?? _tidalCountry;
                 Link(provider, token, name, refresh, exp, profile: null);
+                if (wasPlain) _rewrapAfterLoad = true;
             }
         }
         catch { /* corrupt store */ }
