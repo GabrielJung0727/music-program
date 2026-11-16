@@ -43,6 +43,13 @@ export class ControlClient {
   private secret: string | null = null
   displayName: string
 
+  /**
+   * 다시 붙었을 때 부른다. welcome 을 받은 직후, 끊긴 동안 쌓인 명령을 보내기 전이다.
+   * 방에 다시 들어가는 명령은 여기서 보내야 쌓인 명령보다 먼저 간다. Core 는 한 연결의
+   * 메시지를 순서대로 처리하므로, 쌓인 명령이 "멤버가 아님"으로 거절되지 않는다.
+   */
+  onReconnected: (() => void) | null = null
+
   constructor(displayName: string) {
     this.displayName = displayName
   }
@@ -85,9 +92,11 @@ export class ControlClient {
       }
 
       if (msg.type === MSG.welcome) {
+        const reconnected = this.peerId !== null
         this.peerId = msg.peerId ?? this.peerId
         this.secret = msg.secret ?? this.secret
         this.setState("open")
+        if (reconnected) this.onReconnected?.()
         const queued = this.outbox
         this.outbox = []
         for (const m of queued) this.raw(m)
