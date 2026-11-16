@@ -205,6 +205,17 @@ function AudioTab() {
         <Row title="배타 모드" desc="장치를 Mono 가 독점합니다. 윈도우 믹서를 거치지 않아 샘플레이트가 곡마다 그대로 맞춰집니다. 다른 앱의 소리는 나지 않습니다.">
           <Toggle label="배타 모드" value={audio?.exclusiveMode ?? true} onChange={(v) => { void apply({ exclusiveMode: v }) }} />
         </Row>
+        <Row title="다른 PC 의 출력 허용" desc="켜면 다른 PC 의 출력 워커와 Mono.Cli 가 이 Core 에 붙을 수 있습니다. 끄면 이 PC 에서만 받습니다. Mono 를 다시 시작하면 적용됩니다.">
+          <Toggle
+            label="다른 PC 의 출력 허용"
+            value={app.setup?.allowRemoteOutputs === true}
+            onChange={(v) => {
+              app.setSetup({ ...(app.setup ?? { completed: true }), allowRemoteOutputs: v })
+              void saveSetup({ allowRemoteOutputs: v })
+              app.toast("저장했습니다. Mono 를 다시 시작하면 적용됩니다")
+            }}
+          />
+        </Row>
         <Row
           title="버퍼 크기"
           desc={<>작을수록 반응이 빠르고, 클수록 끊김에 강합니다. 지금 <span className="mono">{buffer}</span> 샘플 ≈ <span className="mono">{((buffer / 44100) * 1000).toFixed(1)} ms</span></>}

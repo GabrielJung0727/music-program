@@ -29,6 +29,8 @@ export interface SetupState {
   theme?: "light" | "dark"
   folders?: string[]
   autoWatch?: boolean
+  /** Core 의 7700 · 7701 을 LAN 에 열지. Core 가 뜰 때 읽는다(NetworkExposure.cs). */
+  allowRemoteOutputs?: boolean
   audio?: AudioSetup
   profile?: ProfileSetup
   savedAt?: string
