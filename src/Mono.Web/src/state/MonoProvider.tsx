@@ -27,7 +27,6 @@ import {
   type RoomListing,
   type RoomSnapshot,
 } from "../lib/protocol"
-import { groupIntoAlbums, type LiveAlbum } from "../lib/adapters"
 import { clearDiscordNowPlaying, setDiscordNowPlaying } from "../lib/shell"
 
 /** Core 는 hello 의 displayName 을 멤버 목록·아카이브 참가자에 그대로 쓴다. */
@@ -48,7 +47,6 @@ export interface MonoState {
 
   /** Core 전체 카탈로그. scan_library·스트리밍 연동 때마다 Core 가 다시 밀어준다. */
   catalog: CatalogTrack[]
-  albums: LiveAlbum[]
   catalogLoaded: boolean
 
   /** 지금 들어와 있는 룸. 솔로 재생도 Core 에서는 룸 하나다. */
@@ -357,11 +355,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
     client.send({ type: MSG.archives })
     client.send({ type: MSG.streamingAccounts })
   }, [connection, client])
-
-  const albums = useMemo(
-    () => groupIntoAlbums(catalog, room?.currentTrack?.id),
-    [catalog, room?.currentTrack?.id],
-  )
 
   // ── 명령 ──────────────────────────────────────────────────────────────────
 
@@ -723,7 +716,6 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       peerId,
       displayName,
       catalog,
-      albums,
       catalogLoaded,
       room,
       rooms,
@@ -734,7 +726,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       streamingAccounts,
       lastError,
     }),
-    [connection, peerId, displayName, catalog, albums, catalogLoaded, room, rooms, folders, playlists, history, archives, streamingAccounts, lastError],
+    [connection, peerId, displayName, catalog, catalogLoaded, room, rooms, folders, playlists, history, archives, streamingAccounts, lastError],
   )
 
   return (
