@@ -111,7 +111,8 @@ public class TrackIdentityTests
     [Fact]
     public void AMovedFileWithoutATrackNumberGetsANewId()
     {
-        // 태그가 하나라도 비어 있으면 무엇과 같은 곡인지 말할 근거가 모자란다. 붙이지 않는다.
+        // 태그가 하나라도 비어 있으면 태그로는 무엇과 같은 곡인지 말할 근거가 모자란다.
+        // 파일 이름까지 바뀌었으면 붙이지 않는다(이름이 그대로인 경우는 아래 FolderRename 테스트).
         var dir = NewDir();
         var lib = Path.Combine(dir, "lib");
         var old = Tagged(Path.Combine(lib, "A", "take.wav"), "Take", "Album A", 0);
@@ -167,5 +168,76 @@ public class TrackIdentityTests
 
         Assert.Equal(id, IdAt(second, original));
         Assert.NotEqual(id, IdAt(second, copy));
+    }
+
+    [Fact]
+    public void AFolderRenameKeepsTheIdsOfFilesWithoutFullTags()
+    {
+        // 싱글이나 직접 뜬 파일은 트랙 번호가 없는 일이 흔하다. 폴더 이름만 바뀌었는데 새 곡이 되면
+        // 기록과 플레이리스트가 재생할 수 없는 옛 줄에 남는다. 파일 이름이 같고 옛 파일이 사라졌으면 잇는다 — 예전 동작이다.
+        var dir = NewDir();
+        var lib = Path.Combine(dir, "lib");
+        var old = Tagged(Path.Combine(lib, "Singles", "Some Song.wav"), null, null, 0);
+        var (first, firstScanner) = Start(dir);
+        firstScanner.Scan(lib);
+        var id = IdAt(first, old);
+
+        Directory.Move(Path.Combine(lib, "Singles"), Path.Combine(lib, "Singles 2024"));
+        var renamed = Path.Combine(lib, "Singles 2024", "Some Song.wav");
+        var (second, secondScanner) = Start(dir);
+        secondScanner.Scan(lib);
+
+        Assert.Equal(id, IdAt(second, renamed));
+        Assert.Single(second.Tracks.Values, t => t.Title == "Some Song");
+    }
+
+    [Fact]
+    public void UntaggedTwinsThatBothExistStayTwoTracks()
+    {
+        // 이름으로 잇는 것은 옛 파일이 사라졌을 때뿐이다. 둘 다 살아 있으면 각자 곡이다.
+        var dir = NewDir();
+        var lib = Path.Combine(dir, "lib");
+        var a = Tagged(Path.Combine(lib, "Rips A", "Track 01.wav"), null, null, 0);
+        var (first, firstScanner) = Start(dir);
+        firstScanner.Scan(lib);
+        var b = Tagged(Path.Combine(lib, "Rips B", "Track 01.wav"), null, null, 0);
+        var (second, secondScanner) = Start(dir);
+        secondScanner.Scan(lib);
+
+        Assert.NotEqual(IdAt(second, a), IdAt(second, b));
+    }
+
+    [Fact]
+    public void TwoScansAtOnceGiveEachFileOneTrack()
+    {
+        // 시작할 때 · 30분마다 · 설정의 "다시 스캔" · 폴더 추가가 겹칠 수 있다.
+        var dir = NewDir();
+        var lib = Path.Combine(dir, "lib");
+        Directory.CreateDirectory(lib);
+        for (var i = 0; i < 200; i++) TinyWav(Path.Combine(lib, $"song-{i:000}.wav"));
+        var (catalog, scanner) = Start(dir);
+
+        var a = Task.Run(() => scanner.Scan(lib));
+        var b = Task.Run(() => scanner.Scan(lib));
+        Task.WaitAll(a, b);
+
+        // 새 카탈로그에는 경로 없는 기본 곡이 들어 있다. 이 라이브러리의 파일만 센다.
+        var perPath = catalog.Tracks.Values
+            .Where(t => t.LocalPath is not null && t.LocalPath.StartsWith(lib, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(t => t.LocalPath, StringComparer.OrdinalIgnoreCase).ToList();
+        Assert.Equal(200, perPath.Count);
+        Assert.All(perPath, g => Assert.Single(g));
+    }
+
+    /// <summary>스캔 동시성 시험용 아주 짧은 무음 WAV. 200개를 만들어도 몇 MB 를 넘지 않는다.</summary>
+    private static void TinyWav(string path)
+    {
+        const int rate = 8000, channels = 1, bits = 16, frames = 80;
+        var dataLen = frames * channels * (bits / 8);
+        using var w = new BinaryWriter(File.Create(path));
+        w.Write("RIFF"u8.ToArray()); w.Write(36 + dataLen); w.Write("WAVE"u8.ToArray());
+        w.Write("fmt "u8.ToArray()); w.Write(16); w.Write((short)1); w.Write((short)channels);
+        w.Write(rate); w.Write(rate * channels * (bits / 8)); w.Write((short)(channels * (bits / 8))); w.Write((short)bits);
+        w.Write("data"u8.ToArray()); w.Write(dataLen); w.Write(new byte[dataLen]);
     }
 }

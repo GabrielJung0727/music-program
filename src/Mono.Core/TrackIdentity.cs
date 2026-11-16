@@ -13,8 +13,10 @@ namespace Mono.Core;
 ///
 /// 1. 같은 경로의 곡이 이미 있으면 그 id.
 /// 2. 없으면, 파일이 사라진 곡 중 태그(앨범 · 트랙 번호 · 제목 · 길이)가 같은 곡이 <b>꼭 하나</b>일 때 그 id 를 이어 준다.
-///    파일을 옮기거나 이름을 바꾼 경우다. 태그가 비었거나 후보가 둘 이상이면 잇지 않는다 — 틀린 곡에 붙으면 되돌릴 수 없다.
+///    파일을 옮기거나 이름을 바꾼 경우다. 후보가 둘 이상이면 잇지 않는다 — 틀린 곡에 붙으면 되돌릴 수 없다.
 ///    디스크 번호는 곡 모델에 없어서 보지 않는다. 위 넷이 같고 디스크만 다른 곡은 드물다.
+///    태그가 덜 달린 파일(싱글, 직접 뜬 파일)은 태그로 알아볼 수 없다. 그래서 예전 이름 기반 id 의 곡이 사라졌고
+///    파일 이름까지 같으면 그 id 를 잇는다. 폴더 이름만 바뀐 경우다 — 예전 동작과 같다.
 /// 3. 둘 다 아니면 새 id. 예전과 같은 이름 기반 id 가 비어 있으면 그것을 쓴다 — 겹치지 않는 곡은 예전 id 를 그대로 가져서
 ///    이미 쌓인 기록이 맞는다. 비어 있지 않으면 경로에서 뽑은 짧은 해시를 붙인다.
 ///
@@ -32,13 +34,16 @@ internal sealed class TrackIdentity
     private readonly Dictionary<string, string> _byPath = new(PathComparer);
     private readonly HashSet<string> _issued = new(StringComparer.Ordinal);
 
+    /// <summary>이 스캔에서 다른 파일이 이어 받은 곡 id. 한 곡은 한 파일에만 이어 준다.</summary>
+    private readonly HashSet<string> _claimed = new(StringComparer.Ordinal);
+
     /// <summary>파일이 사라진 로컬 곡. 경로로 못 찾은 파일이 처음 나올 때 한 번 만든다 — 바뀐 게 없는 재스캔은 이 비용을 치르지 않는다.</summary>
     private List<Track>? _missing;
 
     public TrackIdentity(CatalogStore catalog)
     {
         _catalog = catalog;
-        foreach (var track in catalog.Tracks.Values.ToList())
+        foreach (var track in catalog.TrackSnapshot())
         {
             if (track.Source == StreamingProvider.Local && !string.IsNullOrWhiteSpace(track.LocalPath))
                 _byPath.TryAdd(Normalize(track.LocalPath), track.Id);
@@ -58,22 +63,23 @@ internal sealed class TrackIdentity
         var path = Normalize(file);
         if (_byPath.TryGetValue(path, out var known)) return known;
 
-        var id = (tags is { Complete: true } t ? Reattach(t) : null) ?? Issue(file, path);
+        var id = (tags is { Complete: true } t ? Reattach(t) : ReclaimByName(file)) ?? Issue(file, path);
         _byPath[path] = id;
         _issued.Add(id);
         return id;
     }
 
+    private List<Track> Missing() => _missing ??= _catalog.TrackSnapshot()
+        .Where(t => t.Source == StreamingProvider.Local
+                    && !string.IsNullOrWhiteSpace(t.LocalPath)
+                    && !File.Exists(t.LocalPath))
+        .ToList();
+
     private string? Reattach(Tags tags)
     {
-        _missing ??= _catalog.Tracks.Values
-            .Where(t => t.Source == StreamingProvider.Local
-                        && !string.IsNullOrWhiteSpace(t.LocalPath)
-                        && !File.Exists(t.LocalPath))
-            .ToList();
-
-        var matches = _missing.Where(t =>
-                string.Equals(t.AlbumId, tags.AlbumId, StringComparison.Ordinal)
+        var matches = Missing().Where(t =>
+                !_claimed.Contains(t.Id)
+                && string.Equals(t.AlbumId, tags.AlbumId, StringComparison.Ordinal)
                 && t.TrackNumber == tags.TrackNumber
                 && string.Equals(t.Title, tags.Title, StringComparison.OrdinalIgnoreCase)
                 && Math.Abs(t.DurationMs - tags.DurationMs) <= DurationToleranceMs)
@@ -82,13 +88,35 @@ internal sealed class TrackIdentity
         if (matches.Count != 1) return null;
 
         // 한 곡은 한 파일에만 이어 준다. 같은 태그의 두 번째 파일은 새 곡이 된다.
-        _missing.Remove(matches[0]);
+        _claimed.Add(matches[0].Id);
         return matches[0].Id;
     }
 
+    /// <summary>
+    /// 태그로 알아볼 수 없는 파일. 예전 이름 기반 id 의 곡이 사라졌고 파일 이름이 같으면 그 id 를 잇는다.
+    /// 후보는 그 id 하나뿐이라 고를 일이 없다.
+    /// </summary>
+    private string? ReclaimByName(string file)
+    {
+        var legacy = LegacyId(file);
+        if (_claimed.Contains(legacy) || _issued.Contains(legacy)) return null;
+        if (!_catalog.Tracks.TryGetValue(legacy, out var track)) return null;
+        if (track.Source != StreamingProvider.Local || string.IsNullOrWhiteSpace(track.LocalPath)) return null;
+        if (!string.Equals(Path.GetFileName(track.LocalPath), Path.GetFileName(file), PathComparison)) return null;
+        if (File.Exists(track.LocalPath)) return null;
+
+        _claimed.Add(legacy);
+        return legacy;
+    }
+
+    private static string LegacyId(string file) => "tr-" + Slug(Path.GetFileNameWithoutExtension(file));
+
+    private static readonly StringComparison PathComparison =
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
     private string Issue(string file, string path)
     {
-        var legacy = "tr-" + Slug(Path.GetFileNameWithoutExtension(file));
+        var legacy = LegacyId(file);
         if (IsFree(legacy)) return legacy;
 
         var hashed = legacy + "-" + ShortHash(path);

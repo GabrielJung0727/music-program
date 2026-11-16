@@ -23,7 +23,18 @@ public sealed class LibraryScanner
     public DateTimeOffset? LastScan { get; private set; }
     public int LastCount { get; private set; }
 
+    /// <summary>
+    /// 스캔은 한 번에 하나만 돈다. 시작할 때 · 30분마다 · 설정의 "다시 스캔" · 폴더 추가가 겹칠 수 있는데,
+    /// 둘이 같이 돌면 서로 상대가 막 넣은 곡을 모른 채 같은 파일에 id 를 하나씩 더 발급한다(TrackIdentity).
+    /// </summary>
+    private readonly object _scanGate = new();
+
     public int Scan(string root)
+    {
+        lock (_scanGate) return ScanLocked(root);
+    }
+
+    private int ScanLocked(string root)
     {
         // 없는 폴더를 만들지 않는다. 이 경로는 화면에서 받은 문자열일 수 있고,
         // 스캔 명령 하나로 아무 곳에나 폴더가 생기면 안 된다.
@@ -67,11 +78,16 @@ public sealed class LibraryScanner
     /// </summary>
     public int ScanAll(IEnumerable<string> roots)
     {
+        lock (_scanGate) return ScanAllLocked(roots);
+    }
+
+    private int ScanAllLocked(IEnumerable<string> roots)
+    {
         var total = 0;
         foreach (var root in roots.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
         {
             if (!Directory.Exists(root)) continue;
-            total += Scan(root);
+            total += ScanLocked(root);
         }
 
         LastScan = DateTimeOffset.UtcNow;

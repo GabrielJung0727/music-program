@@ -44,6 +44,12 @@ public sealed class CatalogStore : IDisposable
     }
 
     public IReadOnlyDictionary<string, Track> Tracks { get { lock (_gate) return _tracks; } }
+
+    /// <summary>
+    /// 지금 곡 목록의 사본. <see cref="Tracks"/> 는 살아 있는 사전이라, 다른 쪽이 쓰는 동안 훑으면
+    /// "컬렉션이 바뀌었다" 예외가 난다. 처음부터 끝까지 훑을 때는 이것을 쓴다.
+    /// </summary>
+    public List<Track> TrackSnapshot() { lock (_gate) return _tracks.Values.ToList(); }
     public IReadOnlyDictionary<string, Album> Albums { get { lock (_gate) return _albums; } }
     public IReadOnlyDictionary<string, Artist> Artists { get { lock (_gate) return _artists; } }
 
