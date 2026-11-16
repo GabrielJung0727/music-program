@@ -1,7 +1,9 @@
 # Mono — Technical Architecture
 
 > **Revision:** 2026-09-13  
-> **Stack:** React 19 · TypeScript 5.7 · Vite 8 · Tailwind CSS v4
+> **Stack:** React 19 · TypeScript 5.7 · Vite 8 · 일반 CSS(`src/styles`, 토큰은 `tokens.css`)
+>
+> **주의(2026-11-17):** 화면 부분(컴포넌트 · Tailwind 클래스)은 이전 화면 `web-v1` 태그 기준이다. 지금 화면의 규칙은 [`../DESIGN.md`](../DESIGN.md).
 
 ---
 

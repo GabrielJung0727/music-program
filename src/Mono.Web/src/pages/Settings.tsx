@@ -7,8 +7,8 @@ import { useApp, type SettingsTab } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { MSG } from "../lib/protocol"
 import {
-  applyUpdate, checkForUpdate, discordActivityStatus, hasShell, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
-  restartOutput, setDiscordActivityEnabled, setDiscordApplicationId, shell, useOutputStatus, type AudioDeviceListing, type UpdateStatus,
+  applyUpdate, checkForUpdate, closeToTrayStatus, discordActivityStatus, hasShell, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
+  restartOutput, setCloseToTray, setDiscordActivityEnabled, setDiscordApplicationId, shell, useOutputStatus, type AudioDeviceListing, type UpdateStatus,
 } from "../lib/shell"
 import { clearSetup, saveSetup, startConfiguredOutput, type AudioSetup } from "../lib/setup"
 import { selectDsp, toggleDsp } from "../lib/dsp"
@@ -459,10 +459,13 @@ function GeneralTab() {
   const [percent, setPercent] = useState(0)
   const [discord, setDiscord] = useState<{ enabled: boolean; hasAppId: boolean } | null>(null)
   const [appId, setAppId] = useState("")
+  // 창의 닫기(X)가 트레이로 숨기는가. null 이면 셸이 없다(브라우저).
+  const [closeToTray, setCloseToTrayState] = useState<boolean | null>(null)
 
   useEffect(() => {
     void shell()?.app.version().then((v) => setVersion(v.version)).catch(() => {})
     void discordActivityStatus().then((s) => { if (s) setDiscord({ enabled: s.enabled, hasAppId: s.hasAppId }) })
+    void closeToTrayStatus().then(setCloseToTrayState)
     return onUpdateProgress(setPercent)
   }, [])
 
@@ -512,6 +515,27 @@ function GeneralTab() {
             <button className={app.theme === "dark" ? "is-on" : ""} onClick={() => app.setTheme("dark")}><Moon size={14} />어둡게</button>
             <button className={app.theme === "light" ? "is-on" : ""} onClick={() => app.setTheme("light")}><Sun size={14} />밝게</button>
           </div>
+        </Row>
+      </Group>
+
+      <Group title="창" note={closeToTray === null ? "창 동작은 Mono 데스크톱 앱에서만 바꿀 수 있습니다." : undefined}>
+        <Row
+          title="창을 닫으면 트레이로 숨기기"
+          desc={closeToTray
+            ? "닫기(X)를 눌러도 Mono 가 트레이에서 계속 실행되고 음악도 이어집니다. 완전히 끄려면 트레이 아이콘의 '종료'를 누르세요."
+            : "닫기(X)를 누르면 Mono 가 완전히 종료되고 소리도 멈춥니다."}
+        >
+          <Toggle
+            label="창을 닫으면 트레이로 숨기기"
+            value={closeToTray ?? false}
+            disabled={closeToTray === null}
+            onChange={(v) => {
+              setCloseToTrayState(v)
+              void setCloseToTray(v).then((saved) => {
+                if (saved === null) { setCloseToTrayState(!v); app.toast("설정을 저장하지 못했습니다", true) }
+              })
+            }}
+          />
         </Row>
       </Group>
 

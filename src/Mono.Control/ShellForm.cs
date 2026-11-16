@@ -258,6 +258,8 @@ public sealed class ShellForm : Form
               logPath: () => call('app.logPath'),
               quit: () => call('app.quit'),
               minimizeToTray: () => call('app.minimizeToTray'),
+              closeToTray: () => call('app.closeToTray'),
+              setCloseToTray: (enabled) => call('app.setCloseToTray', { enabled }),
             },
             discord: {
               set: (payload) => call('discord.set', payload),
@@ -405,6 +407,16 @@ public sealed class ShellForm : Form
                 Hide();
                 return true;
 
+            case "app.closeToTray":
+                return new { enabled = WindowClose.ParseSetting(Prefs.Get(WindowClose.PrefKey, "0")) };
+
+            case "app.setCloseToTray":
+            {
+                var on = msg.TryGetProperty("enabled", out var en) && en.ValueKind == JsonValueKind.True;
+                Prefs.Set(WindowClose.PrefKey, on ? "1" : "0");
+                return new { enabled = on };
+            }
+
             case "app.quit":
                 BeginInvoke(QuitFromTray);
                 return true;
@@ -532,8 +544,9 @@ public sealed class ShellForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        // X 는 트레이로 내린다. 종료는 트레이 메뉴나 앱 안에서.
-        if (!_quitting && e.CloseReason == CloseReason.UserClosing)
+        // X 는 Mono 를 끝낸다. 설정에서 "창을 닫으면 트레이로 숨기기"를 켠 사람만 트레이로 내린다(WindowClose).
+        var closeToTray = WindowClose.ParseSetting(Prefs.Get(WindowClose.PrefKey, "0"));
+        if (WindowClose.HideToTray(e.CloseReason == CloseReason.UserClosing, _quitting, closeToTray))
         {
             e.Cancel = true;
             Hide();

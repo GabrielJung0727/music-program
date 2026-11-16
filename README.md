@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <sub>새 Control 화면(<a href="redesign/"><code>redesign/</code></a>). 이식 작업 중이며, 화면의 앨범과 사용자는 모의 데이터입니다.</sub>
+  <sub>Control 화면(<a href="src/Mono.Web/"><code>src/Mono.Web</code></a>). 캡처의 앨범과 사용자는 모의 데이터입니다.</sub>
 </p>
 
 <br>
@@ -61,7 +61,7 @@
       <img src="docs/assets/readme/41-light-album.jpg" alt="밝은 테마의 앨범 화면">
       <h3>두 가지 테마</h3>
       섀시는 무채색이고 색은 앨범 커버에서 나옵니다.
-      규칙은 <a href="redesign/DESIGN.md"><code>redesign/DESIGN.md</code></a> 한 곳에 있습니다.
+      규칙은 <a href="src/Mono.Web/DESIGN.md"><code>src/Mono.Web/DESIGN.md</code></a> 한 곳에 있습니다.
     </td>
   </tr>
 </table>
@@ -107,7 +107,6 @@ src/Mono.Control   WebView2 창 + Core · Output 프로세스 관리 + 트레이
 src/Mono.Output    오디오 출력 워커
 src/Mono.Web       Control 화면 (React). vite build → src/Mono.Core/wwwroot
 src/Mono.Cli       개발용 CLI
-redesign/          새 Control 화면. 이식 전
 ```
 
 화면은 `/ws/control` WebSocket 으로 TCP 7700 과 같은 `MonoMessage` 규약을 씁니다.
@@ -144,20 +143,20 @@ cd src/Mono.Web; npm run dev          # http://localhost:5273
 </details>
 
 <details>
-<summary><b>새 화면(<code>redesign/</code>)을 볼 때</b></summary>
+<summary><b>Core 없이 화면만 볼 때</b></summary>
 
 <br>
 
-Core 없이 모의 서버로 띄울 수 있습니다.
+모의 서버로 띄울 수 있습니다.
 
 ```powershell
-cd redesign; npm install
-npm run mock                          # 모의 Core, http://127.0.0.1:7802
-npm run dev                           # http://127.0.0.1:5373
-npm run capture                       # 창을 띄우지 않고 screenshots/ 에 캡처
+cd src/Mono.Web; npm install
+npm run mock                                         # 모의 Core, http://127.0.0.1:7802
+$env:CORE = "http://127.0.0.1:7802"; npm run dev     # http://localhost:5273
+npm run capture                                      # 창을 띄우지 않고 screenshots/ 에 캡처
 ```
 
-실제 Core 에 붙일 때는 `$env:CORE = "http://127.0.0.1:7702"; npm run dev`.
+자세한 것은 [`src/Mono.Web/README.md`](src/Mono.Web/README.md).
 
 </details>
 
@@ -243,14 +242,15 @@ Core 에는 로그인이 없습니다. 누가 말을 거는지는 요청과 연�
 
 ## 지금 상태
 
-2026-11-16 기준입니다. 이어서 할 일과 순서는 [`redesign/HANDOFF.md`](redesign/HANDOFF.md) 에 있습니다.
+2026-11-17 기준입니다. 이어서 할 일과 순서는 [`docs/08-인수인계.md`](docs/08-인수인계.md) 에 있습니다.
 
 | 항목 | 상태 |
 | --- | --- |
-| 출시 버전 | 0.5.9.3. 화면은 `src/Mono.Web` ([변경 내역](CHANGELOG.md)) |
-| 새 Control 화면 | `redesign/` 에 있습니다. 모의 Core 로만 확인했고 `src/Mono.Web` 에는 아직 이식하지 않았습니다 |
-| Core 접속 강화 | 코드에 반영했습니다. 빌드는 통과했고 테스트는 아직 돌리지 못했습니다 |
-| 남은 과제 | 계정 체계, 7701 인증, 토큰 저장, 릴리스 서명, 곡 id 체계, .NET 10 |
+| 출시 버전 | 0.5.9.3 ([변경 내역](CHANGELOG.md)). 그 뒤의 변경은 아직 릴리스하지 않았습니다 |
+| Control 화면 | 새 화면을 `src/Mono.Web` 에 옮겨 심었습니다. 실제 Core 에서 브라우저로 확인했고, 데스크톱 셸(`Mono.Control`)로는 아직 확인하지 않았습니다. 이전 화면은 `web-v1` 태그에 있습니다 |
+| Core 접속 강화 | 반영했고 테스트를 통과했습니다(317개). 7700 · 7701 은 기본으로 이 PC 에서만 열립니다 |
+| 토큰 · 설치 · 곡 id | 스트리밍 토큰은 DPAPI 로 감싸고, 설치 스크립트는 SHA-256 을 확인하며, 곡 id 는 파일을 따라갑니다 |
+| 남은 과제 | 계정 체계, 7701 인증(원격 출력 페어링), 릴리스 서명, .NET 10 |
 | 출시 전에 풀 것 | 라운지의 음원 공유 범위, 라이선스 고지, 밝은 테마의 글자 대비 |
 
 ## 릴리스
@@ -275,14 +275,15 @@ git tag v<버전>; git push origin v<버전>     # Actions 의 release 워크플
 | [`docs/05-아이콘디자인스펙.md`](docs/05-아이콘디자인스펙.md) | 아이콘 |
 | [`docs/06-로드맵.md`](docs/06-로드맵.md) | v1.0 까지의 로드맵 |
 | [`docs/07-백엔드-점검.md`](docs/07-백엔드-점검.md) | Core 점검: 고친 것, 남은 것 |
-| [`redesign/DESIGN.md`](redesign/DESIGN.md) | 새 화면의 디자인 규칙 |
-| [`redesign/HANDOFF.md`](redesign/HANDOFF.md) | 이어서 할 일 |
+| [`docs/08-인수인계.md`](docs/08-인수인계.md) | 이어서 할 일 |
+| [`src/Mono.Web/DESIGN.md`](src/Mono.Web/DESIGN.md) | 화면의 디자인 규칙 |
+| [`src/Mono.Web/README.md`](src/Mono.Web/README.md) | 화면 실행 · 모의 Core · 캡처 |
 
 이전 Avalonia UI 는 `legacy/Mono.Control.Avalonia` 에 보관돼 있습니다(빌드 대상 아님).
 
 ## 서드파티
 
-새 화면이 번들에 싣는 글꼴과 아이콘입니다.
+화면이 번들에 싣는 글꼴과 아이콘입니다.
 
 | | 라이선스 |
 | --- | --- |

@@ -71,6 +71,9 @@ interface MonoBridge {
     logPath(): Promise<string>
     quit(): Promise<boolean>
     minimizeToTray(): Promise<boolean>
+    /** 창의 닫기(X)가 트레이로 숨기는가. 기본은 끄기 — X 를 누르면 Mono 가 끝난다. */
+    closeToTray(): Promise<{ enabled: boolean }>
+    setCloseToTray(enabled: boolean): Promise<{ enabled: boolean }>
   }
   discord: {
     set(payload: DiscordNowPlaying): Promise<{ ok: boolean; connected: boolean }>
@@ -232,6 +235,19 @@ export async function setDiscordActivityEnabled(enabled: boolean): Promise<boole
   const bridge = shell()
   if (!bridge) return false
   try { return (await bridge.discord.setEnabled(enabled)).enabled } catch { return false }
+}
+
+/** 창을 닫으면 트레이로 숨기는가. 셸이 없으면(브라우저) null. 이 설정이 없는 옛 셸도 null. */
+export async function closeToTrayStatus(): Promise<boolean | null> {
+  const app = shell()?.app
+  if (!app?.closeToTray) return null
+  try { return (await app.closeToTray()).enabled } catch { return null }
+}
+
+export async function setCloseToTray(enabled: boolean): Promise<boolean | null> {
+  const app = shell()?.app
+  if (!app?.setCloseToTray) return null
+  try { return (await app.setCloseToTray(enabled)).enabled } catch { return null }
 }
 
 export async function setDiscordApplicationId(appId: string): Promise<boolean> {

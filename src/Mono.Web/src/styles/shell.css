@@ -251,6 +251,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+  /* 커버 색(.page > .tint)이 cqw 로 이 영역의 폭을 잰다. 크기가 inset 으로 정해지므로 포함해도 바뀌는 것이 없다. */
+  container-type: inline-size;
 }
 .page {
   position: relative;
@@ -295,6 +297,15 @@
     var(--bg-0) 100%
   );
   transition: --tint var(--m-tint);
+}
+/*
+ * 본문(.page)은 넓은 창에서 최대 너비로 가운데 정렬된다. 커버 색이 그 폭에서 잘리면 좌우에 세로 경계가
+ * 생기므로(전체 화면에서 보였다) 본문 영역(.view) 전체로 편다. .page 는 .view 의 가운데에 있으므로
+ * 양쪽으로 .view 폭의 절반(50cqw)씩 펴면 꼭 맞는다. vw 로 펴면 .view 밖으로 넘쳐 숨은 가로 스크롤이 생긴다.
+ */
+.page > .tint {
+  left: calc(50% - 50cqw);
+  right: calc(50% - 50cqw);
 }
 .page > :not(.tint) { position: relative; z-index: 1; }
 
