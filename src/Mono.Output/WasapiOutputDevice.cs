@@ -94,6 +94,22 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
 
     public bool Playing => _out?.PlaybackState == PlaybackState.Playing;
 
+    /// <summary>
+    /// 장치 스트림이 지금까지 내보낸 위치(바이트). 스트림이 돌고 있으면 늘어나고, 멈추면 그대로다.
+    /// 일시정지 뒤에도 스트림이 돌고 있는지 확인하는 데 쓴다. 장치가 열려 있지 않으면 null.
+    /// </summary>
+    public long? StreamPositionBytes
+    {
+        get
+        {
+            lock (_gate)
+            {
+                try { return _out?.GetPosition(); }
+                catch { return null; }
+            }
+        }
+    }
+
     public double BufferedMs
     {
         get { lock (_gate) return _buffer?.BufferedDuration.TotalMilliseconds ?? 0; }
@@ -421,8 +437,21 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             _buffer?.ClearBuffer();
             _aligner.Reset();
             // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
-            try { _out?.Pause(); } catch { /* 장치가 이미 닫혔으면 무시 */ }
+            HaltStream();
         }
+    }
+
+    /// <summary>
+    /// 장치 스트림을 실제로 멈추고 비운다. 다음 PushSamples 가 프라임을 채우면 Play() 로 다시 시작한다.
+    ///
+    /// WasapiOut.Pause() 를 쓰면 안 된다. NAudio 의 Pause 는 상태값만 바꾸고 오디오 클라이언트는 계속 돌린다.
+    /// 공유 모드에서는 Windows 가 빈 자리를 무음으로 채우지만, 배타 모드에서는 장치 버퍼에 남은 마지막 음악
+    /// 조각이 그대로 남고, 드라이버에 따라 그 조각을 되풀이해 내보낸다(일시정지 · 곡 사이에 들리던 "이상한 소리").
+    /// Stop() 은 재생 스레드를 끝내며 IAudioClient::Stop 과 Reset 을 불러 그 조각까지 버린다.
+    /// </summary>
+    private void HaltStream()
+    {
+        try { _out?.Stop(); } catch { /* 장치가 이미 닫혔으면 무시 */ }
     }
 
     /// <summary>
@@ -438,7 +467,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 return;
             }
 
-            try { _out.Pause(); } catch { /* 무시 */ }
+            HaltStream();
             _buffer?.ClearBuffer();
             _aligner.Reset();
             _state = AudioDeviceState.ReleaseWait;
