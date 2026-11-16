@@ -27,7 +27,10 @@ builder.Services.AddSingleton(new HistoryStore(Path.Combine(data, "history.db"))
 builder.Services.AddSingleton(new EndpointRegistry(Path.Combine(data, "endpoints.db")));
 builder.Services.AddSingleton(new ZoneRegistry(Path.Combine(data, "zones.db")));
 builder.Services.AddSingleton(new BackupService(data));
-builder.Services.AddSingleton(new SetupStore(data));
+var setupStore = new SetupStore(data);
+builder.Services.AddSingleton(setupStore);
+// 7700 · 7701 의 노출 범위는 뜰 때 한 번 정한다. 리스너가 그때 열리기 때문이다.
+builder.Services.AddSingleton(new TcpExposure(NetworkExposure.AllowRemoteOutputs(builder.Configuration, setupStore.Read())));
 var wikiHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 // 위키미디어 API 정책상 User-Agent 없는 요청은 403으로 거부된다.
 wikiHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mono-Control/1.0 (local hi-fi lounge app; https://github.com/mono-audio)");
@@ -166,7 +169,7 @@ app.MapGet("/oauth/callback", (string? code, string? state, string? error, Strea
     }
 });
 
-app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegistry endpoints) => Results.Ok(new
+app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegistry endpoints, TcpExposure exposure) => Results.Ok(new
 {
     ok = true,
     product = "Mono Core",
@@ -174,7 +177,9 @@ app.MapGet("/api/health", (RoomManager rooms, CatalogStore catalog, EndpointRegi
     tracks = catalog.Tracks.Count,
     endpoints = endpoints.All().Count(e => e.Online),
     controlPort = CoreHostedService.ControlPort,
-    matpPort = CoreHostedService.MatpPort
+    matpPort = CoreHostedService.MatpPort,
+    // 지금 떠 있는 Core 가 7700 · 7701 을 LAN 에 열었는가. setup.json 의 값과 다르면 다시 시작해야 한다.
+    remoteOutputs = exposure.AllowRemote
 }));
 
 app.MapGet("/api/rooms", (RoomManager rooms) => rooms.List().Select(r => new

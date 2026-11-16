@@ -289,6 +289,17 @@ if ($thumb) { & $signScript -File $branded.FullName -Thumbprint $thumb }
 Copy-Item $branded.FullName "$releasesDir\Mono-win-Setup.exe" -Force
 if (-not $NoTokenSave) { Save-GithubTokenToPrefs }
 
+# 올릴 파일마다 SHA-256 을 적어 같이 올린다. install.ps1 은 받은 Setup 을 이 목록과 맞춰 본 뒤에만
+# "인터넷에서 받은 파일" 표시를 지우고 실행한다. 형식은 sha256sum 과 같다: "<해시>  <파일 이름>".
+$sumsPath = Join-Path $releasesDir 'SHA256SUMS.txt'
+Remove-Item -LiteralPath $sumsPath -ErrorAction SilentlyContinue
+$sumLines = Get-ChildItem $releasesDir -File |
+    Where-Object { $_.Name -notmatch 'Portable' -and $_.Name -ne 'SHA256SUMS.txt' } |
+    Sort-Object Name |
+    ForEach-Object { '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant(), $_.Name }
+[IO.File]::WriteAllLines($sumsPath, [string[]]$sumLines)
+Write-Host "SHA256SUMS.txt: $(@($sumLines).Count)개 파일" -ForegroundColor Cyan
+
 if ($GitHubRelease) {
     Write-Host ">>> GitHub Release v$Version" -ForegroundColor Cyan
     $notes = Get-ReleaseNotes $Version

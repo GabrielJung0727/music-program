@@ -20,6 +20,7 @@ public sealed class CoreHostedService : BackgroundService
     private readonly ConnectionRegistry _connections;
     private readonly PairingService _pairing;
     private readonly EndpointRegistry _endpoints;
+    private readonly TcpExposure _exposure;
 
     public const int ControlPort = 7700;
     public const int MatpPort = 7701;
@@ -37,7 +38,8 @@ public sealed class CoreHostedService : BackgroundService
         RoomBroadcaster broadcaster,
         ConnectionRegistry connections,
         PairingService pairing,
-        EndpointRegistry endpoints)
+        EndpointRegistry endpoints,
+        TcpExposure exposure)
     {
         _log = log;
         _commands = commands;
@@ -46,19 +48,23 @@ public sealed class CoreHostedService : BackgroundService
         _connections = connections;
         _pairing = pairing;
         _endpoints = endpoints;
+        _exposure = exposure;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var control = Listen(ControlPort, HandleControlAsync, stoppingToken);
         var matp = Listen(MatpPort, HandleOutputAsync, stoppingToken);
-        _log.LogInformation("Mono Core · Control TCP :{C} · MATP :{A} · Control UI http://127.0.0.1:7702", ControlPort, MatpPort);
+        _log.LogInformation("Mono Core · Control TCP {Bind}:{C} · MATP {Bind}:{A} · Control UI http://127.0.0.1:7702{Lan}",
+            _exposure.BindAddress, ControlPort, _exposure.BindAddress, MatpPort,
+            _exposure.AllowRemote ? " · 다른 PC 의 출력 허용" : "");
         await Task.WhenAll(control, matp);
     }
 
     private async Task Listen(int port, Func<TcpClient, CancellationToken, Task> handler, CancellationToken ct)
     {
-        var listener = new TcpListener(IPAddress.Any, port);
+        // 기본은 루프백. 다른 PC 의 출력 워커를 쓰는 사람만 설정으로 LAN 에 연다(NetworkExposure).
+        var listener = new TcpListener(_exposure.BindAddress, port);
         listener.Start();
         try
         {

@@ -15,6 +15,12 @@ public sealed class AppUpdater
     public const string GitHubRepo = "https://github.com/GabrielJung0727/music-program";
     public const string PackId = "Mono";
 
+#if DEBUG
+    private const bool AllowFeedOverride = true;
+#else
+    private const bool AllowFeedOverride = false;
+#endif
+
     /// <summary>
     /// 화면에 보여 줄 현재 버전. 설치본에서는 Velopack 이 아는 패키지 버전이 진실이다 —
     /// 어셈블리 버전은 csproj 에 값을 박아 두면 publish 의 -p:Version 을 이겨서 옛 숫자가 남는다.
@@ -61,11 +67,13 @@ public sealed class AppUpdater
 
     public UpdateManager CreateManager()
     {
-        var feed = Environment.GetEnvironmentVariable("MONO_UPDATE_FEED");
-        if (string.IsNullOrWhiteSpace(feed))
-            feed = Prefs.Get("update_feed", "");
-        if (!string.IsNullOrWhiteSpace(feed))
-            return new UpdateManager(feed.Trim());
+        // 업데이트 주소를 바꾸는 길은 개발 빌드에만 있다. 릴리스 빌드는 GitHub 릴리스만 본다(UpdateFeed).
+        var feed = UpdateFeed.Override(
+            Environment.GetEnvironmentVariable("MONO_UPDATE_FEED"),
+            Prefs.Get("update_feed", ""),
+            allowOverride: AllowFeedOverride);
+        if (feed is not null)
+            return new UpdateManager(feed);
 
         return new UpdateManager(new GithubSource(GitHubRepo, accessToken: ResolveGitHubToken(), prerelease: false));
     }

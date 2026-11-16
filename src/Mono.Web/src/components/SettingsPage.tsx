@@ -37,6 +37,8 @@ export default function SettingsPage({
   const [hwScanning, setHwScanning] = useState(false)
   const [audio, setAudio] = useState<AudioSetup | undefined>(undefined)
   const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false)
+  // Core 의 7700 · 7701 을 LAN 에 열지. 기본은 이 PC 에서만. Core 가 뜰 때 읽으므로 다시 시작해야 적용된다.
+  const [allowRemoteOutputs, setAllowRemoteOutputs] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -44,6 +46,7 @@ export default function SettingsPage({
       const state = await loadSetup()
       if (!alive) return
       setAudio(state.audio)
+      setAllowRemoteOutputs(state.allowRemoteOutputs === true)
       setExclusiveMode(state.audio?.exclusiveMode ?? true)
       if (state.audio?.bufferSize) setBufferSize(state.audio.bufferSize)
     })()
@@ -396,6 +399,16 @@ export default function SettingsPage({
                     set: (v: boolean) => { setExclusiveMode(v); void applyAudio({ exclusiveMode: v }) },
                   },
                   { label: "Memory Playback (RAM Load)", sub: "Preloads tracks into RAM before streaming to DAC", value: memoryPlayback, set: setMemoryPlayback },
+                  {
+                    label: "다른 PC 의 출력 허용",
+                    sub: "켜면 다른 PC 의 출력 워커와 Mono.Cli 가 이 Core 에 붙을 수 있습니다. Mono 를 다시 시작하면 적용됩니다",
+                    value: allowRemoteOutputs,
+                    set: (v: boolean) => {
+                      setAllowRemoteOutputs(v)
+                      void saveSetup({ allowRemoteOutputs: v })
+                      setEngineNote("저장했습니다. Mono 를 다시 시작하면 적용됩니다.")
+                    },
+                  },
                 ].map((row) => (
                   <div key={row.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
                     <div>

@@ -23,7 +23,18 @@ public sealed class LibraryScanner
     public DateTimeOffset? LastScan { get; private set; }
     public int LastCount { get; private set; }
 
+    /// <summary>
+    /// 스캔은 한 번에 하나만 돈다. 시작할 때 · 30분마다 · 설정의 "다시 스캔" · 폴더 추가가 겹칠 수 있는데,
+    /// 둘이 같이 돌면 서로 상대가 막 넣은 곡을 모른 채 같은 파일에 id 를 하나씩 더 발급한다(TrackIdentity).
+    /// </summary>
+    private readonly object _scanGate = new();
+
     public int Scan(string root)
+    {
+        lock (_scanGate) return ScanLocked(root);
+    }
+
+    private int ScanLocked(string root)
     {
         // 없는 폴더를 만들지 않는다. 이 경로는 화면에서 받은 문자열일 수 있고,
         // 스캔 명령 하나로 아무 곳에나 폴더가 생기면 안 된다.
@@ -38,18 +49,20 @@ public sealed class LibraryScanner
         // 예외로 끝나지 않게 한다. 건너뛰고 나머지를 읽는다.
         var walk = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
 
+        // 곡 id 는 파일 이름이 아니라 이 스캔의 색인으로 정한다(TrackIdentity).
+        var identity = new TrackIdentity(_catalog);
         var count = 0;
         foreach (var file in Directory.EnumerateFiles(root, "*.*", walk)
                      .Where(f => Ext.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase)))
         {
             try
             {
-                Import(file);
+                Import(file, identity);
                 count++;
             }
             catch (Exception)
             {
-                ImportBare(file);
+                ImportBare(file, identity);
                 count++;
             }
         }
@@ -65,11 +78,16 @@ public sealed class LibraryScanner
     /// </summary>
     public int ScanAll(IEnumerable<string> roots)
     {
+        lock (_scanGate) return ScanAllLocked(roots);
+    }
+
+    private int ScanAllLocked(IEnumerable<string> roots)
+    {
         var total = 0;
         foreach (var root in roots.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
         {
             if (!Directory.Exists(root)) continue;
-            total += Scan(root);
+            total += ScanLocked(root);
         }
 
         LastScan = DateTimeOffset.UtcNow;
@@ -77,7 +95,7 @@ public sealed class LibraryScanner
         return total;
     }
 
-    private void Import(string file)
+    private void Import(string file, TrackIdentity identity)
     {
         using var tf = TagLib.File.Create(file);
         var tag = tf.Tag;
@@ -94,7 +112,13 @@ public sealed class LibraryScanner
         var artistId = "ar-" + Slug(artistName);
         var albumArtistId = "ar-" + Slug(albumArtistName);
         var albumId = "al-" + Slug(albumArtistName + "-" + albumTitle);
-        var trackId = "tr-" + Slug(Path.GetFileNameWithoutExtension(file));
+        var durationMs = DurationOf(tf, file);
+        // 옮긴 파일을 알아볼 때는 파일에 적힌 태그만 쓴다. 이름 · 폴더에서 끌어온 제목이나 앨범은 근거가 못 된다.
+        var trackId = identity.Resolve(file, new TrackIdentity.Tags(
+            Title: Blank(tag.Title),
+            AlbumId: Blank(tag.Album) is null ? null : albumId,
+            TrackNumber: (int)tag.Track,
+            DurationMs: durationMs));
 
         var artist = _catalog.Artists.GetValueOrDefault(artistId) ?? new Artist { Id = artistId, Name = artistName };
         var albumArtist = albumArtistId == artistId
@@ -134,7 +158,7 @@ public sealed class LibraryScanner
             Channels = tf.Properties.AudioChannels > 0 ? tf.Properties.AudioChannels : 2,
             IsDsd = isDsd,
             DsdRate = isDsd ? DsdRateOf(tf.Properties.AudioSampleRate) : null,
-            DurationMs = DurationOf(tf, file),
+            DurationMs = durationMs,
             LyricsLrc = SidecarLyrics(file) ?? (string.IsNullOrWhiteSpace(tag.Lyrics) ? null : tag.Lyrics),
             ArtworkPath = art,
             TrackNumber = (int)tag.Track,
@@ -179,14 +203,15 @@ public sealed class LibraryScanner
         return tagged > 0 ? tagged : ProbeDuration(file);
     }
 
-    private void ImportBare(string file)
+    private void ImportBare(string file, TrackIdentity identity)
     {
         var name = Path.GetFileNameWithoutExtension(file);
         var artist = _catalog.Artists.GetValueOrDefault("ar-local") ?? new Artist { Id = "ar-local", Name = "Local" };
         var album = _catalog.Albums.GetValueOrDefault("al-local") ?? new Album { Id = "al-local", Title = "Imported", ArtistId = artist.Id };
         var track = new Track
         {
-            Id = "tr-" + Slug(name),
+            // 태그를 못 읽었으니 옮긴 파일을 알아볼 근거가 없다. 같은 경로면 그 id, 아니면 새 id.
+            Id = identity.Resolve(file, tags: null),
             Title = name,
             AlbumId = album.Id,
             ArtistId = artist.Id,
