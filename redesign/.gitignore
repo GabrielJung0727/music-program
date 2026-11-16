@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# 캡처는 npm run capture 로 다시 만든다. 저장소에는 싣지 않는다.
+screenshots/
