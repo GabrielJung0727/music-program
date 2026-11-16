@@ -208,7 +208,7 @@ public class TrackIdentityTests
     }
 
     [Fact]
-    public void TwoScansAtOnceGiveEachFileOneTrack()
+    public async Task TwoScansAtOnceGiveEachFileOneTrack()
     {
         // 시작할 때 · 30분마다 · 설정의 "다시 스캔" · 폴더 추가가 겹칠 수 있다.
         var dir = NewDir();
@@ -219,7 +219,7 @@ public class TrackIdentityTests
 
         var a = Task.Run(() => scanner.Scan(lib));
         var b = Task.Run(() => scanner.Scan(lib));
-        Task.WaitAll(a, b);
+        await Task.WhenAll(a, b);
 
         // 새 카탈로그에는 경로 없는 기본 곡이 들어 있다. 이 라이브러리의 파일만 센다.
         var perPath = catalog.Tracks.Values
