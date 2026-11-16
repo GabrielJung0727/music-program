@@ -277,6 +277,8 @@ seedLounge({ id: "lounge-indie", name: "새 앨범 첫 감상회", host: "minjae
 
 /** @type {Map<import("ws").WebSocket, { peerId: string, name: string, roomId: string | null }>} */
 const peers = new Map()
+/** peer id → 그 id 의 주인임을 증명하는 값 */
+const secrets = new Map()
 let peerSeq = 1
 
 const send = (ws, msg) => ws.readyState === 1 && ws.send(json(msg))
@@ -286,11 +288,29 @@ function broadcast(room) {
   for (const [ws, p] of peers) if (p.roomId === room.id) send(ws, stateMsg(room))
 }
 
+/** RoomManager.Peek 과 같다: 지금 곡, 그리고 지금 곡부터 이어지는 서로 다른 앨범의 커버 최대 셋. */
+function peek(room) {
+  const at = room.queueIndex
+  if (at < 0 || at >= room.queue.length) return { covers: [], nowTitle: null, nowArtist: null, upcoming: 0 }
+  const covers = []
+  const seen = new Set()
+  for (const q of room.queue.slice(at)) {
+    const t = trackById.get(q.trackId)
+    if (!t?.artUrl || seen.has(t.albumId)) continue
+    seen.add(t.albumId)
+    covers.push(t.artUrl)
+    if (covers.length === 3) break
+  }
+  const now = trackById.get(room.queue[at].trackId)
+  return { covers, nowTitle: now?.title ?? null, nowArtist: now?.artist ?? null, upcoming: room.queue.length - at - 1 }
+}
+
 function listing() {
   return [...rooms.values()].filter((r) => r.mode !== RoomMode.Solo).map((r) => ({
     id: r.id, name: r.name, mode: r.mode, sourceMode: r.sourceMode, qualityPolicy: r.qualityPolicy,
     playing: r.playing, host: r.peers[r.hostPeerId] ?? r.hostPeerId, needsInvite: r.mode === RoomMode.Invite,
     members: r.members.length, outputs: r.outputs.length, queued: r.queue.length, badge: pathBadge(current(r)),
+    ...peek(r),
   }))
 }
 
@@ -334,9 +354,12 @@ function handle(ws, msg) {
 
   switch (msg.type) {
     case "hello": {
-      const peerId = msg.peerId ?? `peer-${peerSeq++}`
+      // ConnectionRegistry.Claim 과 같다: 주인이 있는 id 는 비밀값이 맞아야 내준다.
+      let peerId = msg.peerId
+      if (!peerId || (secrets.has(peerId) && secrets.get(peerId) !== msg.secret)) peerId = `peer-${peerSeq++}`
+      if (!secrets.has(peerId)) secrets.set(peerId, Math.random().toString(36).slice(2) + Date.now().toString(36))
       peers.set(ws, { peerId, name: msg.displayName ?? "Listener", roomId: null })
-      send(ws, { type: "welcome", peerId, ok: true, body: "Mono Core (mock) · catalog ready" })
+      send(ws, { type: "welcome", peerId, secret: secrets.get(peerId), ok: true, body: "Mono Core (mock) · catalog ready" })
       reply("catalog", CATALOG.tracks.map(trackView))
       return
     }
@@ -487,9 +510,9 @@ function handle(ws, msg) {
       return touch()
     }
     case "set_dsp":
-      // 진짜 Core 와 같다: flag 는 보지 않는다. 프리셋이 Off(0)가 아니면 켜진 것이다.
+      // 진짜 Core 와 같다: flag 가 false 면 끈다. 그 밖에는 프리셋이 Off(0)가 아니면 켜진 것이다.
       if (room.dspLocked) return
-      room.dspPreset = msg.dsp ?? 0
+      room.dspPreset = msg.flag === false ? 0 : msg.dsp ?? 0
       room.dspEnabled = room.dspPreset !== 0
       return touch()
     case "set_policy": room.qualityPolicy = msg.policy ?? 0; return touch()

@@ -5,15 +5,17 @@
 
 ## 1. 지금 상태
 
-- 브랜치 `feature/web-redesign`. `development` 에는 아직 합치지 않았다.
-- `redesign/` 은 원본과 같은 Core 규약(`/ws/control`, `/api/*`)을 쓰는 별도 프런트엔드다. 원본 `src/Mono.Web` 과 C# 은 건드리지 않았다.
+- `redesign/` 은 `development` 에 들어가 있다(PR #4). 이 문서와 그 뒤의 작업은 브랜치 `fix/core-hardening` 에 있다.
+- `redesign/` 은 원본과 같은 Core 규약(`/ws/control`, `/api/*`)을 쓰는 별도 프런트엔드다.
+- **`fix/core-hardening` 은 Core(C#)도 고친다.** 보안 점검에서 나온 것들이고, 내용과 남은 문제는 [`docs/07-백엔드-점검.md`](../docs/07-백엔드-점검.md) 에 있다.
+  빌드는 통과했지만 **테스트는 돌리지 못했다.** 집에서 가장 먼저 `dotnet test Mono.slnx` 를 돌린다.
 - 타입 검사(`npm run typecheck`)와 프로덕션 빌드(`npm run build`)는 통과한다.
 - **실제 Core 에는 한 번도 붙여 보지 않았다.** 작업한 PC 에 .NET SDK 가 없어서 `mock/core.mjs`(모의 Core)로만 돌렸다. 모션 다섯 군데도 정지 캡처로만 확인했다.
 - 캡처(`screenshots/`)는 저장소에 없다. `npm run capture` 로 다시 만든다. 기존 화면 캡처(`before`)는 스크립트로 만들 수 없고 작업한 PC 에만 있다.
 
 ### 원본과 다른 파일
 
-`src/lib`, `src/state/MonoProvider.tsx`, `src/state/useDebounced.ts`, `src/data/types.ts` 는 원본에서 그대로 가져왔다. 다른 것은 셋뿐이다.
+`src/lib`, `src/state/MonoProvider.tsx`, `src/state/useDebounced.ts`, `src/data/types.ts` 는 원본과 같다(`controlClient.ts` 와 `protocol.ts` 는 Core 변경에 맞춰 양쪽을 똑같이 고쳤다). 다른 것은 셋뿐이다.
 
 | 파일 | 내용 |
 | --- | --- |
@@ -44,7 +46,9 @@ $env:CORE = "http://127.0.0.1:7702"; npm run dev     # http://127.0.0.1:5373
 - [ ] 라운지 열기 → 플레이어 바에 `ON AIR`, 링이 한 번 퍼진다. 방송 종료 후에도 듣던 곡이 이어진다.
 - [ ] 다른 창(또는 `Mono.Cli`)으로 같은 방에 들어가면 게스트 화면이 뜨고 트랜스포트가 막힌다.
 - [ ] 창을 새로 고쳐도 호스트/게스트가 그대로다(`hostPeerId` 와 내 `peerId` 비교로 판정한다. `src/lib/model.ts` 의 `sessionRole`).
-- [ ] 라운지 목록의 표지가 커버 콜라주로 나온다(`GET /api/rooms/{id}` 를 방마다 읽는다).
+- [ ] 라운지 목록의 표지가 커버 콜라주로 나온다(`list_rooms` 의 `covers` 에서 온다).
+- [ ] 다른 사이트에서 연 페이지로는 Core 에 붙지 못한다. 예: 아무 사이트의 개발자 콘솔에서 `new WebSocket("ws://127.0.0.1:7702/ws/control")` 가 거절된다.
+- [ ] 연결이 잠깐 끊겼다 다시 붙어도 같은 peer id 를 유지한다(welcome 의 `secret` 을 hello 에 돌려준다).
 - [ ] 태그에 커버가 없는 곡: `artUrl` 이 null 이라 자리표시 그림이 나온다. 깨진 이미지가 보이면 안 된다.
 - [ ] 실제 커버(JPEG/PNG)에서 앨범 헤더의 색이 뽑힌다(`src/ui/motion.tsx` 의 `useArtTint`).
 - [ ] 자동 재생 후보가 대기열 패널에 뜨고 고를 수 있다(Core 는 곡이 끝나기 30초 전에 보낸다).
@@ -60,19 +64,22 @@ $env:CORE = "http://127.0.0.1:7702"; npm run dev     # http://127.0.0.1:5373
 
 | 사실 | 근거 | 화면에서 한 일 |
 | --- | --- | --- |
-| `set_dsp` 는 `flag` 를 보지 않는다. 프리셋이 Off(0)가 아니면 켜진다 | `CommandProcessor.cs` SetDsp | 끌 때 프리셋 0 을 보내고, 마지막 프리셋은 `localStorage`(`mono_dsp_preset`)에 적어 둔다 |
-| 원본 화면은 끌 때 현재 프리셋을 그대로 보낸다 | `src/Mono.Web/.../PlayerBar.tsx:718` | 같은 이유로 꺼지지 않을 것으로 본다. 실제 Core 에서 확인 필요 |
+| `set_dsp` 는 0.5.9.3 까지 `flag` 를 보지 않았다. 프리셋이 Off(0)가 아니면 켜졌다 | `CommandProcessor.cs` SetDsp | 화면은 끌 때 프리셋 0 을 보내고, 마지막 프리셋은 `localStorage`(`mono_dsp_preset`)에 적어 둔다. Core 도 `flag=false` 를 끄기로 받게 고쳤다 |
+| 원본 화면은 끌 때 현재 프리셋과 `flag=false` 를 보낸다 | `src/Mono.Web/.../PlayerBar.tsx:718` | 예전 Core 에서는 꺼지지 않았을 것이다. 고친 Core 에서는 꺼진다 |
+| peer id 는 접속하는 쪽이 골랐고, 방의 권한은 전부 그 id 비교였다 | `ControlPlane.cs`, `RoomManager.cs` | welcome 이 `secret` 을 준다. 같은 id 로 다시 붙으려면 hello 에 돌려줘야 한다(`controlClient.ts`) |
 | `/api/wiki/{id}` 는 `extract` · `sourceUrl` 을 보낸다 | `Mono.Shared/Catalog.cs` ArtistWikiSummary | `rest.ts` 타입과 아티스트 화면을 맞춤 |
 | `badge` 는 `24/96000 · Bit-perfect Local` 형식이다. DR 값이 아니다 | `QualityPolicyEngine.Badge` | 음질은 `sampleRate` · `bitDepth` 에서 직접 계산. DR 표기는 뺐다 |
 | `set_room_flags` 는 호스트만 된다. 자동 재생 플래그 이름은 `smart_autoplay` | `RoomManager.ApplyHostSettings` | 그대로 사용 |
-| `list_rooms` 에는 곡 정보가 없다 | `CommandProcessor.cs` ListRooms | 표지용으로 `GET /api/rooms/{id}` 를 방마다 읽는다(20초 간격) |
-| `GET /api/rooms/{id}` 는 초대 전용 방의 스냅샷도 코드 없이 준다 | `Program.cs` | 원래 있던 동작. 새 화면이 정기적으로 부르게 됐다는 점만 알아 둘 것 |
+| `list_rooms` 에는 곡 정보가 없었다 | `CommandProcessor.cs` ListRooms | Core 가 `covers` · `nowTitle` · `nowArtist` · `upcoming` 을 싣게 고쳤고, 화면은 그걸 쓴다 |
+| `GET /api/rooms/{id}` 는 초대 전용 방의 스냅샷도 코드 없이 준다 | `Program.cs` | 화면은 더 부르지 않는다. 이제 이 PC 에서 온 요청만 받는다 |
+| 창을 새로 고치면 peer id 가 바뀐다(메모리에만 있다) | `controlClient.ts` | 열어 둔 라운지의 호스트 자리를 잃는다. 원래부터 그랬다. 2장의 "새로 고쳐도 그대로다" 항목은 이 때문에 실패할 수 있다 |
 | `set_volume` 은 대상이 없으면 보낸 사람 자신에게 건다 | `CommandProcessor.cs` SetVolume | 출력이 없으면 볼륨을 막아 둠 |
 
 ## 4. 이식 순서
 
 `feature/web-redesign` 에서 이어서 한다. 시작 전에 지금 화면에 태그를 단다(`git tag web-v1 development`).
 
+0. **Core 변경을 먼저 합친다.** `fix/core-hardening` 의 C# 변경은 화면 이식과 별개로 릴리스할 수 있다. 테스트가 통과하면 이것부터 `development` 에 넣는다.
 1. **빌드 설정.** `src/Mono.Web/package.json` 에서 `tailwindcss`, `@tailwindcss/vite` 를 빼고 글꼴 넷(`@fontsource-variable/plus-jakarta-sans`, `@fontsource-variable/inter`, `@fontsource-variable/jetbrains-mono`, `wanted-sans`)과 `pretendard` 를 넣는다. `vite.config.ts` 는 Tailwind 플러그인만 빼고 출력 경로(`../Mono.Core/wwwroot`)·포트(5273)·프록시(7702)는 그대로 둔다. `index.html` 에 `data-theme="dark"` 를 단다(원본은 `html.dark` 클래스였다).
 2. **추가 파일.** `lib/model.ts`, `lib/dsp.ts`, `rest.ts` 의 `WikiBio`.
 3. **스타일과 공용 부품.** `styles/`, `ui/`, `state/app.tsx`.
