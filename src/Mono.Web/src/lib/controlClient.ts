@@ -35,6 +35,12 @@ export class ControlClient {
 
   state: ConnectionState = "closed"
   peerId: string | null = null
+  /**
+   * peerId 의 주인임을 증명하는 값. Core 가 welcome 에 실어 준다.
+   * 다시 붙을 때 hello 에 돌려주지 않으면 Core 는 같은 id 를 내주지 않는다 —
+   * id 만 적어 보내는 것으로 남(예: 방의 호스트)이 될 수 없게 하려는 것이다.
+   */
+  private secret: string | null = null
   displayName: string
 
   constructor(displayName: string) {
@@ -62,7 +68,12 @@ export class ControlClient {
     socket.onopen = () => {
       this.backoff = 500
       // peerId 를 유지하면 재연결 뒤에도 Core 가 같은 사람으로 인식한다.
-      this.raw({ type: MSG.hello, peerId: this.peerId ?? undefined, displayName: this.displayName })
+      this.raw({
+        type: MSG.hello,
+        peerId: this.peerId ?? undefined,
+        secret: this.secret ?? undefined,
+        displayName: this.displayName,
+      })
     }
 
     socket.onmessage = (e) => {
@@ -75,6 +86,7 @@ export class ControlClient {
 
       if (msg.type === MSG.welcome) {
         this.peerId = msg.peerId ?? this.peerId
+        this.secret = msg.secret ?? this.secret
         this.setState("open")
         const queued = this.outbox
         this.outbox = []

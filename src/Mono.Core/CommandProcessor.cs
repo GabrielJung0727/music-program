@@ -53,8 +53,46 @@ public sealed class CommandProcessor
         _setup = setup;
     }
 
-    public CommandResult Execute(string peerId, MonoMessage msg, string? displayName)
+    public const int MaxNameLength = 64;
+    public const int MaxRoomNameLength = 80;
+    public const int MaxChatLength = 2000;
+    public const int MaxPinLength = 500;
+
+    /// <summary>
+    /// 이 PC(루프백)에서 온 연결만 낼 수 있는 명령. 파일 시스템을 건드리거나, 스트리밍 계정을
+    /// 바꾸거나, 원격 접속 코드를 발급하거나, 다른 사람의 출력 장치를 옮기는 것들이다.
+    /// 페어링으로 들어온 원격 사용자는 라운지의 손님이지 이 Core 의 주인이 아니다.
+    /// </summary>
+    private static readonly HashSet<string> OwnerOnly =
+    [
+        MessageTypes.ScanLibrary, MessageTypes.Backup, MessageTypes.LinkStreaming, MessageTypes.Pair,
+        MessageTypes.SetConvolutionIr, MessageTypes.ExportM3u, MessageTypes.Folders,
+        MessageTypes.CreateZone, MessageTypes.RenameZone, MessageTypes.SetZoneMode,
+        MessageTypes.ZoneAddMember, MessageTypes.ZoneRemoveMember, MessageTypes.DeleteZone,
+    ];
+
+    /// <summary>글자 수를 넘으면 잘라 낸다. null 은 그대로 둔다.</summary>
+    public static string? Clip(string? value, int max)
+        => value is not null && value.Length > max ? value[..max] : value;
+
+    /// <param name="local">
+    /// 이 PC 에서 온 연결인가. 원격(페어링) 연결은 <see cref="OwnerOnly"/> 명령을 낼 수 없다.
+    /// </param>
+    public CommandResult Execute(string peerId, MonoMessage msg, string? displayName, bool local = true)
     {
+        if (!local && OwnerOnly.Contains(msg.Type))
+        {
+            return Fail("이 명령은 Mono Core 가 실행 중인 PC 에서만 쓸 수 있습니다.");
+        }
+
+        // 길이 제한이 없으면 채팅 한 줄이 수 MB 가 될 수 있고, 그 한 줄이 방의 모든 스냅샷에 실려 나간다.
+        displayName = Clip(displayName, MaxNameLength);
+        msg.RoomName = Clip(msg.RoomName, MaxRoomNameLength);
+        if (msg.Type == MessageTypes.Chat) msg.Text = Clip(msg.Text, MaxChatLength);
+        else if (msg.Type == MessageTypes.Pin) msg.Text = Clip(msg.Text, MaxPinLength);
+        // JSON 의 "trackIds":[null] 은 List<string> 에 null 로 들어와 카탈로그 조회에서 터진다.
+        msg.TrackIds?.RemoveAll(string.IsNullOrWhiteSpace);
+
         switch (msg.Type)
         {
             // ── 룸 ──────────────────────────────────────────────
@@ -82,8 +120,11 @@ public sealed class CommandProcessor
             case MessageTypes.LeaveRoom:
             {
                 var roomId = NeedRoom(peerId, msg);
-                var left = _rooms.Leave(roomId, peerId);
                 _peerRoom.TryRemove(peerId, out _);
+                // 이미 그 방에 없으면(호스트가 방을 닫았거나 쫓겨난 뒤) 할 일이 없다.
+                // 오류로 답하면 "나가기"를 누른 사람에게 빨간 안내가 뜬다.
+                if (roomId.Length == 0) return default;
+                var left = _rooms.Leave(roomId, peerId);
                 return From(left);
             }
 
@@ -99,7 +140,7 @@ public sealed class CommandProcessor
                     if (!string.IsNullOrWhiteSpace(msg.RoomName)) r.Name = msg.RoomName!;
                     if (r.Mode == RoomMode.Invite)
                     {
-                        r.InviteCode = Random.Shared.Next(100000, 999999).ToString();
+                        r.InviteCode = ListeningRoom.NewInviteCode();
                         r.InviteExpiresAt = DateTimeOffset.UtcNow.AddHours(6);
                     }
                 }));
@@ -128,20 +169,30 @@ public sealed class CommandProcessor
                 return Direct(new MonoMessage
                 {
                     Type = MessageTypes.ListRooms,
-                    Body = JsonSerializer.Serialize(_rooms.ListListed().Select(r => new
+                    Body = JsonSerializer.Serialize(_rooms.ListListed().Select(r =>
                     {
-                        r.Id,
-                        r.Name,
-                        r.Mode,
-                        r.SourceMode,
-                        r.QualityPolicy,
-                        r.Playing,
-                        host = r.PeerNames.GetValueOrDefault(r.HostPeerId, r.HostPeerId),
-                        needsInvite = r.Mode == RoomMode.Invite,
-                        members = r.ControlPeerIds.Count,
-                        outputs = r.Outputs.Count,
-                        queued = r.Queue.Count,
-                        badge = r.PathBadge
+                        // 목록 카드의 표지와 "지금 곡" 한 줄. 이게 없으면 화면이 방마다
+                        // /api/rooms/{id} 로 스냅샷 전체(채팅·초대 코드 포함)를 읽어야 한다.
+                        var peek = _rooms.Peek(r);
+                        return new
+                        {
+                            r.Id,
+                            r.Name,
+                            r.Mode,
+                            r.SourceMode,
+                            r.QualityPolicy,
+                            r.Playing,
+                            host = r.PeerNames.GetValueOrDefault(r.HostPeerId, r.HostPeerId),
+                            needsInvite = r.Mode == RoomMode.Invite,
+                            members = r.ControlPeerIds.Count,
+                            outputs = r.Outputs.Count,
+                            queued = r.Queue.Count,
+                            badge = r.PathBadge,
+                            covers = peek.Covers,
+                            nowTitle = peek.Title,
+                            nowArtist = peek.Artist,
+                            upcoming = peek.Upcoming
+                        };
                     }), LineFraming.JsonOptions)
                 });
 
@@ -257,7 +308,9 @@ public sealed class CommandProcessor
                         return;
                     }
 
-                    r.DspPreset = msg.Dsp ?? DspPresetKind.Off;
+                    // flag 가 false 면 프리셋이 무엇이든 끈다. 예전에는 flag 를 보지 않아서, 화면이
+                    // "끄기"로 현재 프리셋과 flag=false 를 보내면 DSP 가 그대로 켜져 있었다.
+                    r.DspPreset = msg.Flag == false ? DspPresetKind.Off : msg.Dsp ?? DspPresetKind.Off;
                     r.DspEnabled = r.DspPreset != DspPresetKind.Off;
                 }));
 
@@ -698,7 +751,7 @@ public sealed class CommandProcessor
                             artist = _catalog.Tracks.GetValueOrDefault(id) is { } track
                                 ? _catalog.Artists.GetValueOrDefault(track.ArtistId)?.Name : null,
                             durationMs = _catalog.Tracks.GetValueOrDefault(id)?.DurationMs ?? 0,
-                            artUrl = _catalog.Tracks.GetValueOrDefault(id)?.ArtworkPath is null ? null : $"/api/art/{id}"
+                            artUrl = _catalog.ArtUrl(_catalog.Tracks.GetValueOrDefault(id))
                         })
                     }), LineFraming.JsonOptions)
                 });
@@ -1005,6 +1058,11 @@ public sealed class CommandProcessor
     {
         if (!string.IsNullOrWhiteSpace(msg.RoomId))
         {
+            // 방 id 를 안다고 그 방에 명령을 낼 수 있는 건 아니다. 들어와 있는 방이어야 한다.
+            // 이 확인이 없으면 초대 전용 방에 초대 없이 채팅을 쓰고, 쫓겨난 사람이 그대로 돌아온다.
+            // 빈 id 를 돌려주면 뒤의 룸 조회가 "room not found" 로 끝난다.
+            if (!_rooms.IsMember(msg.RoomId, peerId)) return "";
+
             _peerRoom[peerId] = msg.RoomId;
             return msg.RoomId;
         }

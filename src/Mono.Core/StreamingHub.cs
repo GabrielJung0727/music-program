@@ -162,6 +162,20 @@ public sealed class StreamingHub
         };
     }
 
+    /// <summary>
+    /// 이 state 로 시작해 둔 로그인이 있는가. /oauth/callback 이 Mono 가 연 로그인에 대한 것인지 가린다.
+    /// 여기서 걸러 두지 않으면 아무 페이지나 콜백 주소를 열어 진행 중인 로그인을 지워 버릴 수 있다.
+    /// </summary>
+    public bool IsPendingState(StreamingProvider provider, string? state)
+    {
+        lock (_gate)
+        {
+            return !string.IsNullOrEmpty(state)
+                   && _pending.TryGetValue(provider, out var expected)
+                   && string.Equals(expected.State, state, StringComparison.Ordinal);
+        }
+    }
+
     public StreamingAccount CompleteOAuth(StreamingProvider provider, string? codeOrToken, string? state, string? displayName)
     {
         PendingAuth? pending = null;

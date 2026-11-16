@@ -87,6 +87,13 @@ var app = builder.Build();
                           (folders ? ", 라이브러리 폴더 포함" : ""));
 }
 
+// 이 서버에는 로그인이 없다. 그래서 누가 말을 거는지를 요청 자체에서 가려낸다:
+// 다른 사이트의 페이지(Origin), DNS 리바인딩(Host), LAN 의 다른 기기(원격 주소).
+// 도메인 이름으로 접속해야 하면 Mono:AllowedHosts 에 쉼표로 적는다.
+var allowedHosts = (builder.Configuration["Mono:AllowedHosts"] ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+app.UseRequestGuard(allowedHosts);
+
 // Control UI(React, src/Mono.Web)는 wwwroot 에서 정적 서빙한다.
 // WebView2 셸과 브라우저가 같은 번들을 본다.
 var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
@@ -126,6 +133,9 @@ app.MapGet("/oauth/callback", (string? code, string? state, string? error, Strea
         return Results.Content(OAuthPage("Tidal 연동을 취소했거나 거부했습니다.", error), "text/html; charset=utf-8");
     if (string.IsNullOrWhiteSpace(code))
         return Results.Content(OAuthPage("로그인 코드가 없습니다.", "code missing"), "text/html; charset=utf-8");
+    // state 는 이 로그인을 Mono 가 시작했다는 증거다. 없으면 다른 페이지가 이 주소를 직접 연 것이다.
+    if (!streaming.IsPendingState(StreamingProvider.Tidal, state))
+        return Results.Content(OAuthPage("로그인 요청을 확인할 수 없습니다.", "Mono 에서 다시 로그인을 시작해 주세요."), "text/html; charset=utf-8");
     try
     {
         var acc = streaming.CompleteOAuth(StreamingProvider.Tidal, code, state, null);
@@ -182,7 +192,9 @@ app.MapGet("/api/rooms", (RoomManager rooms) => rooms.List().Select(r => new
 app.MapGet("/api/rooms/{id}", (string id, RoomManager rooms) =>
 {
     var room = rooms.Get(id);
-    return room is null ? Results.NotFound() : Results.Ok(rooms.Snapshot(room));
+    // 직렬화까지 룸 잠금 안에서 끝낸 문자열을 내보낸다. 객체를 넘기면 응답을 쓰는 동안
+    // 큐·채팅을 잠금 없이 훑게 된다.
+    return room is null ? Results.NotFound() : Results.Content(rooms.SnapshotJson(room), "application/json; charset=utf-8");
 });
 
 app.MapGet("/api/catalog", (CatalogStore catalog) => catalog.CatalogView());

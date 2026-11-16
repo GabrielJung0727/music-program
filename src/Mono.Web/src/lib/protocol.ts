@@ -130,6 +130,8 @@ export interface MonoMessage {
   path?: string
   provider?: StreamingProvider
   token?: string
+  /** peerId 의 주인임을 증명하는 값. welcome 으로 받고 hello 로 돌려준다. */
+  secret?: string
   dsp?: number
   policy?: QualityPolicy
   sourceMode?: PlaybackSourceMode
@@ -428,6 +430,12 @@ export interface RoomListing {
   outputs: number
   queued: number
   badge?: string | null
+  /** 지금 곡부터 이어지는 서로 다른 앨범의 커버 주소, 최대 셋. 예전 Core 는 보내지 않는다. */
+  covers?: string[]
+  nowTitle?: string | null
+  nowArtist?: string | null
+  /** 지금 곡 뒤에 남은 곡 수. */
+  upcoming?: number
 }
 
 /** album 명령의 body. */

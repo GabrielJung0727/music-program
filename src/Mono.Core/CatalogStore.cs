@@ -48,6 +48,20 @@ public sealed class CatalogStore : IDisposable
     public IReadOnlyDictionary<string, Artist> Artists { get { lock (_gate) return _artists; } }
 
     /// <summary>
+    /// 커버 주소. 곡에 커버가 없으면 앨범의 커버로 물러난다 — /api/art 가 실제로 그렇게 내보낸다.
+    /// 곡의 것만 보면, 커버 파일이 앨범 폴더에만 있는 곡(CD2 하위 폴더 등)은 화면에서 빈 그림이 된다.
+    /// </summary>
+    public string? ArtUrl(Track? t)
+    {
+        if (t is null) return null;
+        lock (_gate)
+        {
+            var path = t.ArtworkPath ?? (_albums.TryGetValue(t.AlbumId, out var album) ? album.ArtworkPath : null);
+            return path is null ? null : $"/api/art/{t.Id}";
+        }
+    }
+
+    /// <summary>
     /// 트랙 한 개를 저장한다. <paramref name="albumArtist"/> 는 컴필레이션처럼 트랙 아티스트와
     /// 앨범 아티스트가 다를 때만 넘긴다 — 앨범이 가리키는 아티스트 행이 없으면 앨범 화면의
     /// 아티스트 이름이 빈칸이 된다.
@@ -269,7 +283,7 @@ public sealed class CatalogStore : IDisposable
             hasLyrics = !string.IsNullOrWhiteSpace(t.LyricsLrc),
             hasLocal = t.LocalPath is not null,
             fileExtension = t.LocalPath is null ? null : Path.GetExtension(t.LocalPath).TrimStart('.').ToUpperInvariant(),
-            artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}",
+            artUrl = ArtUrl(t),
             addedAt = t.AddedAt,
             badge = QualityPolicyEngine.Badge(t, false)
         };

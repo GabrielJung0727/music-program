@@ -24,6 +24,12 @@ public sealed class CoreHostedService : BackgroundService
     public const int ControlPort = 7700;
     public const int MatpPort = 7701;
 
+    /// <summary>컨트롤 한 줄의 상한. WebSocket 쪽 프레임 상한과 같다.</summary>
+    private const int MaxControlLineBytes = 4 * 1024 * 1024;
+
+    /// <summary>출력 워커가 Core 로 보내는 것은 hello · caps · 시계 보고 같은 짧은 줄뿐이다.</summary>
+    private const int MaxOutputLineBytes = 256 * 1024;
+
     public CoreHostedService(
         ILogger<CoreHostedService> log,
         CommandProcessor commands,
@@ -74,13 +80,28 @@ public sealed class CoreHostedService : BackgroundService
         using (client)
         {
             var stream = client.GetStream();
-            using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+            var reader = new BoundedLineReader(stream, MaxControlLineBytes);
+            // 이 연결의 응답과 다른 스레드의 방송이 같은 소켓에 겹쳐 쓰이면 줄이 섞인다.
+            // 한 번에 하나씩만 쓴다(WebSocket 쪽에는 원래 이 문이 있었다).
+            using var writeGate = new SemaphoreSlim(1, 1);
             var session = new ControlSession(_commands, _rooms, _broadcaster, _connections, _pairing);
             try
             {
                 await session.RunAsync(
                     token => reader.ReadLineAsync(token).AsTask(),
-                    (msg, token) => stream.WriteAsync(LineFraming.Encode(msg), token).AsTask(),
+                    async (msg, token) =>
+                    {
+                        var bytes = LineFraming.Encode(msg);
+                        await writeGate.WaitAsync(token);
+                        try
+                        {
+                            await stream.WriteAsync(bytes, token);
+                        }
+                        finally
+                        {
+                            writeGate.Release();
+                        }
+                    },
                     IsLoopback(client),
                     ct);
             }
@@ -98,7 +119,7 @@ public sealed class CoreHostedService : BackgroundService
             client.NoDelay = true;
             var stream = client.GetStream();
             var channel = new OutputChannel { Stream = stream };
-            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 8192, leaveOpen: true);
+            var reader = new BoundedLineReader(stream, MaxOutputLineBytes);
             string? peerId = null;
             try
             {
