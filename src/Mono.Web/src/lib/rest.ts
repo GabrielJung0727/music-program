@@ -14,9 +14,13 @@ export interface HeatBucket {
 }
 
 export interface WikiBio {
+  // Mono.Shared.ArtistWikiSummary 의 거울. summary · url 이라는 필드는 Core 가 보내지 않는다.
+  artistId?: string
   title?: string
-  summary?: string
-  url?: string
+  extract?: string
+  sourceUrl?: string
+  thumbnailUrl?: string | null
+  lang?: string
   [key: string]: unknown
 }
 

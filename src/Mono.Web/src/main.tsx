@@ -1,12 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+// 글꼴은 전부 번들에 싣는다. 데스크톱 앱은 오프라인에서도 같은 모습이어야 한다.
+import '@fontsource-variable/plus-jakarta-sans'
+import 'wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.css'
+import '@fontsource-variable/inter'
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
+import '@fontsource-variable/jetbrains-mono'
+import './styles/tokens.css'
+import './styles/base.css'
+import './styles/shell.css'
+import './styles/pages.css'
 import App from './App'
 import { MonoProvider } from './state/MonoProvider'
-import { installArtworkFallback } from './lib/artwork'
-import './index.css'
-
-// 커버가 없거나 파일이 사라진 곡에서 깨진 이미지 아이콘이 뜨지 않게 한다.
-installArtworkFallback()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
