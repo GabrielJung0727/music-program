@@ -24,13 +24,24 @@
       "port": 5273
     },
     {
-      "name": "mono-redesign-real-core",
+      "name": "mono-mock-core",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "mock",
+        "--prefix",
+        "src/Mono.Web"
+      ],
+      "port": 7802
+    },
+    {
+      "name": "mono-web-on-mock",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "set CORE=http://127.0.0.1:7702&& npm run dev --prefix redesign"
+        "set CORE=http://127.0.0.1:7802&& npm run dev --prefix src/Mono.Web"
       ],
-      "port": 5373
+      "port": 5273
     }
   ]
 }

@@ -46,3 +46,6 @@ src/Mono.Core/wwwroot/
 
 # 로컬 작업용 임시 파일(테스트용 파이썬 런타임, 캡처 등)
 tmp/
+
+# Control UI 캡처. npm run capture 로 다시 만든다.
+src/Mono.Web/screenshots/

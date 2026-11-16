@@ -1,7 +1,7 @@
 // 화면을 띄우지 않고(headless) 새 UI 를 돌려 보며 스크린샷을 남긴다.
 //
 //   npm run mock      # 모의 Core (7802)
-//   npm run dev       # Vite (5373)
+//   $env:CORE = "http://127.0.0.1:7802"; npm run dev   # Vite (5273), 모의 Core 에 붙여서
 //   npm run capture   # screenshots/ 에 PNG 저장
 //
 //   SCALE=2 npm run capture             고해상도
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url"
 import puppeteer from "puppeteer-core"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const BASE = process.env.BASE ?? "http://127.0.0.1:5373"
+const BASE = process.env.BASE ?? "http://localhost:5273"
 const CORE = process.env.CORE ?? "http://127.0.0.1:7802"
 const OUT = path.resolve(here, "..", process.env.OUT ?? "screenshots")
 const SCALE = Number(process.env.SCALE ?? 1)
