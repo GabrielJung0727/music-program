@@ -25,16 +25,21 @@ public sealed class LibraryScanner
 
     public int Scan(string root)
     {
+        // 없는 폴더를 만들지 않는다. 이 경로는 화면에서 받은 문자열일 수 있고,
+        // 스캔 명령 하나로 아무 곳에나 폴더가 생기면 안 된다.
         if (!Directory.Exists(root))
         {
-            Directory.CreateDirectory(root);
             LastScan = DateTimeOffset.UtcNow;
             LastCount = 0;
             return 0;
         }
 
+        // 권한이 없는 하위 폴더 하나(System Volume Information 등) 때문에 스캔 전체가
+        // 예외로 끝나지 않게 한다. 건너뛰고 나머지를 읽는다.
+        var walk = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+
         var count = 0;
-        foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+        foreach (var file in Directory.EnumerateFiles(root, "*.*", walk)
                      .Where(f => Ext.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase)))
         {
             try

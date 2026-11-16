@@ -37,8 +37,74 @@ public sealed class OutputChannel
 
 public sealed class ConnectionRegistry
 {
+    /// <summary>이보다 많이 쌓이면 지금 붙어 있지 않은 id 의 비밀값부터 버린다.</summary>
+    private const int MaxRememberedPeers = 16384;
+
+    private readonly ConcurrentDictionary<string, string> _secrets = new();
+
     public ConcurrentDictionary<string, OutputChannel> Outputs { get; } = new();
     public ConcurrentDictionary<string, Func<MonoMessage, Task>> Controls { get; } = new();
+
+    /// <summary>
+    /// 접속한 쪽이 쓸 peer id 를 정한다.
+    ///
+    /// 방의 권한은 전부 peer id 비교다(호스트인가, DJ 인가). 그런데 id 는 접속하는 쪽이 고르고,
+    /// 호스트의 id 는 스냅샷에 실려 방의 모두에게 보인다. 그대로 받아 주면 hello 에 호스트의 id 를
+    /// 적는 것만으로 방을 넘겨받는다. 그래서 id 를 처음 내줄 때 비밀값을 같이 내주고,
+    /// 같은 id 로 다시 붙으려면 그 값을 내게 한다. 값이 없거나 틀리면 새 id 를 준다.
+    /// </summary>
+    public (string PeerId, string Secret) Claim(string? requestedId, string? secret)
+    {
+        var id = requestedId?.Trim();
+        if (!string.IsNullOrEmpty(id) && id.Length <= 64)
+        {
+            if (_secrets.TryGetValue(id, out var known))
+            {
+                if (secret is not null && FixedTimeEquals(known, secret)) return (id, known);
+            }
+            else
+            {
+                var first = NewSecret();
+                if (_secrets.TryAdd(id, first))
+                {
+                    Trim();
+                    return (id, first);
+                }
+            }
+        }
+
+        while (true)
+        {
+            var fresh = Guid.NewGuid().ToString("n")[..10];
+            var value = NewSecret();
+            if (!_secrets.TryAdd(fresh, value)) continue;
+            Trim();
+            return (fresh, value);
+        }
+    }
+
+    /// <summary>
+    /// 이 연결이 등록한 송신 함수일 때만 지운다. 같은 id 로 새 연결이 이미 붙었다면 그대로 둔다 —
+    /// 새로 고침 직후 옛 소켓의 정리 코드가 방금 붙은 연결을 지워 버리던 경합을 막는다.
+    /// </summary>
+    public bool ReleaseControl(string peerId, Func<MonoMessage, Task> sender)
+        => Controls.TryRemove(new KeyValuePair<string, Func<MonoMessage, Task>>(peerId, sender));
+
+    private static string NewSecret()
+        => Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
+    private static bool FixedTimeEquals(string a, string b)
+        => System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(a), System.Text.Encoding.UTF8.GetBytes(b));
+
+    private void Trim()
+    {
+        if (_secrets.Count <= MaxRememberedPeers) return;
+        foreach (var id in _secrets.Keys)
+        {
+            if (!Controls.ContainsKey(id)) _secrets.TryRemove(id, out _);
+        }
+    }
 }
 
 /// <summary>룸 상태를 그 룸의 Control/Output 전원에게 보낸다.</summary>
@@ -104,7 +170,7 @@ public sealed class RoomBroadcaster
                 }
                 catch (Exception)
                 {
-                    _connections.Controls.TryRemove(id, out _);
+                    _connections.ReleaseControl(id, send);
                 }
             }
 
@@ -125,7 +191,7 @@ public sealed class RoomBroadcaster
             }
             catch (Exception)
             {
-                _connections.Controls.TryRemove(peerId, out _);
+                _connections.ReleaseControl(peerId, send);
             }
         }
 
@@ -146,7 +212,7 @@ public sealed class RoomBroadcaster
             }
             catch (Exception)
             {
-                _connections.Controls.TryRemove(peer, out _);
+                _connections.ReleaseControl(peer, send);
             }
         }
     }

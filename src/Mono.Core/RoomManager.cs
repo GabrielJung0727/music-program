@@ -173,6 +173,14 @@ public sealed class RoomManager
                 return (null, "kicked from this room");
             }
 
+            // 솔로 방은 라운지가 아니다. 목록에 나가지 않을 뿐 아니라, id 를 안다고 들어올 수도 없다.
+            // 출력 워커는 주인의 솔로 방에 붙어야 하므로 Control 로 들어오는 경우만 막는다.
+            if (room.Mode == RoomMode.Solo && role == PeerRole.Control && peerId != room.HostPeerId
+                && !room.ControlPeerIds.Contains(peerId))
+            {
+                return (null, "room not found");
+            }
+
             var members = room.ControlPeerIds.Count + room.OutputPeerIds.Count;
             var alreadyIn = room.ControlPeerIds.Contains(peerId) || room.OutputPeerIds.Contains(peerId);
             if (!alreadyIn && members >= room.MaxMembers)
@@ -999,6 +1007,15 @@ public sealed class RoomManager
         }
     }
 
+    /// <summary>
+    /// 자동 재생 후보를 고를 때 살펴볼 곡 수. 여기서 재생할 수 있는 셋을 고른다.
+    ///
+    /// 예전에는 카탈로그 전체 수를 넘겼다. Recommend 는 파일이 실제로 있는지 곡마다 디스크에
+    /// 물어보므로, 룸 잠금을 쥔 채 라이브러리의 모든 파일을 확인하게 된다. NAS 에 5만 곡이 있으면
+    /// 그동안 오디오 전송까지 멈춘다.
+    /// </summary>
+    private const int AutoplayPoolSize = 48;
+
     private string? PickAutoplayNext(ListeningRoom room)
     {
         if (room.AutoplayCandidateIds.Count == 0)
@@ -1006,7 +1023,7 @@ public sealed class RoomManager
             var track = room.CurrentTrack(_catalog.Tracks);
             if (track is null) return null;
             var exclude = room.PlayedTrackIds.Concat(room.Queue.Select(q => q.TrackId)).Append(track.Id);
-            room.AutoplayCandidateIds.AddRange(_catalog.Recommend(track.Id, exclude, _catalog.Tracks.Count)
+            room.AutoplayCandidateIds.AddRange(_catalog.Recommend(track.Id, exclude, AutoplayPoolSize)
                 .Where(t => SourceUnavailable(t) is null).Take(3).Select(t => t.Id));
             if (room.AutoplayCandidateIds.Count == 0) return null;
         }
@@ -1053,10 +1070,13 @@ public sealed class RoomManager
                 }
 
                 var exclude = room.PlayedTrackIds.Concat(room.Queue.Select(q => q.TrackId)).Append(track.Id);
-                var candidates = _catalog.Recommend(track.Id, exclude, _catalog.Tracks.Count)
+                var candidates = _catalog.Recommend(track.Id, exclude, AutoplayPoolSize)
                     .Where(t => SourceUnavailable(t) is null).Take(3).ToList();
                 if (candidates.Count == 0)
                 {
+                    // 후보가 없어도 "이 곡은 찾아봤다"고 적어 둔다. 적지 않으면 곡이 끝나기 전
+                    // 30초 동안 250ms 마다 카탈로그 전체를 다시 훑는다.
+                    room.AutoplayProposedForTrackId = track.Id;
                     continue;
                 }
 
@@ -1400,11 +1420,11 @@ public sealed class RoomManager
             switch (action)
             {
                 case InviteAction.Rotate:
-                    room.InviteCode = Random.Shared.Next(100000, 999999).ToString();
+                    room.InviteCode = ListeningRoom.NewInviteCode();
                     room.InviteExpiresAt = DateTimeOffset.UtcNow.AddMinutes(minutes <= 0 ? 360 : minutes);
                     break;
                 case InviteAction.Extend:
-                    room.InviteCode ??= Random.Shared.Next(100000, 999999).ToString();
+                    room.InviteCode ??= ListeningRoom.NewInviteCode();
                     var from = room.InviteExpiresAt is { } e && e > DateTimeOffset.UtcNow ? e : DateTimeOffset.UtcNow;
                     room.InviteExpiresAt = from.AddMinutes(minutes <= 0 ? 60 : minutes);
                     break;
@@ -1726,8 +1746,20 @@ public sealed class RoomManager
             .ToList();
     }
 
+    /// <summary>
+    /// 스냅샷을 JSON 으로. 직렬화까지 잠금 안에서 끝낸다.
+    ///
+    /// Snapshot 이 돌려주는 객체는 큐·채팅·멤버를 지연 열거(LINQ)로 들고 있어서, 잠금 밖에서
+    /// 직렬화하면 그 사이 다른 스레드가 컬렉션을 고치는 순간 "Collection was modified" 로 터진다.
+    /// 그 예외는 방송 루프를 타고 올라가 보낸 사람의 연결을 끊는다.
+    /// </summary>
     public string SnapshotJson(ListeningRoom room)
-        => JsonSerializer.Serialize(Snapshot(room), LineFraming.JsonOptions);
+    {
+        lock (_gate)
+        {
+            return JsonSerializer.Serialize(Snapshot(room), LineFraming.JsonOptions);
+        }
+    }
 
     public object Snapshot(ListeningRoom room)
     {
@@ -1885,7 +1917,7 @@ public sealed class RoomManager
             artist = t is null ? null : _catalog.Artists.GetValueOrDefault(t.ArtistId)?.Name,
             durationMs = t?.DurationMs ?? 0,
             badge = t is null ? "" : QualityPolicyEngine.Badge(t, false),
-            artUrl = t?.ArtworkPath is null ? null : $"/api/art/{t.Id}"
+            artUrl = _catalog.ArtUrl(t)
         };
     }
 
@@ -1909,8 +1941,51 @@ public sealed class RoomManager
         hasLocal = t.LocalPath is not null,
         fileExtension = t.LocalPath is null ? null : Path.GetExtension(t.LocalPath).TrimStart('.').ToUpperInvariant(),
         badge = QualityPolicyEngine.Badge(t, false),
-        artUrl = t.ArtworkPath is null ? null : $"/api/art/{t.Id}"
+        artUrl = _catalog.ArtUrl(t)
     };
+
+    /// <summary>이 사람이 그 방에 들어와 있는가(호스트 · 멤버 · 관전자 · 출력).</summary>
+    public bool IsMember(string roomId, string peerId)
+    {
+        lock (_gate)
+        {
+            return _rooms.TryGetValue(roomId, out var room)
+                   && (room.HostPeerId == peerId
+                       || room.ControlPeerIds.Contains(peerId)
+                       || room.SpectatorPeerIds.Contains(peerId)
+                       || room.OutputPeerIds.Contains(peerId));
+        }
+    }
+
+    /// <summary>
+    /// 라운지 목록 카드에 쓸 요약: 지금 곡, 그리고 지금 곡부터 이어지는 서로 다른 앨범의 커버 최대 셋.
+    /// 같은 앨범이 이어지면 같은 그림이 세 번 나오므로 앨범이 달라지는 곡을 찾아 내려간다.
+    /// </summary>
+    public (IReadOnlyList<string> Covers, string? Title, string? Artist, int Upcoming) Peek(ListeningRoom room)
+    {
+        lock (_gate)
+        {
+            var at = room.QueueIndex;
+            if (at < 0 || at >= room.Queue.Count) return ([], null, null, 0);
+
+            var tracks = _catalog.Tracks;
+            var current = tracks.GetValueOrDefault(room.Queue[at].TrackId);
+            var covers = new List<string>(3);
+            var seen = new HashSet<string>();
+            for (var i = at; i < room.Queue.Count && covers.Count < 3; i++)
+            {
+                var t = tracks.GetValueOrDefault(room.Queue[i].TrackId);
+                if (t is null || _catalog.ArtUrl(t) is not { } url) continue;
+                if (seen.Add(t.AlbumId)) covers.Add(url);
+            }
+
+            return (
+                covers,
+                current?.Title,
+                current is null ? null : _catalog.Artists.GetValueOrDefault(current.ArtistId)?.Name,
+                room.Queue.Count - at - 1);
+        }
+    }
 
     public static IEnumerable<string> AllPeers(ListeningRoom room)
         => room.ControlPeerIds

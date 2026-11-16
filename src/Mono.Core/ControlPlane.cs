@@ -43,6 +43,8 @@ public sealed class ControlSession
     {
         string? peerId = null;
         string? peerName = null;
+        // 이 연결이 등록한 송신 함수. 정리할 때 "내 것"만 지우는 데 쓴다.
+        Func<MonoMessage, Task>? sender = null;
         try
         {
             while (!ct.IsCancellationRequested)
@@ -77,14 +79,24 @@ public sealed class ControlSession
                         break;
                     }
 
-                    peerId = string.IsNullOrWhiteSpace(msg.PeerId) ? Guid.NewGuid().ToString("n")[..10] : msg.PeerId;
-                    peerName = string.IsNullOrWhiteSpace(msg.DisplayName) ? peerId : msg.DisplayName;
-                    var id = peerId;
-                    _connections.Controls[id] = m => send(m, ct);
+                    // 한 연결이 hello 를 두 번 보내면 앞의 등록을 먼저 거둔다. 그대로 두면 앞의 id 가
+                    // 연결이 끊긴 뒤에도 레지스트리에 남는다.
+                    if (peerId is not null && sender is not null)
+                    {
+                        _connections.ReleaseControl(peerId, sender);
+                    }
+
+                    // id 는 요청대로 주지 않는다. 이미 주인이 있는 id 는 비밀값이 맞아야 내준다.
+                    var (id, secret) = _connections.Claim(msg.PeerId, msg.Secret);
+                    peerId = id;
+                    peerName = string.IsNullOrWhiteSpace(msg.DisplayName) ? id : CommandProcessor.Clip(msg.DisplayName, CommandProcessor.MaxNameLength);
+                    sender = m => send(m, ct);
+                    _connections.Controls[id] = sender;
                     await send(new MonoMessage
                     {
                         Type = MessageTypes.Welcome,
                         PeerId = id,
+                        Secret = secret,
                         Ok = true,
                         Body = "Mono Core · catalog ready"
                     }, ct);
@@ -109,7 +121,24 @@ public sealed class ControlSession
                     continue;
                 }
 
-                var executed = _commands.Execute(peerId, msg, msg.DisplayName ?? peerName);
+                CommandResult executed;
+                try
+                {
+                    executed = _commands.Execute(peerId, msg, msg.DisplayName ?? peerName, isLocal);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // 잘못된 입력 하나(null 이 섞인 배열, 접근할 수 없는 폴더 등)가 연결을 끊지 않게 한다.
+                    // 예전에는 여기서 예외가 그대로 올라가 소켓이 닫혔다.
+                    await send(new MonoMessage
+                    {
+                        Type = MessageTypes.Error,
+                        Ok = false,
+                        Error = $"명령을 처리하지 못했습니다 ({msg.Type}): {ex.Message}"
+                    }, ct);
+                    continue;
+                }
+
                 if (executed.Direct is not null)
                 {
                     await send(executed.Direct, ct);
@@ -128,9 +157,16 @@ public sealed class ControlSession
         }
         finally
         {
-            if (peerId is not null)
+            // 같은 id 로 새 연결이 이미 붙어 있으면(새로 고침, 재접속) 방에서 빼면 안 된다.
+            // 옛 소켓이 끊긴 것을 늦게 알아챈 것뿐이고, 사람은 여전히 그 방에 있다.
+            var replaced = peerId is not null
+                           && _connections.Controls.TryGetValue(peerId, out var current)
+                           && !ReferenceEquals(current, sender);
+            if (peerId is not null && !replaced)
             {
-                _connections.Controls.TryRemove(peerId, out _);
+                if (sender is not null) _connections.ReleaseControl(peerId, sender);
+                else _connections.Controls.TryRemove(peerId, out _);
+
                 foreach (var room in _rooms.RoomsOf(peerId))
                 {
                     var left = _rooms.Leave(room.Id, peerId);

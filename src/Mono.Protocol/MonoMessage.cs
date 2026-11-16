@@ -149,6 +149,13 @@ public sealed class MonoMessage
     [JsonPropertyName("token")]
     public string? Token { get; set; }
 
+    /// <summary>
+    /// peer id 의 주인임을 증명하는 값. Core 가 welcome 에 실어 주고, 같은 id 로 다시 붙을 때
+    /// hello 에 실어 돌려준다. 룸 상태나 다른 사람에게 가는 메시지에는 절대 싣지 않는다.
+    /// </summary>
+    [JsonPropertyName("secret")]
+    public string? Secret { get; set; }
+
     [JsonPropertyName("dsp")]
     public DspPresetKind? Dsp { get; set; }
 

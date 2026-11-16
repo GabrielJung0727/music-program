@@ -44,6 +44,10 @@ public sealed class ScanScheduler : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // 호스트는 ExecuteAsync 를 첫 await 까지 동기로 돌린 뒤에야 다음 서비스와 Kestrel 을 올린다.
+        // 스캔을 그대로 시작하면 라이브러리가 클수록 7702 가 늦게 열린다. 먼저 자리를 비켜 준다.
+        await Task.Yield();
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

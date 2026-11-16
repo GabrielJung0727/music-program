@@ -95,6 +95,12 @@ public sealed class ListeningRoom
     public Dictionary<string, PeerStats> Stats { get; } = [];
     public Dictionary<string, OutputCapability> Outputs { get; } = [];
 
+    /// <summary>
+    /// 초대 코드 6자리. 예측할 수 없어야 하므로 암호용 난수로 뽑는다(Random.Shared 는 그런 용도가 아니다).
+    /// </summary>
+    public static string NewInviteCode()
+        => System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+
     public static ListeningRoom ForMode(string id, string name, string hostPeerId, RoomMode mode)
     {
         var room = new ListeningRoom { Id = id, Name = name, HostPeerId = hostPeerId, Mode = mode };
@@ -115,7 +121,7 @@ public sealed class ListeningRoom
                 room.SourceMode = PlaybackSourceMode.FanOut;
                 break;
             case RoomMode.Invite:
-                room.InviteCode = Random.Shared.Next(100000, 999999).ToString();
+                room.InviteCode = NewInviteCode();
                 room.InviteExpiresAt = DateTimeOffset.UtcNow.AddHours(6);
                 break;
             case RoomMode.OpenLounge:

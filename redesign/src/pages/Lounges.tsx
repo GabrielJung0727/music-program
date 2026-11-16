@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useEffect, useMemo, useState, type CSSProperties } from "react"
 import { ListPlus, Lock, Radio } from "lucide-react"
 import { useApp } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { hueOf, mostPlayed, ROOM_MODE_LABEL } from "../lib/model"
-import { RoomMode, type RoomListing, type RoomSnapshot } from "../lib/protocol"
+import { RoomMode, type RoomListing } from "../lib/protocol"
 import { Art, Avatar, Empty, Modal } from "../ui"
 import { TrackRow } from "../ui/tracks"
 
@@ -33,67 +33,17 @@ export interface LoungePeek {
 }
 
 /**
- * 지금 곡과 다음 곡들의 커버를 고른다. 같은 앨범이 이어지면 같은 그림이 세 번 나오므로,
- * 앨범이 달라지는 곡을 찾아 내려가며 서로 다른 커버만 모은다.
+ * 목록 카드에 쓸 요약. Core 가 list_rooms 에 실어 준다(covers · nowTitle · nowArtist · upcoming).
+ * 같은 앨범이 이어질 때 커버를 걸러 내는 일도 Core 가 한다.
+ * 이 필드를 모르는 예전 Core 에서는 비어 있고, 그때는 호스트 패턴 표지로 그린다.
  */
-function peekOf(snap: Pick<RoomSnapshot, "queue" | "queueIndex">, albumOf: (trackId: string) => string | undefined): LoungePeek {
-  const at = snap.queueIndex
-  const current = at >= 0 ? snap.queue[at] : undefined
-  const covers: string[] = []
-  const seen = new Set<string>()
-  if (current) {
-    for (const q of snap.queue.slice(at)) {
-      if (!q.artUrl) continue
-      const key = albumOf(q.trackId) ?? q.artUrl
-      if (seen.has(key)) continue
-      seen.add(key)
-      covers.push(q.artUrl)
-      if (covers.length === 3) break
-    }
-  }
+export function peekOf(room: RoomListing): LoungePeek {
   return {
-    covers,
-    upcoming: current ? snap.queue.length - at - 1 : 0,
-    title: current?.title ?? null,
-    artist: current?.artist ?? null,
+    covers: room.covers ?? [],
+    upcoming: room.upcoming ?? 0,
+    title: room.nowTitle ?? null,
+    artist: room.nowArtist ?? null,
   }
-}
-
-/**
- * 목록(list_rooms)에는 곡 정보가 없다. 표지를 그리려면 방마다 스냅샷을 따로 읽어야 한다.
- * Core 의 GET /api/rooms/{id} 가 그걸 준다. 목록이 바뀔 때와 20초마다 다시 읽는다.
- */
-export function useLoungePeeks(rooms: RoomListing[]): Map<string, LoungePeek> {
-  const { trackById } = useApp()
-  const [peeks, setPeeks] = useState<Map<string, LoungePeek>>(new Map())
-  const ids = rooms.map((r) => r.id).join(",")
-  const idsRef = useRef(ids)
-  idsRef.current = ids
-  const albumOf = useRef((id: string) => trackById.get(id)?.albumId)
-  albumOf.current = (id) => trackById.get(id)?.albumId
-
-  useEffect(() => {
-    if (!ids) { setPeeks(new Map()); return }
-    const ac = new AbortController()
-    const load = async () => {
-      const entries = await Promise.all(idsRef.current.split(",").map(async (id) => {
-        try {
-          const res = await fetch(`/api/rooms/${encodeURIComponent(id)}`, { signal: ac.signal, headers: { accept: "application/json" } })
-          if (!res.ok) return null
-          return [id, peekOf((await res.json()) as RoomSnapshot, (trackId) => albumOf.current(trackId))] as const
-        } catch {
-          return null
-        }
-      }))
-      if (!ac.signal.aborted) setPeeks(new Map(entries.filter((e): e is readonly [string, LoungePeek] => !!e)))
-    }
-    void load()
-    const timer = setInterval(() => { void load() }, 20000)
-    return () => { ac.abort(); clearInterval(timer) }
-    // 카탈로그가 늦게 오면 앨범을 몰라 같은 커버를 거르지 못한다. 도착하면 한 번 더 읽는다.
-  }, [ids, trackById.size])
-
-  return peeks
 }
 
 /**
@@ -145,7 +95,6 @@ export default function Lounges() {
   const [filter, setFilter] = useState<Filter>("all")
   const [invite, setInvite] = useState<RoomListing | null>(null)
   const [code, setCode] = useState("")
-  const peeks = useLoungePeeks(rooms)
 
   // 목록은 Core 가 밀어 주지 않는다. 화면에 있는 동안 가끔 다시 묻는다.
   useEffect(() => {
@@ -181,7 +130,7 @@ export default function Lounges() {
     join(r)
   }
   const nowLine = (r: RoomListing) => {
-    const p = peeks.get(r.id)
+    const p = peekOf(r)
     return p?.title ? [p.title, p.artist].filter(Boolean).join(" · ") : r.playing ? "재생 중" : "호스트가 곡을 고르는 중"
   }
 
@@ -214,7 +163,7 @@ export default function Lounges() {
           {featured && (
             <section style={{ marginTop: 28 }}>
               <div className="lounge-feature">
-                <LoungeCover room={featured} peek={peeks.get(featured.id)} className="lounge-feature__art" />
+                <LoungeCover room={featured} peek={peekOf(featured)} className="lounge-feature__art" />
                 <div className="lounge-feature__body">
                   <span className="label">가장 많이 모인 방{featured.mode !== RoomMode.Open ? ` · ${ROOM_MODE_LABEL[featured.mode]}` : ""}</span>
                   <h2 className="t-display clip-2" style={{ fontSize: 40, marginTop: 12 }}>{featured.name}</h2>
@@ -251,7 +200,7 @@ export default function Lounges() {
               <div className="lounge-grid">
                 {rest.map((r) => (
                   <button key={r.id} className="lounge-card" onClick={() => tryJoin(r)}>
-                    <LoungeCover room={r} peek={peeks.get(r.id)} className="lounge-card__art" />
+                    <LoungeCover room={r} peek={peekOf(r)} className="lounge-card__art" />
                     <div className="lounge-card__body">
                       <div className="t-h3 clip" style={{ fontSize: 15.5 }}>{r.name}</div>
                       <div className="t-small dim clip" style={{ marginTop: 3 }}>

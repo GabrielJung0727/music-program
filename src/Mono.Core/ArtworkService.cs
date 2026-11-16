@@ -41,25 +41,14 @@ public sealed class ArtworkService
     }
 
     /// <summary>
-    /// 그리드용 사본. 픽셀 축소는 Control ArtCache DecodeToWidth가 담당한다.
+    /// 폭을 지정한 요청에 내줄 파일. 지금은 원본을 그대로 돌려준다.
+    ///
+    /// 예전에는 폭마다 thumbs 폴더에 사본을 만들었는데, 크기를 줄이지 않는 단순 복사였고
+    /// 사본 이름을 원본 파일 이름에서 땄다. 그래서 커버 파일이 전부 cover.jpg 인 라이브러리에서는
+    /// 처음 요청된 앨범의 커버가 그 폭의 모든 앨범에 나갔고, 폭을 바꿔 요청할 때마다 사본이 늘었다.
+    /// 실제로 줄인 썸네일이 필요해지면 원본 경로와 수정 시각으로 이름을 지어 여기서 만든다.
     /// </summary>
-    public string? EnsureThumbnail(string sourcePath, int width)
-    {
-        if (!System.IO.File.Exists(sourcePath) || width <= 0)
-            return sourcePath;
-        try
-        {
-            var name = Sanitize(Path.GetFileNameWithoutExtension(sourcePath)) + $"_w{width}" + Path.GetExtension(sourcePath);
-            var dest = Path.Combine(_root, "thumbs", name);
-            if (!System.IO.File.Exists(dest))
-                System.IO.File.Copy(sourcePath, dest, overwrite: false);
-            return dest;
-        }
-        catch
-        {
-            return sourcePath;
-        }
-    }
+    public string? EnsureThumbnail(string sourcePath, int width) => sourcePath;
 
     /// <summary>앨범 폴더에 놓인 cover.jpg / folder.jpg 류를 찾는다.</summary>
     public static string? SidecarFor(string audioPath)

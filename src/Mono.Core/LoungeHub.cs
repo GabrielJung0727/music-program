@@ -31,11 +31,20 @@ public sealed class LoungeHub : Hub
 
     public override Task OnConnectedAsync()
     {
-        var peer = Context.GetHttpContext()?.Request.Query["peer"].ToString();
-        if (string.IsNullOrWhiteSpace(peer))
+        var http = Context.GetHttpContext();
+
+        // 이 허브에는 페어링 절차가 없다. 이 PC 에서 온 연결만 받는다.
+        if (!RequestGuard.IsLoopback(http?.Connection.RemoteIpAddress))
         {
-            peer = "web-" + Context.ConnectionId[..8];
+            Context.Abort();
+            return Task.CompletedTask;
         }
+
+        // 쿼리로 받은 id 도 hello 와 같은 규칙을 탄다. 주인이 있는 id 는 비밀값 없이 내주지 않는다.
+        var requested = http?.Request.Query["peer"].ToString();
+        var peer = _connections.Claim(
+            string.IsNullOrWhiteSpace(requested) ? "web-" + Context.ConnectionId[..8] : requested,
+            http?.Request.Query["secret"].ToString()).PeerId;
 
         Context.Items["peer"] = peer;
         Register(peer, Context.ConnectionId);
@@ -70,10 +79,16 @@ public sealed class LoungeHub : Hub
 
         if (message.Type == MessageTypes.Hello)
         {
-            peer = string.IsNullOrWhiteSpace(message.PeerId) ? peer : message.PeerId;
+            string? secret = null;
+            if (!string.IsNullOrWhiteSpace(message.PeerId) && message.PeerId != peer)
+            {
+                _connections.Controls.TryRemove(peer, out _);
+                (peer, secret) = _connections.Claim(message.PeerId, message.Secret);
+            }
+
             Context.Items["peer"] = peer;
             Register(peer, Context.ConnectionId);
-            await Clients.Caller.SendAsync("msg", new MonoMessage { Type = MessageTypes.Welcome, PeerId = peer, Ok = true });
+            await Clients.Caller.SendAsync("msg", new MonoMessage { Type = MessageTypes.Welcome, PeerId = peer, Secret = secret, Ok = true });
             await Clients.Caller.SendAsync("msg", _commands.CatalogMessage());
             var rooms = _commands.Execute(peer, new MonoMessage { Type = MessageTypes.ListRooms }, name);
             if (rooms.Direct is not null)
