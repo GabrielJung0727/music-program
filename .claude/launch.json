@@ -7,7 +7,8 @@
       "runtimeArgs": [
         "run",
         "--project",
-        "src/Mono.Core"
+        "src/Mono.Core",
+        "-p:RollForward=Major"
       ],
       "port": 7702
     },
@@ -21,6 +22,15 @@
         "src/Mono.Web"
       ],
       "port": 5273
+    },
+    {
+      "name": "mono-redesign-real-core",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set CORE=http://127.0.0.1:7702&& npm run dev --prefix redesign"
+      ],
+      "port": 5373
     }
   ]
 }
