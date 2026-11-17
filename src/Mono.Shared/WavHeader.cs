@@ -26,7 +26,7 @@ public sealed record WavHeader(
         : DataSize / SourceBytesPerFrame * 1000 / SampleRate;
 
     /// <summary>헤더를 읽는다. RIFF/WAVE 가 아니거나 data 청크가 없으면 null.</summary>
-    public static WavHeader? Parse(FileStream fs)
+    public static WavHeader? Parse(Stream fs)
     {
         try
         {

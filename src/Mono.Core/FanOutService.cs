@@ -123,7 +123,7 @@ public sealed class FanOutService : BackgroundService
             var depth = format.BitDepth;
             if (!format.IsDsd)
             {
-                payload = DspPipeline.Process(pcm, rate, depth, format.Channels, room, out rate, out depth, out _);
+                payload = DspPipeline.Process(pcm, rate, depth, format.Channels, room, state.Dsp, out rate, out depth, out _);
             }
 
             var basePts = state.CursorMs;
@@ -195,8 +195,12 @@ public sealed class FanOutService : BackgroundService
         public long Epoch = -1;
         public long CursorMs;
 
+        /// <summary>이 스트림의 DSP 상태. 조각 사이에 필터의 기억을 이어 간다.</summary>
+        public readonly DspChain Dsp = new();
+
         public void Reset()
         {
+            Dsp.Reset();
             Source?.Dispose();
             Source = null;
             TrackId = "";
