@@ -2286,7 +2286,7 @@ public sealed class RoomManager
             return;
         }
 
-        var src = room.DspEnabled && room.DspPreset is DspPresetKind.Headphones or DspPresetKind.Speakers;
+        var src = UpsamplingApplies(room, track);
         if (room.QualityPolicy == QualityPolicy.LowestCommonFormat && room.Outputs.Count > 0)
         {
             var (rate, depth) = QualityPolicyEngine.CommonFormat(room.Outputs.Values, track);
@@ -2296,6 +2296,31 @@ public sealed class RoomManager
         room.SrcApplied = src;
         room.BitPerfect = !src && !room.DspEnabled;
         room.PathBadge = QualityPolicyEngine.Badge(track, src);
+    }
+
+    /// <summary>
+    /// 헤드폰·스피커 프리셋의 2배 업샘플링이 지금 실제로 일어나는가.
+    ///
+    /// 프리셋을 골랐다는 것만으로는 알 수 없다. 클럭싱크 룸에서는 출력 워커가 가공하는데,
+    /// 장치가 2배 레이트를 받지 않으면 올리지 않고 원래 레이트로 낸다(LocalPlayer.Finish).
+    /// 그때도 "샘플레이트 변환"이라고 표시하면 화면이 하지 않은 일을 했다고 말하는 것이다.
+    /// 워커와 같은 기준(장치가 보고한 샘플레이트 목록)으로 판정한다.
+    /// 팬아웃 룸에서는 Core 가 올려서 보내므로 언제나 일어난다.
+    /// </summary>
+    private static bool UpsamplingApplies(ListeningRoom room, Track track)
+    {
+        if (!DspSettings.From(room).Upsamples)
+        {
+            return false;
+        }
+
+        if (room.SourceMode == PlaybackSourceMode.FanOut)
+        {
+            return true;
+        }
+
+        var doubled = track.SampleRate * 2;
+        return room.Outputs.Values.Any(cap => !room.SpectatorPeerIds.Contains(cap.PeerId) && cap.AcceptsRate(doubled));
     }
 
     private void MarkComplete(ListeningRoom room, bool forceComplete = false)

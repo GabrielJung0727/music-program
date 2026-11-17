@@ -287,6 +287,10 @@ function SignalFlyout({ onClose }: { onClose: () => void }) {
   const state = !t ? "대기 중" : !out ? "출력 없음" : processed ? "가공됨" : room?.bitPerfect ? "무손실" : "재생 중"
   const tone = !t || !out ? "" : processed ? "warn" : room?.bitPerfect ? "ok" : ""
   const dsp = !!room?.dspEnabled
+  // 헤드폰 EQ(1)와 스피커 보정(2)은 2배 업샘플링을 함께 한다. 다만 장치가 2배 레이트를 받을 때만이다.
+  // 실제로 올렸는지는 Core 가 srcApplied 로 알려 준다.
+  const upsampling = dsp && (room?.dspPreset === 1 || room?.dspPreset === 2)
+  const doubledKhz = t ? (t.sampleRate * 2) / 1000 : 0
 
   // "로컬 FLAC 96kHz 24bit 2ch" — 한 줄로 읽히는 원본 규격.
   const sourceSpec = t && q
@@ -321,7 +325,11 @@ function SignalFlyout({ onClose }: { onClose: () => void }) {
               <span className="sp__node" />
               <div>
                 <div className="sp__name">샘플레이트 변환<i className="lamp lamp--warn" /></div>
-                <div className="sp__spec">출력 장치가 받을 수 있는 규격으로 맞춤</div>
+                <div className="sp__spec">
+                  {upsampling && t
+                    ? `DSP 프리셋의 2배 업샘플링 · ${t.sampleRate / 1000} → ${doubledKhz} kHz`
+                    : "출력 장치가 받을 수 있는 규격으로 맞춤"}
+                </div>
               </div>
             </li>
           )}
@@ -340,6 +348,7 @@ function SignalFlyout({ onClose }: { onClose: () => void }) {
               <div className="sp__name">{dsp ? DSP_PRESETS[room!.dspPreset] ?? "DSP" : "DSP 우회"}{dsp && <i className="lamp lamp--warn" />}</div>
               <div className="sp__spec">
                 {dsp ? `헤드룸 ${room!.headroomDb} dB` : "신호에 손대지 않습니다"}
+                {upsampling && t && out && !room?.srcApplied ? ` · 장치가 ${doubledKhz} kHz 를 받지 않아 업샘플링은 하지 않습니다` : ""}
                 {room?.dspLocked ? " · 호스트가 잠금" : ""}
               </div>
             </div>

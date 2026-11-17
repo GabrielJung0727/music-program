@@ -201,6 +201,10 @@ public sealed class MonoMessage
     [JsonPropertyName("maxSampleRate")]
     public int? MaxSampleRate { get; set; }
 
+    /// <summary>출력 장치가 실제로 여는 샘플레이트 목록. output_hello 에 실린다.</summary>
+    [JsonPropertyName("sampleRates")]
+    public List<int>? SampleRates { get; set; }
+
     [JsonPropertyName("maxBitDepth")]
     public int? MaxBitDepth { get; set; }
 

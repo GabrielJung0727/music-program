@@ -5,7 +5,7 @@ import {
 } from "lucide-react"
 import { useApp, type SettingsTab } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
-import { MSG, TrackTransition } from "../lib/protocol"
+import { MSG, PlaybackSourceMode, TrackTransition } from "../lib/protocol"
 import {
   applyUpdate, checkForUpdate, closeToTrayStatus, discordActivityStatus, hasShell, listAsioChannels, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
   restartOutput, setCloseToTray, setDiscordActivityEnabled, setDiscordApplicationId, shell, useOutputStatus, type AudioDeviceListing, type UpdateStatus,
@@ -76,8 +76,6 @@ export default function Settings({ tab }: { tab: SettingsTab }) {
 
 // ── 오디오 엔진 ─────────────────────────────────────────────────────────────
 
-const BUFFERS = [64, 128, 256, 512, 1024]
-
 function AudioTab() {
   const app = useApp()
   const { room } = useMono()
@@ -104,7 +102,6 @@ function AudioTab() {
       driverType: patch.driverType ?? audio?.driverType ?? "WASAPI_EXCLUSIVE",
       deviceId: patch.deviceId ?? audio?.deviceId ?? "",
       deviceName: patch.deviceName ?? audio?.deviceName ?? "",
-      bufferSize: patch.bufferSize ?? audio?.bufferSize ?? 256,
       exclusiveMode: patch.exclusiveMode ?? audio?.exclusiveMode ?? true,
       // 장치를 바꾸면 채널은 첫 쌍으로 돌아간다. 앞 장치의 3/4 가 새 장치에도 있다는 보장이 없다.
       asioChannelOffset: patch.asioChannelOffset ?? (patch.deviceId !== undefined ? 0 : audio?.asioChannelOffset ?? 0),
@@ -117,7 +114,6 @@ function AudioTab() {
     app.toast(res.ok ? `출력을 ${next.deviceName || "기본 장치"} 로 바꿨습니다` : (res.error ?? "출력을 바꾸지 못했습니다"), !res.ok)
   }
 
-  const buffer = audio?.bufferSize ?? 256
   const selected = devices.find((d) => d.id === audio?.deviceId) ?? devices.find((d) => d.name === audio?.deviceName)
 
   // ASIO 드라이버의 출력 채널. 드라이버를 잠깐 열어야 알 수 있어서, 고른 장치 하나에 대해서만 묻는다.
@@ -134,6 +130,9 @@ function AudioTab() {
 
   // 곡 전환. 방이 있으면 방의 값이 진실이고, 없으면 이 PC 에 저장해 둔 값을 보여 준다.
   const guest = app.role === "guest"
+  // 곡을 잇는 일은 출력 워커가 파일을 직접 열 때만 한다. Core 가 오디오를 보내 주는 방(팬아웃)에서는
+  // 무엇을 골라도 곡이 바뀔 때 끊고 새로 시작한다. 그 방에 있는 동안에는 그렇다고 말해야 한다.
+  const notApplied = room?.sourceMode === PlaybackSourceMode.FanOut
   const prefs = app.setup?.playback ?? playbackPrefs()
   const transition = room?.transition ?? prefs.transition
   const savedFadeSec = room ? Math.max(1, Math.min(12, Math.round(room.crossfadeMs / 1000))) : prefs.crossfadeSec
@@ -273,18 +272,30 @@ function AudioTab() {
           ? "라운지에서는 호스트가 정한 방식을 따릅니다."
           : "곡이 끝까지 재생되어 다음 곡으로 넘어갈 때 적용됩니다. 직접 곡을 넘기거나 탐색하면 바로 바뀝니다. 샘플레이트가 서로 다른 두 곡은 장치를 다시 열어야 해서 잇지 못합니다."}
       >
+        {notApplied && (
+          <div className="setrow" style={{ color: "var(--warn-text)", gap: 12, minHeight: 0 }}>
+            <TriangleAlert size={16} style={{ flex: "none" }} />
+            <span className="t-small">
+              지금 들어와 있는 라운지에서는 적용되지 않습니다. 이 방은 Core 가 오디오를 보내 주는 방식이라, 무엇을 골라도 곡이 바뀔 때 끊고 새로 시작합니다.
+              {guest ? "" : " 아래에서 고른 값은 저장되어 혼자 들을 때 쓰입니다."}
+            </span>
+          </div>
+        )}
         <Row
           title="자연스러운 곡 전환"
-          desc={joined
-            ? "곡과 곡 사이에서 장치를 멈추지 않고 이어서 재생합니다."
-            : "곡이 바뀔 때마다 장치를 멈췄다 다시 엽니다. 곡 사이에 짧은 공백이 생깁니다."}
+          desc={notApplied
+            ? (joined ? "켜 두었지만 이 방에서는 쓰이지 않습니다." : "꺼져 있습니다.")
+            : joined
+              ? "곡과 곡 사이에서 장치를 멈추지 않고 이어서 재생합니다."
+              : "곡이 바뀔 때마다 장치를 멈췄다 다시 엽니다. 곡 사이에 짧은 공백이 생깁니다."}
         >
           <Toggle
             label="자연스러운 곡 전환" value={joined} disabled={guest}
             onChange={(v) => { void setPlayback({ transition: v ? lastJoin.current : TrackTransition.Off }) }}
           />
         </Row>
-        {joined && (
+        {/* 적용되지 않는 방의 손님에게는 방식과 길이를 보이지 않는다. 바꿀 수도 없고 쓰이지도 않는 값이다. */}
+        {joined && !(notApplied && guest) && (
           <Row
             title="전환 방식"
             desc={crossfade
@@ -297,7 +308,7 @@ function AudioTab() {
             </div>
           </Row>
         )}
-        {joined && crossfade && (
+        {joined && crossfade && !(notApplied && guest) && (
           <Row title="겹치는 길이" desc={<>두 곡이 <span className="mono">{fadeSec}</span>초 동안 겹칩니다. 1초에서 12초까지 고를 수 있습니다.</>}>
             <div style={{ width: 200, flex: "none" }}>
               <Slider
@@ -329,16 +340,16 @@ function AudioTab() {
             }}
           />
         </Row>
+        {/*
+          예전에는 여기에 64~1024 샘플을 고르는 단추가 있었다. 그 값은 저장만 되고 출력 워커에는 전달되지 않아서,
+          무엇을 골라도 소리는 달라지지 않았다. 실제로 버퍼를 정하는 쪽이 누구인지를 적는다.
+        */}
         <Row
-          title="버퍼 크기"
-          desc={<>작을수록 반응이 빠르고, 클수록 끊김에 강합니다. 지금 <span className="mono">{buffer}</span> 샘플 ≈ <span className="mono">{((buffer / 44100) * 1000).toFixed(1)} ms</span></>}
-        >
-          <div className="seg">
-            {BUFFERS.map((b) => (
-              <button key={b} className={`mono ${buffer === b ? "is-on" : ""}`} onClick={() => { void apply({ bufferSize: b }) }}>{b}</button>
-            ))}
-          </div>
-        </Row>
+          title="장치 버퍼"
+          desc={audio?.driverType === "ASIO"
+            ? "ASIO 는 드라이버가 정한 버퍼 크기를 그대로 씁니다. Mono 에서는 바꿀 수 없고, 장치의 드라이버 설정에서 바꿉니다."
+            : "WASAPI 는 배타 모드에서 10 ms, 공유 모드에서 20 ms 로 엽니다. Mono 에서 고르는 값이 아닙니다."}
+        />
       </Group>
     </>
   )
