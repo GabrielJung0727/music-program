@@ -26,7 +26,9 @@ import {
   type PlaylistView,
   type RoomListing,
   type RoomSnapshot,
+  type TrackTransition,
 } from "../lib/protocol"
+import { playbackPrefs } from "../lib/setup"
 import { clearDiscordNowPlaying, setDiscordNowPlaying } from "../lib/shell"
 
 /** Core 는 hello 의 displayName 을 멤버 목록·아카이브 참가자에 그대로 쓴다. */
@@ -118,6 +120,8 @@ export interface MonoCommands {
   jumpTo(index: number, itemId?: string): void
   setShuffle(on: boolean): void
   setRepeat(mode: RepeatMode): void
+  /** 곡이 끝까지 재생되어 다음 곡으로 넘어갈 때의 방식과, 크로스페이드로 겹치는 길이(ms). */
+  setTransition(mode: TrackTransition, crossfadeMs: number): void
   setVolume(percent: number, targetPeerId?: string): void
 
   // 큐
@@ -376,6 +380,15 @@ export function MonoProvider({ children }: { children: ReactNode }) {
    * 다만 이 방은 라운지가 아니다. RoomMode.Solo 는 라운지 목록에 나가지 않으므로,
    * 곡을 튼다고 해서 호스트가 되지는 않는다. 호스트는 publishRoom 으로 고르는 것이다.
    */
+  /**
+   * 방을 새로 만들면 이 PC 에 저장해 둔 곡 전환 설정을 그 방에 건다. Core 는 방마다 기억하고,
+   * 방은 Core 가 다시 뜨면 사라지므로, 만들 때마다 걸어야 설정이 유지된다.
+   */
+  const applyPlaybackPrefs = useCallback((roomId: string) => {
+    const prefs = playbackPrefs()
+    client.send({ type: MSG.setTransition, roomId, index: prefs.transition, mediaTimeMs: prefs.crossfadeSec * 1000 })
+  }, [client])
+
   const ensureRoom = useCallback(async (): Promise<string | null> => {
     if (myRoomRef.current) return myRoomRef.current
     try {
@@ -387,13 +400,14 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       if (snap) {
         myRoomRef.current = snap.id
         setRoom(snap)
+        applyPlaybackPrefs(snap.id)
         return snap.id
       }
     } catch (err) {
       setLastError(err instanceof Error ? err.message : String(err))
     }
     return null
-  }, [client])
+  }, [client, applyPlaybackPrefs])
 
   const commands = useMemo<MonoCommands>(() => {
     const withRoom = (msg: MonoMessage) => {
@@ -428,6 +442,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
           if (!snap) return null
           myRoomRef.current = snap.id
           setRoom(snap)
+          applyPlaybackPrefs(snap.id)
           return snap.id
         } catch (err) {
           setLastError(err instanceof Error ? err.message : String(err))
@@ -518,6 +533,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       jumpTo: (index, itemId) => withRoom({ type: MSG.jumpTo, index, itemId }),
       setShuffle: (on) => withRoom({ type: MSG.setShuffle, flag: on }),
       setRepeat: (mode) => withRoom({ type: MSG.setRepeat, index: mode }),
+      setTransition: (mode, crossfadeMs) => withRoom({ type: MSG.setTransition, index: mode, mediaTimeMs: Math.round(crossfadeMs) }),
       setVolume: (percent, targetPeerId) =>
         withRoom({
           type: MSG.setVolume,
@@ -712,7 +728,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
 
       clearError: () => setLastError(null),
     }
-  }, [client, send, request, ensureRoom, room?.playing])
+  }, [client, send, request, ensureRoom, applyPlaybackPrefs, room?.playing])
 
   const state = useMemo<MonoState>(
     () => ({

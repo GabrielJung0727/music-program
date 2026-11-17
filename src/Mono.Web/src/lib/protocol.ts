@@ -27,6 +27,7 @@ export const MSG = {
   setHeadroom: "set_headroom",
   setDeviceEq: "set_device_eq",
   setSourceMode: "set_source_mode",
+  setTransition: "set_transition",
   setRoomFlags: "set_room_flags",
 
   enqueue: "enqueue",
@@ -158,6 +159,10 @@ export type RoomMode = (typeof RoomMode)[keyof typeof RoomMode]
 // Mono.Shared.RepeatMode 와 값이 같아야 한다.
 export const RepeatMode = { Off: 0, All: 1, One: 2 } as const
 export type RepeatMode = (typeof RepeatMode)[keyof typeof RepeatMode]
+
+// Mono.Shared.TrackTransition 과 값이 같아야 한다. 곡이 끝까지 재생되어 다음 곡으로 넘어갈 때의 방식이다.
+export const TrackTransition = { Off: 0, Gapless: 1, Crossfade: 2 } as const
+export type TrackTransition = (typeof TrackTransition)[keyof typeof TrackTransition]
 
 export const StreamingProvider = { Local: 0, Tidal: 1, Qobuz: 2 } as const
 export type StreamingProvider = (typeof StreamingProvider)[keyof typeof StreamingProvider]
@@ -333,6 +338,8 @@ export interface RoomSnapshot {
   smartAutoplay: boolean
   shuffle: boolean
   repeat: RepeatMode
+  transition: TrackTransition
+  crossfadeMs: number
   linerPage: number
   linerScrollY: number
   maxMembers: number

@@ -56,11 +56,13 @@ interface MonoBridge {
   pickFile(title?: string, filter?: string): Promise<string | null>
   openExternal(url: string): Promise<boolean>
   output: {
-    start(roomId?: string | null, backend?: string, device?: string): Promise<{ ok: boolean; error?: string | null }>
+    start(roomId?: string | null, backend?: string, device?: string, asioChannel?: number): Promise<{ ok: boolean; error?: string | null }>
     stop(): Promise<{ ok: boolean }>
     restart(): Promise<{ ok: boolean; error?: string | null }>
     status(): Promise<OutputStatus>
     devices(): Promise<AudioDeviceListing[]>
+    /** 고른 ASIO 드라이버의 출력 채널 이름. 이 호출이 없는 옛 셸도 있다. */
+    asioChannels?(device?: string): Promise<{ channels: string[]; error?: string | null }>
   }
   update: {
     check(): Promise<UpdateStatus>
@@ -130,11 +132,11 @@ export function openExternal(url: string) {
 }
 
 /** 출력 워커. 셸이 없으면 Output 프로세스를 띄울 방법이 없으므로 안내가 필요하다. */
-export async function startOutput(roomId?: string | null, backend?: string, device?: string) {
+export async function startOutput(roomId?: string | null, backend?: string, device?: string, asioChannel?: number) {
   const bridge = shell()
   if (!bridge) return { ok: false, error: "출력은 Mono 데스크톱 앱에서만 연결할 수 있습니다." }
   try {
-    return await bridge.output.start(roomId ?? null, backend, device)
+    return await bridge.output.start(roomId ?? null, backend, device, asioChannel)
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -149,6 +151,17 @@ export async function listAudioDevices(): Promise<AudioDeviceListing[]> {
   if (!bridge) return []
   try {
     return await bridge.output.devices()
+  } catch {
+    return []
+  }
+}
+
+/** ASIO 드라이버의 출력 채널 이름. 셸이 없거나 드라이버가 열리지 않으면 빈 배열이다. */
+export async function listAsioChannels(device?: string): Promise<string[]> {
+  const output = shell()?.output
+  if (!output?.asioChannels) return []
+  try {
+    return (await output.asioChannels(device)).channels ?? []
   } catch {
     return []
   }
