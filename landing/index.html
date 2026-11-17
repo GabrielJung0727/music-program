@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mono · 하이파이 오디오 플레이어</title>
+  <meta name="description" content="로컬 고해상도 음원과 TIDAL · Qobuz 를 한 라이브러리에서 재생하는 Windows 용 오디오 플레이어. 신호 경로를 단계별로 보여 주고, 라운지를 열어 같은 곡을 같은 시각에 듣습니다.">
+  <meta name="theme-color" content="#0b0b0d">
+  <meta property="og:title" content="Mono · 하이파이 오디오 플레이어">
+  <meta property="og:description" content="파일에서 DAC 까지, 손대지 않고. Windows 용 오디오 플레이어 Mono.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="public/screenshots/album-1440.webp">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/plus-jakarta-sans-latin-wght-normal.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin-wght-normal.woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/fonts.css">
+  <link rel="stylesheet" href="assets/fonts/wanted-sans/wanted-sans.css">
+  <link rel="stylesheet" href="assets/fonts/pretendard/pretendard.css">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <!-- ── 상단 네비게이션 ───────────────────────────────────────────── -->
+  <header class="nav" id="top">
+    <div class="wrap nav__in">
+      <a class="brand" href="#top" aria-label="Mono 처음으로">
+        <svg class="brand__mark" width="28" height="28" viewBox="150 280 760 470" aria-hidden="true">
+          <path d="M 230 670 C 230 460, 316 360, 416 360 C 484 360, 506 460, 512 490 C 518 460, 540 360, 608 360 C 708 360, 794 460, 794 670" fill="none" stroke="currentColor" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="880" cy="670" r="40"/>
+        </svg>
+        <span class="brand__word">Mono</span>
+      </a>
+
+      <nav class="nav__links" aria-label="섹션">
+        <a href="#signal">신호 경로</a>
+        <a href="#lounge">라이브 라운지</a>
+        <a href="#interface">인터페이스</a>
+        <a href="#install">설치 방법</a>
+      </nav>
+
+      <a class="btn btn--primary btn--sm" data-download href="https://github.com/GabrielJung0727/music-program/releases/latest/download/Mono-win-Setup.exe">다운로드</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ── Hero ────────────────────────────────────────────────────── -->
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero__copy">
+          <h1 class="display">파일에서 DAC 까지,<br>손대지 않고.</h1>
+          <p class="lead">
+            Mono 는 로컬 고해상도 음원과 TIDAL · Qobuz 를 한 라이브러리에서 재생하는 Windows 용 오디오 플레이어입니다.
+            라운지를 열면 들어온 기기들이 같은 곡을 같은 시각에 듣습니다.
+          </p>
+
+          <div class="cta">
+            <a class="btn btn--primary btn--lg" data-download href="https://github.com/GabrielJung0727/music-program/releases/latest/download/Mono-win-Setup.exe">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+              <span data-download-label>Windows 용 Mono 다운로드</span>
+            </a>
+
+            <details class="os-menu">
+              <summary class="btn btn--line btn--lg">
+                다른 운영체제
+                <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </summary>
+              <div class="os-menu__pop">
+                <a class="os-menu__item" data-download href="https://github.com/GabrielJung0727/music-program/releases/latest/download/Mono-win-Setup.exe">
+                  <span>Windows <span class="mono">(x64)</span></span>
+                  <span class="os-menu__state os-menu__state--ok">받기</span>
+                </a>
+                <div class="os-menu__item is-off" aria-disabled="true">
+                  <span>macOS <span class="mono">(Apple Silicon)</span></span>
+                  <span class="os-menu__state">아직 없음</span>
+                </div>
+                <div class="os-menu__item is-off" aria-disabled="true">
+                  <span>macOS <span class="mono">(Intel)</span></span>
+                  <span class="os-menu__state">아직 없음</span>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <p class="os-note" data-os-note hidden></p>
+
+          <p class="meta mono">
+            <span data-version>v0.6.0</span><span class="meta__sep">·</span>Windows 10/11 (64-bit)<span class="meta__sep">·</span>Core 엔진 내장<span class="meta__sep">·</span>무료 다운로드
+          </p>
+        </div>
+
+        <div class="showcase" data-tabs>
+          <div class="seg" role="tablist" aria-label="앱 화면">
+            <button class="is-on" role="tab" aria-selected="true" aria-controls="shot-album" id="tab-album" data-tab="album">앨범</button>
+            <button role="tab" aria-selected="false" aria-controls="shot-lyrics" id="tab-lyrics" data-tab="lyrics" tabindex="-1">지금 재생</button>
+          </div>
+
+          <figure class="frame">
+            <img id="shot-album" role="tabpanel" aria-labelledby="tab-album" data-panel="album"
+                 src="public/screenshots/album-1440.webp"
+                 srcset="public/screenshots/album-1440.webp 1440w, public/screenshots/album-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 1200px, calc(100vw - 40px)"
+                 width="1440" height="900" fetchpriority="high" decoding="async"
+                 alt="앨범 화면. 커버에서 뽑은 색이 헤더에 깔리고, 플레이어 바에 24/192 · BIT-PERFECT 칩이 보인다">
+            <img id="shot-lyrics" role="tabpanel" aria-labelledby="tab-lyrics" data-panel="lyrics" hidden
+                 src="public/screenshots/lyrics-1440.webp"
+                 srcset="public/screenshots/lyrics-1440.webp 1440w, public/screenshots/lyrics-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 1200px, calc(100vw - 40px)"
+                 width="1440" height="900" loading="lazy" decoding="async"
+                 alt="지금 재생 화면. 커버 옆에 가사가 크게 놓이고 지금 소절만 밝다">
+          </figure>
+          <p class="cap">실제 앱 화면입니다. 캡처에 보이는 앨범과 사용자는 예시 데이터입니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 01 신호 경로 ─────────────────────────────────────────────── -->
+    <section class="section" id="signal" data-signal="clean">
+      <div class="wrap">
+        <header class="head">
+          <p class="label"><span class="mono">01</span> 신호 경로</p>
+          <h2 class="title">어디서 무엇이 손댔는지,<br>숨기지 않습니다.</h2>
+          <p class="lead">
+            곡이 파일에서 장치까지 가는 길을 단계마다 보여 줍니다. 아무것도 손대지 않았으면 초록, DSP 가 끼어들면 앰버입니다.
+            화면은 실제로 한 일만 말합니다.
+          </p>
+        </header>
+
+        <div class="signal">
+          <div class="signal__path">
+            <div class="signal__switch">
+              <span class="signal__state">
+                신호 경로: <b class="signal__word signal__word--clean">무손실</b><b class="signal__word signal__word--dsp">가공됨</b>
+              </span>
+              <div class="seg" role="group" aria-label="DSP 를 켰을 때와 껐을 때">
+                <button class="is-on" data-signal-set="clean" aria-pressed="true">DSP 끔</button>
+                <button data-signal-set="dsp" aria-pressed="false">DSP 켬</button>
+              </div>
+            </div>
+
+            <ol class="rail">
+              <li class="rail__stage">
+                <span class="rail__node mono">01</span>
+                <div>
+                  <h3 class="rail__name">소스 <i class="lamp lamp--ok"></i></h3>
+                  <p class="rail__text">로컬 FLAC · WAV · ALAC · AIFF 와 TIDAL · Qobuz. 어디서 온 곡이든 같은 경로로 들어옵니다.</p>
+                  <p class="rail__spec mono">로컬 FLAC 96kHz 24bit 2ch</p>
+                </div>
+              </li>
+              <li class="rail__stage">
+                <span class="rail__node mono">02</span>
+                <div>
+                  <h3 class="rail__name">Mono Core <i class="lamp lamp--ok lamp--follows"></i></h3>
+                  <p class="rail__text">큐와 재생 시계를 맡습니다. 샘플에는 손대지 않습니다.</p>
+                  <p class="rail__spec mono">원본 그대로 전송</p>
+                </div>
+              </li>
+              <li class="rail__stage rail__stage--dsp">
+                <span class="rail__node mono">03</span>
+                <div>
+                  <h3 class="rail__name">
+                    <span class="only-clean">DSP 우회</span><span class="only-dsp">헤드폰 EQ</span>
+                    <i class="lamp lamp--warn only-dsp"></i>
+                  </h3>
+                  <p class="rail__text">꺼 두면 건너뜁니다. 켜면 앰버 램프가 들어오고, 무엇이 끼어들었는지 이름으로 적힙니다.</p>
+                  <p class="rail__spec mono"><span class="only-clean">신호에 손대지 않습니다</span><span class="only-dsp">헤드룸 -3 dB · 2배 업샘플링 96 → 192 kHz</span></p>
+                </div>
+              </li>
+              <li class="rail__stage">
+                <span class="rail__node mono">04</span>
+                <div>
+                  <h3 class="rail__name">출력 장치 <i class="lamp lamp--ok lamp--follows"></i></h3>
+                  <p class="rail__text">WASAPI 배타 모드나 ASIO 로 장치를 직접 엽니다. 윈도우 믹서를 거치지 않습니다.</p>
+                  <p class="rail__spec mono"><span class="only-clean">WASAPI 배타 모드 · Bit-Perfect</span><span class="only-dsp">WASAPI 배타 모드 · 가공된 신호</span></p>
+                </div>
+              </li>
+            </ol>
+
+            <p class="note">
+              플레이어 바의 <span class="chip"><i class="lamp lamp--ok"></i><span class="mono">BIT-PERFECT</span></span> 칩은
+              DSP 가 꺼져 있고, 장치가 곡의 규격을 그대로 받고, 배타로 붙어 있고, 볼륨을 디지털로 줄이지 않았을 때만 켜집니다.
+            </p>
+          </div>
+
+          <figure class="signal__shot">
+            <div class="pop">
+              <img class="only-clean"
+                   src="public/screenshots/signal-clean-380.webp"
+                   srcset="public/screenshots/signal-clean-380.webp 1x, public/screenshots/signal-clean-760.webp 2x"
+                   width="380" height="411" loading="lazy" decoding="async"
+                   alt="앱의 신호 경로 팝오버. 소스, Mono Core, DSP 우회, 출력 장치가 위에서 아래로 놓이고 모두 초록 점이다">
+              <img class="only-dsp"
+                   src="public/screenshots/signal-dsp-380.webp"
+                   srcset="public/screenshots/signal-dsp-380.webp 1x, public/screenshots/signal-dsp-760.webp 2x"
+                   width="380" height="472" loading="lazy" decoding="async"
+                   alt="DSP 를 켠 신호 경로 팝오버. 샘플레이트 변환과 헤드폰 EQ 단계에 앰버 점이 들어왔다">
+            </div>
+            <figcaption class="cap">앱의 신호 경로 팝오버. 플레이어 바의 칩을 누르면 열립니다.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 02 라이브 라운지 ─────────────────────────────────────────── -->
+    <section class="section" id="lounge">
+      <div class="wrap">
+        <header class="head head--split">
+          <div>
+            <p class="label"><span class="mono">02</span> 라이브 라운지</p>
+            <h2 class="title">혼자 깊게 듣거나,<br>라운지를 열어 함께 듣거나.</h2>
+          </div>
+          <p class="lead">
+            듣던 방을 그대로 공개로 바꾸면 라운지가 됩니다. 큐도 재생 위치도 그대로입니다.
+            들어온 기기들은 호스트의 재생 시각과 곡 순서를 따라갑니다.
+          </p>
+        </header>
+
+        <div class="lounge">
+          <figure class="lounge__main frame">
+            <img src="public/screenshots/lounges-1440.webp"
+                 srcset="public/screenshots/lounges-1440.webp 1440w, public/screenshots/lounges-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 1000px, calc(100vw - 40px)"
+                 width="1440" height="900" loading="lazy" decoding="async"
+                 alt="라운지 목록. 열려 있는 방마다 지금 곡의 커버와 ON AIR 배지, 청취자 수, 음질이 보인다">
+          </figure>
+          <figure class="lounge__room frame">
+            <img src="public/screenshots/room-1440.webp"
+                 srcset="public/screenshots/room-1440.webp 1440w, public/screenshots/room-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 560px, calc(100vw - 40px)"
+                 width="1440" height="900" loading="lazy" decoding="async"
+                 alt="호스트의 라운지 방. 셋리스트와 채팅, 멤버 목록이 한 화면에 있다">
+          </figure>
+        </div>
+        <p class="cap">라운지 목록과 호스트의 방. 캡처에 보이는 방과 사람은 예시 데이터입니다.</p>
+
+        <div class="facts">
+          <div class="facts__lead">
+            <span class="chip chip--live"><i class="lamp lamp--live"></i><span class="mono">ON AIR</span></span>
+            <p>방송 중인 방에는 빨간 표시가 붙습니다. 빨강은 이 뜻으로만 씁니다.</p>
+          </div>
+          <dl class="facts__list">
+            <div>
+              <dt>같은 시각</dt>
+              <dd>모든 기기가 Core 의 시계에 맞춰 같은 지점을 재생합니다. 출력 장치의 오프셋과 지터는 설정 화면에 숫자로 나옵니다.</dd>
+            </div>
+            <div>
+              <dt>셋리스트 · 채팅 · 반응</dt>
+              <dd>호스트가 셋리스트를 짜고, 듣는 사람은 채팅과 반응을 남깁니다. 전부 한 화면에 있습니다.</dd>
+            </div>
+            <div>
+              <dt>기록</dt>
+              <dd>끝난 라운지는 지난 세션에 남습니다. 그날의 셋리스트를 플레이리스트로 만들 수 있습니다.</dd>
+            </div>
+            <div>
+              <dt>Discord</dt>
+              <dd>설정에서 켜면 듣는 곡이 Discord 프로필의 활동 카드에 나옵니다. Discord 개발자 포털에서 만든 Application ID 가 필요합니다.</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 03 인터페이스 ────────────────────────────────────────────── -->
+    <section class="section" id="interface">
+      <div class="wrap">
+        <header class="head">
+          <p class="label"><span class="mono">03</span> 인터페이스</p>
+          <h2 class="title">색은 앨범 커버에서 나옵니다.</h2>
+          <p class="lead">
+            섀시는 무채색입니다. 어두운 테마와 밝은 테마 중에 고르면 되고, 화면의 색은 재생 중인 앨범이 정합니다.
+          </p>
+        </header>
+
+        <div class="themes" data-theme="dark" data-themes>
+          <div class="themes__bar">
+            <div class="seg" role="group" aria-label="앱 테마 미리보기">
+              <button class="is-on" data-theme-set="dark" aria-pressed="true">어둡게</button>
+              <button data-theme-set="light" aria-pressed="false">밝게</button>
+            </div>
+            <p class="themes__spec mono">
+              <span class="only-dark">캔버스 #0B0B0D · 포인트 #6D6DF6</span>
+              <span class="only-light">배경 #F6F6F8 · 포인트 #5252E0</span>
+            </p>
+          </div>
+          <figure class="frame">
+            <img class="only-dark"
+                 src="public/screenshots/home-dark-1440.webp"
+                 srcset="public/screenshots/home-dark-1440.webp 1440w, public/screenshots/home-dark-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 1152px, calc(100vw - 72px)"
+                 width="1440" height="900" loading="lazy" decoding="async"
+                 alt="어두운 테마의 홈 화면">
+            <img class="only-light"
+                 src="public/screenshots/home-light-1440.webp"
+                 srcset="public/screenshots/home-light-1440.webp 1440w, public/screenshots/home-light-2880.webp 2880w"
+                 sizes="(min-width: 1272px) 1152px, calc(100vw - 72px)"
+                 width="1440" height="900" loading="lazy" decoding="async"
+                 alt="밝은 테마의 홈 화면">
+          </figure>
+        </div>
+
+        <ul class="notes">
+          <li>지금 재생 화면은 커버와 가사만 남깁니다. 지금 소절만 또렷하고 나머지는 물러납니다.</li>
+          <li><span class="mono">24/96</span>, <span class="mono">FLAC</span> 같은 규격과 시간은 고정폭 숫자로 적어 자리가 흔들리지 않습니다.</li>
+          <li>글꼴을 앱에 함께 실었습니다. 인터넷이 없어도 같은 모습입니다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── 04 설치 방법 ─────────────────────────────────────────────── -->
+    <section class="section" id="install">
+      <div class="wrap">
+        <header class="head">
+          <p class="label"><span class="mono">04</span> 설치 방법</p>
+          <h2 class="title">세 단계면 소리가 납니다.</h2>
+        </header>
+
+        <div class="install" data-os-tabs>
+          <div class="seg seg--lg" role="tablist" aria-label="운영체제">
+            <button class="is-on" role="tab" aria-selected="true" aria-controls="os-windows" id="os-tab-windows" data-os="windows">Windows</button>
+            <button role="tab" aria-selected="false" aria-controls="os-macos" id="os-tab-macos" data-os="macos" tabindex="-1">macOS</button>
+          </div>
+
+          <div class="install__panel" id="os-windows" role="tabpanel" aria-labelledby="os-tab-windows" data-os-panel="windows">
+            <div class="steps" data-steps>
+              <figure class="steps__shot frame">
+                <img data-step-shot="1"
+                     src="public/screenshots/setup-1-1440.webp"
+                     srcset="public/screenshots/setup-1-1440.webp 1440w, public/screenshots/setup-1-2880.webp 2880w"
+                     sizes="(min-width: 1272px) 700px, calc(100vw - 40px)"
+                     width="1440" height="900" loading="lazy" decoding="async"
+                     alt="첫 실행 화면. 몇 가지만 고르면 바로 들을 수 있다는 안내">
+                <img data-step-shot="2" hidden
+                     src="public/screenshots/setup-2-1440.webp"
+                     srcset="public/screenshots/setup-2-1440.webp 1440w, public/screenshots/setup-2-2880.webp 2880w"
+                     sizes="(min-width: 1272px) 700px, calc(100vw - 40px)"
+                     width="1440" height="900" loading="lazy" decoding="async"
+                     alt="음악 폴더를 고르는 단계">
+                <img data-step-shot="3" hidden
+                     src="public/screenshots/setup-3-1440.webp"
+                     srcset="public/screenshots/setup-3-1440.webp 1440w, public/screenshots/setup-3-2880.webp 2880w"
+                     sizes="(min-width: 1272px) 700px, calc(100vw - 40px)"
+                     width="1440" height="900" loading="lazy" decoding="async"
+                     alt="설정을 마친 화면. 고른 폴더와 출력 장치가 요약되어 있다">
+              </figure>
+
+              <ol class="steps__list">
+                <li>
+                  <button class="step is-on" data-step="1" aria-pressed="true">
+                    <span class="step__no mono">STEP 01</span>
+                    <span class="step__title">설치 파일을 받아 실행합니다</span>
+                    <span class="step__text"><span class="mono">Mono-win-Setup.exe</span> 하나에 Core 와 출력 엔진이 함께 들어 있습니다. .NET 런타임을 따로 설치하지 않아도 됩니다.</span>
+                  </button>
+                </li>
+                <li>
+                  <button class="step" data-step="2" aria-pressed="false">
+                    <span class="step__no mono">STEP 02</span>
+                    <span class="step__title">음악 폴더와 스트리밍을 연결합니다</span>
+                    <span class="step__text">음악이 들어 있는 폴더를 고르면 바로 스캔합니다. TIDAL · Qobuz 는 계정이 있을 때만 연결하면 됩니다.</span>
+                  </button>
+                </li>
+                <li>
+                  <button class="step" data-step="3" aria-pressed="false">
+                    <span class="step__no mono">STEP 03</span>
+                    <span class="step__title">출력 장치를 고르고 재생합니다</span>
+                    <span class="step__text">DAC 나 오디오 인터페이스를 고릅니다. 배타 모드를 켜면 Mono 가 장치를 직접 열어 곡의 샘플레이트 그대로 내보냅니다.</span>
+                  </button>
+                </li>
+              </ol>
+            </div>
+
+            <div class="get">
+              <a class="btn btn--primary btn--lg" data-download href="https://github.com/GabrielJung0727/music-program/releases/latest/download/Mono-win-Setup.exe">
+                <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+                Windows 용 Mono 다운로드
+              </a>
+              <p class="get__note">
+                받은 파일은 같은 릴리스의
+                <a class="link" data-sums href="https://github.com/GabrielJung0727/music-program/releases/latest/download/SHA256SUMS.txt"><span class="mono">SHA256SUMS.txt</span></a>
+                와 맞춰 볼 수 있습니다.
+                <a class="link" data-releases href="https://github.com/GabrielJung0727/music-program/releases">이전 버전 보기</a>
+              </p>
+            </div>
+          </div>
+
+          <div class="install__panel" id="os-macos" role="tabpanel" aria-labelledby="os-tab-macos" data-os-panel="macos" hidden>
+            <div class="absent">
+              <h3 class="absent__title">macOS 용은 아직 없습니다.</h3>
+              <p>
+                Mono 의 출력 엔진은 지금 Windows 의 WASAPI 와 ASIO 에 맞춰져 있습니다.
+                macOS 에서 장치를 직접 여는 경로(CoreAudio)는 만들지 않았습니다.
+              </p>
+              <p>
+                Windows PC 에 Mono 를 설치해 두면, Mac 을 포함한 같은 네트워크의 다른 기기에서 브라우저로 붙어 조작할 수 있습니다.
+                붙을 때는 Mono 가 보여 주는 6자리 페어링 코드를 씁니다. 소리는 Windows PC 에 연결한 장치에서 납니다.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="specs">
+          <div class="spec">
+            <h3 class="spec__title">지원 형식</h3>
+            <dl class="spec__rows mono">
+              <div><dt>무손실</dt><dd>FLAC · WAV · AIFF · ALAC (M4A)</dd></div>
+              <div><dt>손실</dt><dd>MP3 · AAC</dd></div>
+              <div><dt>비트 뎁스</dt><dd>16 · 24 bit</dd></div>
+              <div><dt>샘플레이트</dt><dd>장치가 받는 값 그대로 (리샘플링 없음)</dd></div>
+              <div><dt>스트리밍</dt><dd>TIDAL · Qobuz (각 서비스 계정 필요)</dd></div>
+              <div><dt>DSD</dt><dd>DSF · DFF 는 라이브러리에 표시. 재생은 아직 지원하지 않음</dd></div>
+            </dl>
+          </div>
+          <div class="spec">
+            <h3 class="spec__title">시스템 사양</h3>
+            <dl class="spec__rows mono">
+              <div><dt>운영체제</dt><dd>Windows 10 · 11 (64-bit)</dd></div>
+              <div><dt>런타임</dt><dd>WebView2 (Windows 11 기본 포함). .NET 은 설치 파일에 포함</dd></div>
+              <div><dt>출력</dt><dd>WASAPI 배타 · 공유, ASIO</dd></div>
+              <div><dt>장치</dt><dd>USB DAC · 오디오 인터페이스 · 내장 사운드</dd></div>
+              <div><dt>업데이트</dt><dd>앱 안에서 확인하고 설치</dd></div>
+              <div><dt>가격</dt><dd>무료</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── 푸터 ──────────────────────────────────────────────────────── -->
+  <footer class="foot">
+    <div class="wrap foot__in">
+      <div class="foot__brand">
+        <a class="brand" href="#top" aria-label="Mono 처음으로">
+          <svg class="brand__mark" width="24" height="24" viewBox="150 280 760 470" aria-hidden="true">
+            <path d="M 230 670 C 230 460, 316 360, 416 360 C 484 360, 506 460, 512 490 C 518 460, 540 360, 608 360 C 708 360, 794 460, 794 670" fill="none" stroke="currentColor" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="880" cy="670" r="40"/>
+          </svg>
+          <span class="brand__word">Mono</span>
+        </a>
+        <span class="mono foot__ver" data-version>v0.6.0</span>
+      </div>
+
+      <nav class="foot__links" aria-label="바로가기">
+        <a href="#signal">신호 경로</a>
+        <a href="#lounge">라이브 라운지</a>
+        <a href="#interface">인터페이스</a>
+        <a href="#install">설치 방법</a>
+      </nav>
+
+      <nav class="foot__links foot__links--legal" aria-label="약관">
+        <a href="#">개인정보처리방침</a>
+        <a href="#">이용약관</a>
+      </nav>
+    </div>
+    <div class="wrap">
+      <p class="foot__fine">TIDAL, Qobuz, Discord 는 각 소유자의 상표입니다.</p>
+    </div>
+  </footer>
+
+  <script src="assets/js/site.js" defer></script>
+</body>
+</html>
