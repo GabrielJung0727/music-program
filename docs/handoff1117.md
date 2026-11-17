@@ -186,9 +186,8 @@ dotnet test Mono.slnx
 | 무엇 | 어디까지 |
 | --- | --- |
 | 첫 버전 (`acd523e`), 예전 `site/` 삭제 (`54448d9`) | PR #19로 `development` 에 들어갔다 |
-| Hero 2단 · 모션 · 문구 교정 (`353dd85`) | `feature/landing-site` 에 푸시됨. **아직 `development` 에 없다** |
-| 배포 워크플로, 이 문서 | `feature/landing-site` 의 로컬 커밋. 푸시와 PR이 남았다 |
-| 공개 주소 | 아직 없다. 아래 "배포" 순서를 마치면 `https://gabrieljung0727.github.io/music-program/` |
+| Hero 2단 · 모션 · 문구 교정 (`353dd85`), 배포 워크플로 (`02eac85`) | `development` 에 들어갔다 (`b7e1154`) |
+| 공개 주소 | **배포됨.** `https://gabrieljung0727.github.io/music-program/` |
 
 ### 구성
 
@@ -215,12 +214,16 @@ dotnet test Mono.slnx
 
 ### 배포
 
-GitHub Pages로 올린다. `.github/workflows/landing.yml` 이 `development` 에 `landing/` 이 바뀐 커밋이 들어올 때 폴더를 그대로 올린다. 이 PC에서는 푸시와 저장소 설정을 할 수 없어서 아래는 사람이 한다.
+GitHub Pages에 올라가 있다. `.github/workflows/landing.yml` 이 `development` 에 `landing/` 이 바뀐 커밋이 들어올 때마다 폴더를 그대로 다시 올린다. 수동으로 돌리려면 Actions → landing → Run workflow.
 
-- [ ] `feature/landing-site` 를 푸시하고 `development` 로 PR을 열어 합친다.
-- [ ] 저장소 Settings → Pages → Build and deployment → Source 를 **GitHub Actions** 로 바꾼다(처음 한 번). 합치기 전에 해 두면 첫 실행이 바로 성공한다. 순서가 바뀌었으면 Actions → landing → Run workflow 로 다시 돌린다.
-- [ ] Actions의 `landing` 실행이 초록인지 보고, 주소를 열어 첫 화면 · 다운로드 버튼 · 이미지가 뜨는지 확인한다.
-- [ ] 워크플로의 액션 버전(`checkout@v7`, `configure-pages@v6`, `upload-pages-artifact@v5`, `deploy-pages@v5`)은 2026-11-17의 최신 주 버전을 적은 것이고 돌려 보지는 못했다. 첫 실행에서 버전 문제로 실패하면 여기부터 본다.
+2026-11-17에 끝낸 것:
+
+- [x] `feature/landing-site` 를 `development` 로 합쳤다.
+- [x] 저장소 Settings → Pages 의 Source 를 **GitHub Actions** 로 바꿨다.
+- [x] `landing` 워크플로의 첫 실행이 성공했다(`b7e1154`). 액션 버전(`checkout@v7`, `configure-pages@v6`, `upload-pages-artifact@v5`, `deploy-pages@v5`)에 문제가 없었다.
+- [x] 공개 주소를 헤드리스 Chrome으로 1440px · 390px에서 열어 확인했다. 최신 내용이 올라가 있고, 가로 스크롤 · 깨진 이미지 · 실패한 요청 · 콘솔 오류가 없다.
+
+아직 사람이 해 보지 않은 것: 공개 주소를 실제 브라우저와 휴대폰에서 열어 눌러 보기, 다운로드 버튼으로 설치 파일을 끝까지 받아 보기.
 
 ### 남은 것
 
