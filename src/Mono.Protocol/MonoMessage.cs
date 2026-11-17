@@ -131,6 +131,13 @@ public sealed class MonoMessage
     [JsonPropertyName("index")]
     public int? Index { get; set; }
 
+    /// <summary>
+    /// 큐 항목의 id. 칸 번호(index)는 보내는 사이에 큐가 바뀌면 다른 곡을 가리킨다 —
+    /// 같이 실려 오면 Core 는 이 id 로 항목을 찾는다.
+    /// </summary>
+    [JsonPropertyName("itemId")]
+    public string? ItemId { get; set; }
+
     [JsonPropertyName("delta")]
     public int? Delta { get; set; }
 

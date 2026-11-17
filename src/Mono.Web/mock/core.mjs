@@ -451,7 +451,13 @@ function handle(ws, msg) {
       room.queue = (msg.trackIds ?? []).filter((id) => trackById.has(id)).map((id) => slot(room, id, p.peerId))
       load(room, msg.index ?? 0, true)
       return touch()
-    case "jump_to": load(room, msg.index ?? 0, true); return touch()
+    case "jump_to": {
+      // Core 와 같다: itemId 가 오면 칸 번호 대신 그 항목을 찾고, 이미 빠졌으면 아무것도 틀지 않는다.
+      const i = msg.itemId ? room.queue.findIndex((q) => q.id === msg.itemId) : (msg.index ?? 0)
+      if (i < 0) return
+      load(room, i, true)
+      return touch()
+    }
     case "skip": {
       const next = room.queueIndex + (msg.delta ?? 1)
       if (msg.delta < 0 && position(room) > 3000) anchor(room, 0)
@@ -474,7 +480,7 @@ function handle(ws, msg) {
     case "set_repeat": room.repeat = msg.index ?? 0; return touch()
 
     case "remove_queue": {
-      const i = msg.index ?? -1
+      const i = msg.itemId ? room.queue.findIndex((q) => q.id === msg.itemId) : (msg.index ?? -1)
       if (i < 0 || i >= room.queue.length) return
       room.queue.splice(i, 1)
       if (i < room.queueIndex) room.queueIndex--

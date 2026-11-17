@@ -4,7 +4,7 @@ import { useApp } from "../state/app"
 import { useMediaClock, useMono, useMonoCommands } from "../state/MonoProvider"
 import { fmtTime, qualityOf, ROOM_MODE_LABEL } from "../lib/model"
 import { MemberRole, RoomMode } from "../lib/protocol"
-import { Art, Avatar, Empty, Eq, QualityTag, Slider } from "../ui"
+import { Art, Avatar, Empty, Eq, QualityTag, Slider, fromButton } from "../ui"
 import { Tint } from "../ui/motion"
 import { signalSummary } from "../shell/PlayerBar"
 
@@ -190,7 +190,11 @@ export default function Room() {
                         key={q.id}
                         className={`trow ${isCurrent ? "is-current" : ""}`}
                         style={i < room.queueIndex ? { opacity: 0.5 } : undefined}
-                        onDoubleClick={() => isHost && !isCurrent && cmd.jumpTo(i)}
+                        onDoubleClick={(e) => {
+                          // X 를 연달아 눌러 곡을 빼는 것이 더블클릭으로 묶여 다음 곡을 틀지 않게 한다.
+                          if (fromButton(e)) return
+                          if (isHost && !isCurrent) cmd.jumpTo(i, q.id)
+                        }}
                       >
                         <div className="trow__idx">{isCurrent ? <Eq paused={!room.playing} /> : <span>{i + 1}</span>}</div>
                         <div className="trow__main">
@@ -203,7 +207,7 @@ export default function Room() {
                         <div className="trow__cell clip dimmer" style={{ fontSize: 12.5 }}>{room.peers[q.addedByPeerId] ?? hostName} 추가</div>
                         <div className="trow__time num">{fmtTime(q.durationMs)}</div>
                         {isHost && !isCurrent ? (
-                          <button className="icon-btn icon-btn--sm trow__more" aria-label="셋리스트에서 빼기" onClick={() => cmd.removeFromQueue(i)}><X size={15} /></button>
+                          <button className="icon-btn icon-btn--sm trow__more" aria-label="셋리스트에서 빼기" onClick={() => cmd.removeFromQueue(i, q.id)}><X size={15} /></button>
                         ) : <span />}
                       </div>
                     )

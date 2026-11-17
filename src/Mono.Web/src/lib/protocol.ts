@@ -124,6 +124,8 @@ export interface MonoMessage {
   targetPeerId?: string
   member?: number
   index?: number
+  /** 큐 항목의 id. index 와 같이 보내면 Core 가 칸 번호 대신 이 항목을 찾는다. */
+  itemId?: string
   delta?: number
   flag?: boolean
   volume?: number

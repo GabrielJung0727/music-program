@@ -500,7 +500,14 @@ public sealed class RoomManager
         }
     }
 
-    public (ListeningRoom? Room, string? Error) RemoveQueue(string roomId, string peerId, int index)
+    /// <summary>
+    /// 큐에서 한 곡을 뺀다.
+    ///
+    /// itemId 가 오면 칸 번호 대신 그 항목을 찾는다. 칸 번호는 화면이 본 순간의 것이라,
+    /// 보내는 사이에 큐가 바뀌면(다른 사람이 곡을 뺐거나, 방금 뺀 자리로 아래 곡이 올라왔거나)
+    /// 엉뚱한 곡을 가리킨다. 이미 빠진 항목이면 할 일이 없다.
+    /// </summary>
+    public (ListeningRoom? Room, string? Error) RemoveQueue(string roomId, string peerId, int index, string? itemId = null)
     {
         lock (_gate)
         {
@@ -509,9 +516,24 @@ public sealed class RoomManager
                 return (null, err);
             }
 
+            if (itemId is not null)
+            {
+                index = room.Queue.FindIndex(q => q.Id == itemId);
+                if (index < 0)
+                {
+                    return (room, null);
+                }
+            }
+
             if (index < 0 || index >= room.Queue.Count)
             {
                 return (null, "bad index");
+            }
+
+            var wasCurrent = index == room.QueueIndex;
+            if (wasCurrent)
+            {
+                MarkComplete(room);
             }
 
             room.Queue.RemoveAt(index);
@@ -520,12 +542,27 @@ public sealed class RoomManager
                 room.QueueIndex--;
             }
 
+            if (!wasCurrent)
+            {
+                RefreshPath(room);
+                return (room, null);
+            }
+
+            // 재생 중이던 칸을 뺐다. 그 자리로 올라온 다음 곡을 처음부터 연다 — 타임라인을
+            // 그대로 두면 다음 곡이 뺀 곡의 재생 위치에서 이어지고, 세대가 바뀌지 않아 출력은
+            // 뺀 곡을 계속 낸다. 뒤에 곡이 없으면 앞 곡을 대신 틀지 않고 멈춘다.
             if (room.QueueIndex >= room.Queue.Count)
             {
                 room.QueueIndex = Math.Max(0, room.Queue.Count - 1);
+                room.Playing = false;
             }
 
-            RefreshPath(room);
+            StartTrackTimeline(room, 0);
+            if (room.Playing)
+            {
+                NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
+            }
+
             return (room, null);
         }
     }
@@ -584,8 +621,11 @@ public sealed class RoomManager
         }
     }
 
-    /// <summary>큐의 특정 곡으로 바로 이동(곡 단위 이동은 Audiophile에서도 허용).</summary>
-    public (ListeningRoom? Room, string? Error) JumpTo(string roomId, string peerId, int index)
+    /// <summary>
+    /// 큐의 특정 곡으로 바로 이동(곡 단위 이동은 Audiophile에서도 허용).
+    /// itemId 가 오면 칸 번호 대신 그 항목으로 간다 — 그 항목이 이미 빠졌으면 아무 곡도 틀지 않는다.
+    /// </summary>
+    public (ListeningRoom? Room, string? Error) JumpTo(string roomId, string peerId, int index, string? itemId = null)
     {
         lock (_gate)
         {
@@ -597,6 +637,15 @@ public sealed class RoomManager
             if (!room.CanDirect(peerId))
             {
                 return (null, "only host may change the track");
+            }
+
+            if (itemId is not null)
+            {
+                index = room.Queue.FindIndex(q => q.Id == itemId);
+                if (index < 0)
+                {
+                    return (room, null);
+                }
             }
 
             if (index < 0 || index >= room.Queue.Count)
