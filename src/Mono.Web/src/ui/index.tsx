@@ -1,8 +1,18 @@
 // 공용 부품. 모양은 styles/base.css 가 정하고, 여기는 동작만 얹는다.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type SyntheticEvent } from "react"
 import { Disc3, X } from "lucide-react"
 import { hueOf, initials, qualityOf, type Quality } from "../lib/model"
+
+/**
+ * 이 이벤트가 행 안의 버튼에서 올라온 것인가.
+ *
+ * 더블클릭으로 동작하는 행에 버튼이 들어 있으면, 버튼을 빠르게 두 번 누른 것도 행의
+ * 더블클릭으로 올라온다. 행의 동작은 행의 맨바닥을 눌렀을 때만 해야 한다.
+ */
+export function fromButton(e: SyntheticEvent): boolean {
+  return e.target instanceof Element && e.target.closest("button") !== null
+}
 
 // ── 커버 아트 ────────────────────────────────────────────────────────────────
 

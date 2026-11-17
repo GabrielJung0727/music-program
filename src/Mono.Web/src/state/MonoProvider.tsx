@@ -111,7 +111,11 @@ export interface MonoCommands {
   next(): void
   previous(): void
   seek(mediaTimeMs: number): void
-  jumpTo(index: number): void
+  /**
+   * 큐의 그 칸으로 옮긴다. itemId 는 화면에서 누른 바로 그 항목의 id 다 — 같이 보내면
+   * 누르는 사이에 큐가 바뀌어 칸 번호가 밀렸어도 Core 가 다른 곡을 건드리지 않는다.
+   */
+  jumpTo(index: number, itemId?: string): void
   setShuffle(on: boolean): void
   setRepeat(mode: RepeatMode): void
   setVolume(percent: number, targetPeerId?: string): void
@@ -123,7 +127,7 @@ export interface MonoCommands {
   playAlbum(trackIds: string[]): Promise<void>
   /** 목록을 통째로 큐에 걸고 고른 칸부터 재생한다. 앨범 가운데 곡을 눌렀을 때 쓴다. */
   playFrom(trackIds: string[], startIndex: number): Promise<void>
-  removeFromQueue(index: number): void
+  removeFromQueue(index: number, itemId?: string): void
   moveInQueue(index: number, delta: number): void
   clearQueue(): void
 
@@ -511,7 +515,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
       next: () => withRoom({ type: MSG.skip, delta: 1 }),
       previous: () => withRoom({ type: MSG.skip, delta: -1 }),
       seek: (mediaTimeMs) => withRoom({ type: MSG.seek, mediaTimeMs: Math.max(0, Math.round(mediaTimeMs)) }),
-      jumpTo: (index) => withRoom({ type: MSG.jumpTo, index }),
+      jumpTo: (index, itemId) => withRoom({ type: MSG.jumpTo, index, itemId }),
       setShuffle: (on) => withRoom({ type: MSG.setShuffle, flag: on }),
       setRepeat: (mode) => withRoom({ type: MSG.setRepeat, index: mode }),
       setVolume: (percent, targetPeerId) =>
@@ -574,7 +578,7 @@ export function MonoProvider({ children }: { children: ReactNode }) {
         })
       },
 
-      removeFromQueue: (index) => withRoom({ type: MSG.removeQueue, index }),
+      removeFromQueue: (index, itemId) => withRoom({ type: MSG.removeQueue, index, itemId }),
       moveInQueue: (index, delta) => withRoom({ type: MSG.moveQueue, index, delta }),
       clearQueue: () => withRoom({ type: MSG.clearQueue }),
 

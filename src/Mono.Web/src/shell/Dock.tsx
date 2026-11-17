@@ -4,7 +4,7 @@ import { useApp, type Panel } from "../state/app"
 import { useMediaClock, useMono, useMonoCommands } from "../state/MonoProvider"
 import { fmtTime } from "../lib/model"
 import type { SnapshotLyricLine } from "../lib/protocol"
-import { Art, Empty, Eq, Toggle } from "../ui"
+import { Art, Empty, Eq, Toggle, fromButton } from "../ui"
 import { centerInScroll, usePresence } from "../ui/motion"
 
 /**
@@ -86,7 +86,13 @@ function Queue() {
           setDragFrom(null)
           setDragOver(null)
         }}
-        onDoubleClick={() => canControl && !isCurrent && cmd.jumpTo(i)}
+        onDoubleClick={(e) => {
+          // 행 안의 버튼에서 올라온 더블클릭은 "이 곡으로 이동"이 아니다. X 를 눌러 곡을 빼면
+          // 아래 곡이 그 자리로 올라오는데, 이어서 한 번 더 누르면 브라우저는 그 두 번을
+          // 더블클릭으로 묶는다 — 걸러 내지 않으면 곡을 빼다 말고 다음 곡이 재생된다.
+          if (fromButton(e)) return
+          if (canControl && !isCurrent) cmd.jumpTo(i, q.id)
+        }}
       >
         <Art src={q.artUrl} size={40} />
         <div className="grow">
@@ -98,7 +104,7 @@ function Queue() {
             <>
               <span className="time num">{fmtTime(q.durationMs)}</span>
               {canControl && (
-                <button className="icon-btn icon-btn--sm" aria-label="대기열에서 빼기" onClick={() => cmd.removeFromQueue(i)}>
+                <button className="icon-btn icon-btn--sm" aria-label="대기열에서 빼기" onClick={() => cmd.removeFromQueue(i, q.id)}>
                   <X size={15} />
                 </button>
               )}

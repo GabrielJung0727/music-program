@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -308,6 +309,8 @@ void RenderLoop(CancellationToken ct)
 {
     ILocalChunkSource? local = null;
     var lastEpoch = long.MinValue;
+    // 늦게 읽혀서 버린 로컬 조각 수. 읽기가 계속 느린 소스에서 영영 아무것도 못 내는 일을 막는다.
+    var staleLocalReads = 0;
     while (!ct.IsCancellationRequested)
     {
         Interlocked.Exchange(ref renderHeartbeat, Environment.TickCount64);
@@ -330,6 +333,7 @@ void RenderLoop(CancellationToken ct)
                 Interlocked.Exchange(ref renderFailureSince, 0);
                 local?.Dispose();
                 local = null;
+                staleLocalReads = 0;
                 if (!firstLock)
                 {
                     resyncs++;
@@ -359,7 +363,22 @@ void RenderLoop(CancellationToken ct)
                         {
                             var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
                             var wantMs = Math.Clamp((int)Math.Ceiling(ceiling - renderer.BufferedMs), 10, 30);
+                            var readStarted = Stopwatch.GetTimestamp();
                             var chunk = local.Read(mediaNow, wantMs, out var fmt);
+                            var readMs = Stopwatch.GetElapsedTime(readStarted).TotalMilliseconds;
+
+                            // 탐색 직후의 첫 읽기는 디코더가 자리를 찾느라 오래 걸릴 수 있다. 그동안
+                            // 타임라인은 흘러갔으니 이 조각은 이미 지난 소리다. 장치가 아직 비어 있을
+                            // 때는 넣지 않고 곧바로 다시 읽는다 — 디코더가 이미 그 근처에 있어서
+                            // 이번에는 금방 지금 자리의 소리를 낸다. 몇 번을 해도 느리면 그냥 넣는다.
+                            if (renderer.BufferedMs <= 0 && staleLocalReads < 3
+                                && RenderGate.IsStaleLocalRead(readMs, wantMs))
+                            {
+                                staleLocalReads++;
+                                continue;
+                            }
+
+                            staleLocalReads = 0;
                             if (chunk.Length > 0)
                             {
                                 PushAudio(

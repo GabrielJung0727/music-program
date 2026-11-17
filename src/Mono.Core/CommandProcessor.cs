@@ -225,7 +225,7 @@ public sealed class CommandProcessor
                 return From(_rooms.Reject(NeedRoom(peerId, msg), peerId, msg.Text ?? ""));
 
             case MessageTypes.RemoveQueue:
-                return From(_rooms.RemoveQueue(NeedRoom(peerId, msg), peerId, msg.Index ?? 0));
+                return From(_rooms.RemoveQueue(NeedRoom(peerId, msg), peerId, msg.Index ?? 0, msg.ItemId));
 
             case MessageTypes.MoveQueue:
                 return From(_rooms.MoveQueue(NeedRoom(peerId, msg), peerId, msg.Index ?? 0, msg.Delta ?? (int?)msg.MediaTimeMs ?? 1));
@@ -234,7 +234,7 @@ public sealed class CommandProcessor
                 return From(_rooms.ClearQueue(NeedRoom(peerId, msg), peerId));
 
             case MessageTypes.JumpTo:
-                return From(_rooms.JumpTo(NeedRoom(peerId, msg), peerId, msg.Index ?? 0));
+                return From(_rooms.JumpTo(NeedRoom(peerId, msg), peerId, msg.Index ?? 0, msg.ItemId));
 
             // 앨범을 통째로 걸고 고른 칸부터 재생한다. clear/enqueue/jump/play 를 따로 보내면
             // 그 사이사이의 룸 상태가 방송되어 큐가 한 곡짜리로 보이는 순간이 생긴다.
