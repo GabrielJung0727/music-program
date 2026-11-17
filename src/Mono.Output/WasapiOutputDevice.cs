@@ -48,6 +48,13 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
 
     private WasapiOut? _out;
     private BufferedWaveProvider? _buffer;
+    private FadeProvider? _fade;
+    private bool _fadeInArmed;
+
+    /// <summary>바로 앞 조각에 건 볼륨 게인과, 줄인 값을 정수로 되돌릴 때 쓰는 디더.</summary>
+    private float _gain = 1f;
+    private bool _gainSet;
+    private readonly TpdfDither _dither = new();
     private AudioDeviceState _state = AudioDeviceState.Idle;
     private long _releaseAtUnixMs;
     private readonly FrameAligner _aligner = new();
@@ -255,7 +262,9 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             attempt = _device is null
                 ? new WasapiOut(share, latency)
                 : new WasapiOut(_device, share, true, latency);
-            attempt.Init(buffer);
+            // 장치는 버퍼가 아니라 페이드를 거쳐 읽는다. 평소에는 바이트를 그대로 넘긴다.
+            var fade = new FadeProvider(buffer);
+            attempt.Init(fade);
 
             // NAudio 는 요청 포맷을 장치가 못 받으면 예외를 던지지 않는다. 배타 모드에서도
             // 지원되는 포맷으로 바꿔 잡고 DMO 리샘플러를 조용히 끼워 넣는다. 그러면 상태는
@@ -275,6 +284,8 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
 
             _out = attempt;
             _buffer = buffer;
+            _fade = fade;
+            _gainSet = false;
             _openConfig = config;
             Exclusive = share == AudioClientShareMode.Exclusive;
             LatencyMs = latency;
@@ -287,6 +298,7 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             try { attempt?.Dispose(); } catch { /* 이미 닫혔으면 무시 */ }
             _out = null;
             _buffer = null;
+            _fade = null;
             _openConfig = null;
             refusal = Describe(ex, config);
             return false;
@@ -386,9 +398,19 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 payload = PcmSamples.ToDeviceDepth(payload, buffer.BitDepth, PcmEncoding.Integer, out _);
             }
 
-            if (!HardwareVolume && volumePercent < 100)
+            // 하드웨어 볼륨이 없을 때만 디지털로 줄인다. 줄인 값을 정수로 되돌릴 때 디더를 걸고,
+            // 게인은 앞 조각에서 이번 조각까지 이어 준다. 100% 면 바이트를 건드리지 않는다.
+            if (!HardwareVolume && !buffer.IsDsd)
             {
-                payload = Attenuate(payload, bits, volumePercent);
+                var gain = PcmGain.FromPercent(volumePercent);
+                if (!_gainSet)
+                {
+                    _gain = gain;
+                    _gainSet = true;
+                }
+
+                payload = PcmGain.Apply(payload, bits, channels, _gain, gain, _dither);
+                _gain = gain;
             }
 
             // 온전한 프레임만 넘긴다. 남는 꼬리는 다음 청크 앞에 붙는다.
@@ -416,6 +438,9 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 && _out.PlaybackState != PlaybackState.Playing
                 && _buffer.BufferedDuration.TotalMilliseconds >= PrimeMs)
             {
+                if (_fadeInArmed) _fade?.ArmFadeIn();
+                else _fade?.Reset();
+                _fadeInArmed = false;
                 _out.Play();
             }
 
@@ -424,7 +449,16 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         }
     }
 
-    public void Flush()
+    public void Flush() => Flush(fadeOut: false);
+
+    public void FadeOutAndFlush() => Flush(fadeOut: true);
+
+    public void ArmFadeIn(bool armed)
+    {
+        lock (_gate) _fadeInArmed = armed;
+    }
+
+    private void Flush(bool fadeOut)
     {
         lock (_gate)
         {
@@ -434,10 +468,23 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
                 _state = AudioDeviceState.Idle;
                 LastError = null;
             }
+
+            // 장치의 재생 스레드가 페이드를 다 읽어 갈 때까지 잠깐 기다린다. 그 스레드는 이 잠금을
+            // 쓰지 않는다. 읽어 가지 않으면 시간만 채우고 넘어간다.
+            if (fadeOut && _fade is { } fade && _buffer is { } queued
+                && _out?.PlaybackState == PlaybackState.Playing
+                && queued.BufferedDuration.TotalMilliseconds > 0)
+            {
+                fade.BeginFadeOut();
+                fade.WaitSilent(FadeProvider.RampMs * 8);
+            }
+
             _buffer?.ClearBuffer();
             _aligner.Reset();
+            _gainSet = false;
             // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
             HaltStream();
+            _fade?.Reset();
         }
     }
 
@@ -470,6 +517,8 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
             HaltStream();
             _buffer?.ClearBuffer();
             _aligner.Reset();
+            _gainSet = false;
+            _fade?.Reset();
             _state = AudioDeviceState.ReleaseWait;
             _releaseAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ReleaseHoldMs;
         }
@@ -528,6 +577,8 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         try { _out?.Dispose(); } catch { /* 무시 */ }
         _out = null;
         _buffer = null;
+        _fade = null;
+        _gainSet = false;
         _openConfig = null;
         _releaseAtUnixMs = 0;
     }
@@ -576,39 +627,6 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
         }
 
         return wide;
-    }
-
-    private static byte[] Attenuate(byte[] pcm, int bits, int percent)
-    {
-        var gain = Math.Clamp(percent, 0, 100) / 100f;
-        var copy = new byte[pcm.Length];
-        Buffer.BlockCopy(pcm, 0, copy, 0, pcm.Length);
-        if (bits == 16)
-        {
-            for (var i = 0; i + 1 < copy.Length; i += 2)
-            {
-                var s = (short)(BitConverter.ToInt16(copy, i) * gain);
-                BitConverter.TryWriteBytes(copy.AsSpan(i), s);
-            }
-
-            return copy;
-        }
-
-        for (var i = 0; i + 2 < copy.Length; i += 3)
-        {
-            var v = copy[i] | (copy[i + 1] << 8) | (copy[i + 2] << 16);
-            if ((v & 0x800000) != 0)
-            {
-                v |= unchecked((int)0xFF000000);
-            }
-
-            v = (int)(v * gain);
-            copy[i] = (byte)v;
-            copy[i + 1] = (byte)(v >> 8);
-            copy[i + 2] = (byte)(v >> 16);
-        }
-
-        return copy;
     }
 
     public void Dispose()

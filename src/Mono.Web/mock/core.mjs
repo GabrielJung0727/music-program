@@ -110,6 +110,7 @@ function makeRoom({ id, name, mode, hostPeerId, hostName }) {
     deviceEqProfile: null,
     seekingAllowed: true, commentsAllowed: true, chatCollapsed: false, queueLocked: false,
     followHostView: false, autoAdvance: true, smartAutoplay: true, shuffle: false, repeat: 0,
+    transition: 1, crossfadeMs: 5000,
     linerPage: 0, linerScrollY: 0, maxMembers: 32, inviteCode: null, inviteExpiresAt: null,
     archiveDefaultConsent: true, commentRetentionDays: 30, anonymizeArchive: false, cloudSyncOptIn: false,
     playing: false, queueIndex: -1, hostPeerId, resyncEpoch: 1, startedAt: iso(now()),
@@ -523,6 +524,11 @@ function handle(ws, msg) {
       return touch()
     case "set_policy": room.qualityPolicy = msg.policy ?? 0; return touch()
     case "set_headroom": room.headroomDb = msg.volume ?? room.headroomDb; return touch()
+    case "set_transition":
+      // Core 와 같다: index = 방식(0 끔 · 1 끊김 없이 · 2 크로스페이드), mediaTimeMs = 겹치는 길이.
+      if ([0, 1, 2].includes(msg.index)) room.transition = msg.index
+      if (typeof msg.mediaTimeMs === "number") room.crossfadeMs = Math.max(1000, Math.min(12000, msg.mediaTimeMs))
+      return touch()
     case "set_room_flags": {
       const field = { seek: "seekingAllowed", comments: "commentsAllowed", chat: "chatCollapsed", queue_lock: "queueLocked", follow_host: "followHostView", auto_advance: "autoAdvance", smart_autoplay: "smartAutoplay", cloud: "cloudSyncOptIn", dsp_lock: "dspLocked" }[msg.text]
       if (field) room[field] = msg.flag ?? !room[field]

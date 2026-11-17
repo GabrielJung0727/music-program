@@ -1,18 +1,18 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import {
   Check, Cpu, Download, FolderOpen, FolderPlus, HardDrive, Headphones, Moon, RefreshCw, SlidersHorizontal, Speaker, Sun,
   TriangleAlert, UserRound, Waves,
 } from "lucide-react"
 import { useApp, type SettingsTab } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
-import { MSG } from "../lib/protocol"
+import { MSG, TrackTransition } from "../lib/protocol"
 import {
-  applyUpdate, checkForUpdate, closeToTrayStatus, discordActivityStatus, hasShell, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
+  applyUpdate, checkForUpdate, closeToTrayStatus, discordActivityStatus, hasShell, listAsioChannels, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
   restartOutput, setCloseToTray, setDiscordActivityEnabled, setDiscordApplicationId, shell, useOutputStatus, type AudioDeviceListing, type UpdateStatus,
 } from "../lib/shell"
-import { clearSetup, saveSetup, startConfiguredOutput, type AudioSetup } from "../lib/setup"
+import { clearSetup, playbackPrefs, saveSetup, startConfiguredOutput, type AudioSetup, type PlaybackSetup } from "../lib/setup"
 import { selectDsp, toggleDsp } from "../lib/dsp"
-import { Toggle } from "../ui"
+import { Slider, Toggle } from "../ui"
 import { DSP_PRESETS } from "../shell/PlayerBar"
 import { SERVICES, ServiceGlyph } from "./Explore"
 
@@ -106,6 +106,8 @@ function AudioTab() {
       deviceName: patch.deviceName ?? audio?.deviceName ?? "",
       bufferSize: patch.bufferSize ?? audio?.bufferSize ?? 256,
       exclusiveMode: patch.exclusiveMode ?? audio?.exclusiveMode ?? true,
+      // 장치를 바꾸면 채널은 첫 쌍으로 돌아간다. 앞 장치의 3/4 가 새 장치에도 있다는 보장이 없다.
+      asioChannelOffset: patch.asioChannelOffset ?? (patch.deviceId !== undefined ? 0 : audio?.asioChannelOffset ?? 0),
     }
     app.setSetup({ ...(app.setup ?? { completed: true }), audio: next })
     await saveSetup({ audio: next })
@@ -117,6 +119,43 @@ function AudioTab() {
 
   const buffer = audio?.bufferSize ?? 256
   const selected = devices.find((d) => d.id === audio?.deviceId) ?? devices.find((d) => d.name === audio?.deviceName)
+
+  // ASIO 드라이버의 출력 채널. 드라이버를 잠깐 열어야 알 수 있어서, 고른 장치 하나에 대해서만 묻는다.
+  const asioName = audio?.driverType === "ASIO" ? audio.deviceName : ""
+  const [asioChannels, setAsioChannels] = useState<string[]>([])
+  useEffect(() => {
+    let alive = true
+    setAsioChannels([])
+    if (asioName) void listAsioChannels(asioName).then((names) => { if (alive) setAsioChannels(names) })
+    return () => { alive = false }
+  }, [asioName])
+  const asioOffset = audio?.asioChannelOffset ?? 0
+  const asioPairs = Array.from({ length: Math.floor(asioChannels.length / 2) }, (_, i) => i * 2)
+
+  // 곡 전환. 방이 있으면 방의 값이 진실이고, 없으면 이 PC 에 저장해 둔 값을 보여 준다.
+  const guest = app.role === "guest"
+  const prefs = app.setup?.playback ?? playbackPrefs()
+  const transition = room?.transition ?? prefs.transition
+  const savedFadeSec = room ? Math.max(1, Math.min(12, Math.round(room.crossfadeMs / 1000))) : prefs.crossfadeSec
+  const [fadeDraft, setFadeDraft] = useState<number | null>(null)
+  useEffect(() => setFadeDraft(null), [room?.crossfadeMs])
+  const fadeSec = fadeDraft ?? savedFadeSec
+  const joined = transition !== TrackTransition.Off
+  const crossfade = transition === TrackTransition.Crossfade
+  // 껐다 켜면 끄기 전에 쓰던 방식으로 돌아온다.
+  const lastJoin = useRef<TrackTransition>(TrackTransition.Gapless)
+  if (joined) lastJoin.current = transition
+
+  const setPlayback = async (patch: Partial<PlaybackSetup>) => {
+    const next: PlaybackSetup = {
+      transition: patch.transition ?? transition,
+      crossfadeSec: patch.crossfadeSec ?? savedFadeSec,
+    }
+    app.setSetup({ ...(app.setup ?? { completed: true }), playback: next })
+    void saveSetup({ playback: next })
+    if (!room) await cmd.ensureSoloRoom()
+    cmd.setTransition(next.transition, next.crossfadeSec * 1000)
+  }
 
   return (
     <>
@@ -198,6 +237,80 @@ function AudioTab() {
               <button className="btn btn--sm btn--quiet" style={{ marginLeft: -12 }} onClick={rescan} disabled={scanning}><RefreshCw size={14} />{scanning ? "찾는 중…" : "장치 다시 찾기"}</button>
             </div>
           </>
+        )}
+        {asioPairs.length > 1 && (
+          <Row title="ASIO 출력 채널" desc="출력이 여러 쌍인 인터페이스에서 소리를 내보낼 채널을 고릅니다. 헤드폰 단자가 따로 있다면 그 쌍을 고르세요.">
+            {asioPairs.length <= 8 ? (
+              <div className="seg">
+                {asioPairs.map((first) => (
+                  <button
+                    key={first}
+                    className={`mono ${asioOffset === first ? "is-on" : ""}`}
+                    title={`${asioChannels[first]} · ${asioChannels[first + 1]}`}
+                    onClick={() => { void apply({ asioChannelOffset: first }) }}
+                  >
+                    {first + 1}/{first + 2}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <select
+                className="input mono" style={{ width: 240, flex: "none" }} aria-label="ASIO 출력 채널"
+                value={asioOffset} onChange={(e) => { void apply({ asioChannelOffset: Number(e.target.value) }) }}
+              >
+                {asioPairs.map((first) => (
+                  <option key={first} value={first}>{first + 1}/{first + 2} · {asioChannels[first]}</option>
+                ))}
+              </select>
+            )}
+          </Row>
+        )}
+      </Group>
+
+      <Group
+        title="곡 전환"
+        note={guest
+          ? "라운지에서는 호스트가 정한 방식을 따릅니다."
+          : "곡이 끝까지 재생되어 다음 곡으로 넘어갈 때 적용됩니다. 직접 곡을 넘기거나 탐색하면 바로 바뀝니다. 샘플레이트가 서로 다른 두 곡은 장치를 다시 열어야 해서 잇지 못합니다."}
+      >
+        <Row
+          title="자연스러운 곡 전환"
+          desc={joined
+            ? "곡과 곡 사이에서 장치를 멈추지 않고 이어서 재생합니다."
+            : "곡이 바뀔 때마다 장치를 멈췄다 다시 엽니다. 곡 사이에 짧은 공백이 생깁니다."}
+        >
+          <Toggle
+            label="자연스러운 곡 전환" value={joined} disabled={guest}
+            onChange={(v) => { void setPlayback({ transition: v ? lastJoin.current : TrackTransition.Off }) }}
+          />
+        </Row>
+        {joined && (
+          <Row
+            title="전환 방식"
+            desc={crossfade
+              ? "앞 곡의 끝과 다음 곡의 처음을 겹쳐 서서히 바꿉니다. 겹치는 구간은 두 곡을 섞으므로 비트 퍼펙트가 아닙니다."
+              : "틈도 겹침도 없이 다음 곡을 그대로 이어 붙입니다. 라이브 앨범이나 악장이 이어지는 클래식에 맞습니다."}
+          >
+            <div className="seg">
+              <button className={!crossfade ? "is-on" : ""} disabled={guest} onClick={() => { void setPlayback({ transition: TrackTransition.Gapless }) }}>끊김 없이</button>
+              <button className={crossfade ? "is-on" : ""} disabled={guest} onClick={() => { void setPlayback({ transition: TrackTransition.Crossfade }) }}>크로스페이드</button>
+            </div>
+          </Row>
+        )}
+        {joined && crossfade && (
+          <Row title="겹치는 길이" desc={<>두 곡이 <span className="mono">{fadeSec}</span>초 동안 겹칩니다. 1초에서 12초까지 고를 수 있습니다.</>}>
+            <div style={{ width: 200, flex: "none" }}>
+              <Slider
+                value={(fadeSec - 1) / 11} disabled={guest} label="크로스페이드 길이"
+                onInput={(v) => setFadeDraft(1 + Math.round(v * 11))}
+                onCommit={(v) => {
+                  const sec = 1 + Math.round(v * 11)
+                  setFadeDraft(sec)
+                  void setPlayback({ crossfadeSec: sec })
+                }}
+              />
+            </div>
+          </Row>
         )}
       </Group>
 

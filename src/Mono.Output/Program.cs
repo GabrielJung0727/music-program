@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Mono.Output;
 using Mono.Protocol;
-using NAudio.CoreAudioApi;
-using NAudio.Wave;
+using Mono.Shared;
 
 // Mono Output — 클럭 슬레이브 오디오 엔드포인트.
 // Core가 준 PTS와 클럭 오프셋으로 지정 시각에 출력한다. UI도, 선곡도 하지 않는다.
@@ -16,6 +14,17 @@ using NAudio.Wave;
 if (args.Contains("--list-devices"))
 {
     Console.Out.WriteLine(DeviceCatalog.ToJson());
+    Console.Out.Flush();
+    return;
+}
+
+// 고른 ASIO 드라이버의 출력 채널 이름만 찍고 빠지는 모드. 설정 화면이 "어느 출력 쌍으로 낼지"를
+// 고르게 할 때 쓴다. 드라이버를 잠깐 열어야 알 수 있어서 장치 목록과는 따로 묻는다.
+if (args.FirstOrDefault(a => a.StartsWith("--list-asio-channels")) is { } listChannels)
+{
+    var hint = listChannels.Contains('=') ? listChannels[(listChannels.IndexOf('=') + 1)..].Trim('"') : null;
+    var names = AsioAudioRenderer.OutputChannelNames(string.IsNullOrWhiteSpace(hint) ? null : hint, out var channelError);
+    Console.Out.WriteLine(JsonSerializer.Serialize(new { channels = names, error = channelError }));
     Console.Out.Flush();
     return;
 }
@@ -34,6 +43,8 @@ var allowSharedFallback = !args.Contains("--strict-exclusive");
 // Do not advertise support based solely on a command-line flag.
 var claimDsd = false;
 var preferAsio = args.Contains("--asio");
+// ASIO 에서 소리를 내보낼 첫 출력 채널(0부터). 헤드폰 단자가 3/4 에 있는 인터페이스라면 2 를 준다.
+var asioChannel = int.TryParse(Arg("--asio-channel="), out var ch0) ? Math.Max(0, ch0) : 0;
 var startVolume = int.TryParse(Arg("--volume="), out var v0) ? Math.Clamp(v0, 0, 100) : 100;
 const int matpPort = 7701;
 
@@ -47,7 +58,7 @@ Console.WriteLine(asioDrivers.Length > 0
 IAudioOutputDevice renderer;
 if (preferAsio)
 {
-    var asio = AsioAudioRenderer.TryCreate(deviceHint, out var asioError);
+    var asio = AsioAudioRenderer.TryCreate(deviceHint, asioChannel, out var asioError);
     if (asio is null)
     {
         // 요청한 백엔드를 못 쓰면 조용히 넘어가지 않고 사유까지 남긴다.
@@ -69,6 +80,8 @@ var clock = new ClockState();
 var frames = new ConcurrentQueue<MatpAudio>();
 byte[]? fanOutKey = null;
 var volumePercent = startVolume;
+// 룸에 걸린 DSP 설정. 수신 스레드가 바꿔 끼우고 렌더 스레드가 읽는다.
+var dspSettings = DspSettings.Off;
 var resyncs = 0;
 var drops = 0;
 var lastLog = DateTimeOffset.MinValue;
@@ -202,12 +215,18 @@ try
 
             case MessageTypes.RoomState:
                 timeline.Apply(msg);
-                var newVolume = VolumeFromSnapshot(msg.Body, peerId);
+                var (newVolume, newDsp) = OutputSnapshot.Parse(msg.Body, peerId);
                 if (newVolume is { } vol && vol != volumePercent)
                 {
                     volumePercent = vol;
                     renderer.SetHardwareVolume(vol);
                     Console.WriteLine($"volume → {vol}%");
+                }
+
+                if (newDsp is not null && newDsp != Volatile.Read(ref dspSettings))
+                {
+                    Volatile.Write(ref dspSettings, newDsp);
+                    Console.WriteLine(newDsp.Active ? $"dsp → {newDsp.Preset}" : "dsp → off");
                 }
 
                 Console.WriteLine($"timeline playing={msg.Playing} track={msg.TrackId} {msg.BitDepth}/{msg.SampleRate} source={msg.SourceMode} epoch={msg.Epoch}");
@@ -307,87 +326,220 @@ double DepthCeilingMs(MatpAudio frame)
 // 렌더 루프: PTS가 도래한 프레임만 DAC 버퍼로 넘긴다. 소셜/네트워크 처리와 스레드를 나눈다.
 void RenderLoop(CancellationToken ct)
 {
-    ILocalChunkSource? local = null;
+    // Clock-sync: Core는 파일을 보내지 않는다. 같은 트랙을 내 소스로 열어 같은 시각에 재생한다.
+    // 곡과 곡 사이를 잇는 일(끊김 없이 잇기 · 크로스페이드)도 이 재생기가 한다.
+    using var player = new LocalPlayer(LocalFileRenderer.TryOpen)
+    {
+        CanOpenRate = rate => caps.SampleRates.Contains(rate)
+    };
+
     var lastEpoch = long.MinValue;
-    // 늦게 읽혀서 버린 로컬 조각 수. 읽기가 계속 느린 소스에서 영영 아무것도 못 내는 일을 막는다.
-    var staleLocalReads = 0;
+
+    // 바로 앞 바퀴에서 본 타임라인. 세대가 바뀌는 순간 "앞 세대라면 지금 어디인가"를 여기에 묻는다.
+    var previous = TimelineState.Empty;
+
+    // 형식(샘플레이트·뎁스)이 바뀌는 조각. 장치는 형식이 바뀌면 다시 열리면서 큐에 남은 소리를 버리므로,
+    // 앞의 소리가 다 나갈 때까지 들고 있다가 넣는다.
+    LocalChunk? held = null;
+    PcmFormat? pushedFormat = null;
+
+    // 장치가 비기를 기다리기 시작한 시각. 장치가 읽어 가지 않아도 영영 기다리지 않도록 재 둔다. 0 이면 기다리지 않는 중.
+    long waitingSince = 0;
+
+    void Push(LocalChunk chunk)
+    {
+        PushAudio(
+            new AudioBuffer(chunk.Pcm, 0, chunk.Pcm.Length, chunk.Format.Rate, chunk.Format.Depth, chunk.Format.Channels, false),
+            volumePercent);
+        pushedFormat = chunk.Format;
+    }
+
+    void ForgetLocal()
+    {
+        player.Stop();
+        held = null;
+        pushedFormat = null;
+        waitingSince = 0;
+    }
+
+    // 장치에 아직 낼 소리가 남았는가. 기다린 지 limitMs 가 넘었으면 남았더라도 그만 기다린다.
+    bool StillDraining(int limitMs)
+    {
+        if (waitingSince == 0) waitingSince = Environment.TickCount64;
+        return renderer.Playing && renderer.BufferedMs > 1 && Environment.TickCount64 - waitingSince < limitMs;
+    }
+
     while (!ct.IsCancellationRequested)
     {
         Interlocked.Exchange(ref renderHeartbeat, Environment.TickCount64);
         try
         {
-            if (timeline.Epoch != lastEpoch)
+            // 이번 바퀴는 이 타임라인 하나만 본다. 수신 스레드가 도중에 바꿔 끼워도 섞이지 않는다.
+            var state = timeline.State;
+
+            if (state.Epoch != lastEpoch)
             {
                 var firstLock = lastEpoch == long.MinValue;
-                lastEpoch = timeline.Epoch;
+                lastEpoch = state.Epoch;
 
-                // 지난 epoch 의 프레임만 걷어낸다. 통째로 비우면 곡을 넘긴 직후 Core 가 한꺼번에
-                // 보내 둔 새 곡의 룩어헤드(약 320ms)까지 함께 지워져, 새 곡이 앞부분을 잃고
-                // 한참 뒤에서 튀어나온다. 수신 루프는 이미 새 epoch 기준으로 받아들이고 있다.
-                foreach (var keep in RenderGate.DropStaleEpochs(frames, timeline.Epoch))
+                // 곡이 끝까지 재생되어 넘어온 세대이고 재생기가 그 곡으로 이어 가고 있으면, 아무것도 끊지 않는다.
+                var seamless = !firstLock && state.ClockSyncMode && state.Playing && state.Seamless
+                               && player.AdoptSeamless(
+                                   state.TrackId,
+                                   previous.MediaTimeMs(clock.OffsetMs),
+                                   state.MediaTimeMs(clock.OffsetMs));
+                if (!seamless)
                 {
-                    frames.Enqueue(keep);
-                }
+                    // 지난 epoch 의 프레임만 걷어낸다. 통째로 비우면 곡을 넘긴 직후 Core 가 한꺼번에
+                    // 보내 둔 새 곡의 룩어헤드(약 320ms)까지 함께 지워져, 새 곡이 앞부분을 잃고
+                    // 한참 뒤에서 튀어나온다. 수신 루프는 이미 새 epoch 기준으로 받아들이고 있다.
+                    foreach (var keep in RenderGate.DropStaleEpochs(frames, state.Epoch))
+                    {
+                        frames.Enqueue(keep);
+                    }
 
-                renderer.Flush();
-                Interlocked.Exchange(ref renderFailureSince, 0);
-                local?.Dispose();
-                local = null;
-                staleLocalReads = 0;
-                if (!firstLock)
-                {
-                    resyncs++;
+                    // 재생 중이던 소리는 짧게 내린 뒤 끊는다. 새로 시작하는 자리가 곡의 중간이면
+                    // (탐색) 올리면서 시작하고, 곡의 처음이면 첫 샘플부터 그대로 낸다.
+                    if (firstLock) renderer.Flush();
+                    else renderer.FadeOutAndFlush();
+                    renderer.ArmFadeIn(state.TimeAtOriginMs > 0);
+
+                    Interlocked.Exchange(ref renderFailureSince, 0);
+                    ForgetLocal();
+                    if (!firstLock)
+                    {
+                        resyncs++;
+                    }
                 }
             }
 
-            if (!timeline.Playing || timeline.IsDsd)
+            previous = state;
+
+            if (!state.Playing || state.IsDsd)
             {
-                if (renderer.Playing) renderer.Flush();
+                // 곡이 끝까지 재생되어 멈춘 것이면(큐의 마지막 곡) 남은 소리를 끝까지 낸다. 출력은
+                // 타임라인보다 버퍼만큼 늦게 나가므로, 여기서 바로 비우면 곡의 꼬리가 잘린다.
+                var finishing = state.ClockSyncMode && !state.IsDsd && state.DurationMs > 0
+                                && state.TimeAtOriginMs >= state.DurationMs - 50
+                                && player.PlayingTrackId is not null;
+                if (finishing)
+                {
+                    // 장치가 받을 수 있는 만큼만 넣는다. 한꺼번에 밀어 넣으면 큐가 넘쳐 조각이 버려진다.
+                    var room = !renderer.Playing || renderer.BufferedMs < Math.Max(clock.TargetBufferMs + 60, 100);
+                    var reading = !player.Ended && held is null;
+                    if (reading && !room)
+                    {
+                        Thread.Sleep(5);
+                        continue;
+                    }
+
+                    var tail = reading ? player.ReadTail(30) : null;
+                    if (tail is not null)
+                    {
+                        Push(tail);
+                        Thread.Sleep(10);
+                        continue;
+                    }
+
+                    if (StillDraining(4000))
+                    {
+                        Thread.Sleep(5);
+                        continue;
+                    }
+
+                    renderer.Flush();
+                    ForgetLocal();
+                }
+                else if (renderer.Playing || renderer.BufferedMs > 0)
+                {
+                    // 일시정지. 짧게 내린 뒤 비우고, 버린 만큼 디코더를 되돌려 둔다 — 다시 재생하면
+                    // 멈춘 자리에서 올리면서 이어진다.
+                    var flushedMs = renderer.BufferedMs;
+                    if (held is not null) flushedMs += held.Format.MsOf(held.Pcm.Length / held.Format.BytesPerFrame);
+                    renderer.FadeOutAndFlush();
+                    renderer.ArmFadeIn(true);
+                    player.RewindAfterFlush(flushedMs);
+                    held = null;
+                    waitingSince = 0;
+                }
+
                 Interlocked.Exchange(ref renderFailureSince, 0);
                 Thread.Sleep(10);
                 continue;
             }
 
-            if (timeline.ClockSyncMode)
+            if (state.ClockSyncMode)
             {
-                // Clock-sync: Core는 파일을 보내지 않는다. 같은 트랙을 내 소스로 열어 같은 시각에 재생한다.
                 renderer.PrimeMs = clock.TargetBufferMs;
-                if (timeline.Playing && timeline.LocalPath is not null)
+                var current = TrackRef.From(state.TrackId, state.LocalPath);
+                if (current is null)
                 {
-                    local ??= LocalFileRenderer.TryOpen(timeline.LocalPath);
-                    if (local is not null)
+                    Thread.Sleep(15);
+                    continue;
+                }
+
+                player.Transition = state.Transition;
+                player.CrossfadeMs = state.CrossfadeMs;
+                player.Dsp = Volatile.Read(ref dspSettings);
+                // 혼자 들을 때는 곡의 첫 샘플부터 낸다. 여럿이 듣는 방은 타임라인에 맞춘다.
+                player.AnchorTrackStart = state.Mode == RoomMode.Solo;
+
+                if (held is not null)
+                {
+                    if (StillDraining(2000))
                     {
-                        // 40ms를 20ms마다 밀어 넣으면 버퍼가 계속 불어 DiscardOnOverflow 로 지직거린다.
-                        var ceiling = Math.Max(clock.TargetBufferMs + 60, 100);
-                        if (!renderer.Playing || renderer.BufferedMs < ceiling)
+                        Thread.Sleep(3);
+                        continue;
+                    }
+
+                    Push(held);
+                    held = null;
+                    waitingSince = 0;
+                }
+
+                if (player.Ended)
+                {
+                    // 이어 붙일 곡 없이 지금 곡이 끝났다(다음 곡의 샘플레이트가 다르거나 열리지 않았다).
+                    // Core 가 이미 다음 곡으로 넘어갔으면, 남은 소리를 다 낸 뒤에 그 곡을 새로 연다.
+                    // 아직이면 Core 가 넘길 때까지 기다린다.
+                    if (player.Behind && !StillDraining(2000))
+                    {
+                        renderer.Flush();
+                        ForgetLocal();
+                        // 타임라인은 이미 그 곡 안으로 들어가 있다. 지나간 만큼을 건너뛰지 않고 처음부터 낸다.
+                        player.RestartFromTop();
+                    }
+
+                    Thread.Sleep(5);
+                    continue;
+                }
+
+                // 40ms를 20ms마다 밀어 넣으면 버퍼가 계속 불어 DiscardOnOverflow 로 지직거린다.
+                var ceiling = Math.Max(clock.TargetBufferMs + 60, 100);
+                if (!renderer.Playing || renderer.BufferedMs < ceiling)
+                {
+                    var wantMs = Math.Clamp((int)Math.Ceiling(ceiling - renderer.BufferedMs), 10, 30);
+                    var chunk = player.Read(
+                        () => state.MediaTimeMs(clock.OffsetMs),
+                        startsAtTop: state.TimeAtOriginMs == 0,
+                        deviceEmpty: renderer.BufferedMs <= 0,
+                        current.Value,
+                        TrackRef.From(state.NextTrackId, state.NextLocalPath),
+                        wantMs);
+
+                    if (chunk is not null)
+                    {
+                        if (pushedFormat is { } was && was != chunk.Format && renderer.Playing && renderer.BufferedMs > 1)
                         {
-                            var mediaNow = timeline.MediaTimeMs(clock.OffsetMs);
-                            var wantMs = Math.Clamp((int)Math.Ceiling(ceiling - renderer.BufferedMs), 10, 30);
-                            var readStarted = Stopwatch.GetTimestamp();
-                            var chunk = local.Read(mediaNow, wantMs, out var fmt);
-                            var readMs = Stopwatch.GetElapsedTime(readStarted).TotalMilliseconds;
-
-                            // 탐색 직후의 첫 읽기는 디코더가 자리를 찾느라 오래 걸릴 수 있다. 그동안
-                            // 타임라인은 흘러갔으니 이 조각은 이미 지난 소리다. 장치가 아직 비어 있을
-                            // 때는 넣지 않고 곧바로 다시 읽는다 — 디코더가 이미 그 근처에 있어서
-                            // 이번에는 금방 지금 자리의 소리를 낸다. 몇 번을 해도 느리면 그냥 넣는다.
-                            if (renderer.BufferedMs <= 0 && staleLocalReads < 3
-                                && RenderGate.IsStaleLocalRead(readMs, wantMs))
-                            {
-                                staleLocalReads++;
-                                continue;
-                            }
-
-                            staleLocalReads = 0;
-                            if (chunk.Length > 0)
-                            {
-                                PushAudio(
-                                    new AudioBuffer(chunk, 0, chunk.Length, fmt.rate, fmt.depth, fmt.channels, false),
-                                    volumePercent);
-                            }
+                            held = chunk;
+                            waitingSince = 0;
+                        }
+                        else
+                        {
+                            Push(chunk);
                         }
                     }
-                    else if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(10))
+                    else if (player.PlayingTrackId is null && DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(10))
                     {
                         lastLog = DateTimeOffset.UtcNow;
                         Console.WriteLine("clock-sync: 재생 소스를 열 수 없습니다 — Tidal이면 Core 프록시(7702)와 출력 연결을 확인하세요.");
@@ -398,22 +550,25 @@ void RenderLoop(CancellationToken ct)
                 continue;
             }
 
-            local?.Dispose();
-            local = null;
+            if (player.PlayingTrackId is not null) ForgetLocal();
 
             // 프라임 깊이는 스케줄러가 앞당겨 잡아 둔 지터 버퍼와 같아야 동기가 맞는다.
             renderer.PrimeMs = clock.TargetBufferMs;
+
+            // 팬아웃에서는 디지털 볼륨을 Core 가 이미 걸어서 보낸다(룸 정책이 허용할 때만). 여기서
+            // 또 걸면 볼륨이 두 번 줄어든다.
+            const int fanOutVolume = 100;
 
             while (frames.TryPeek(out var head))
             {
                 // 아직 못 받은 세대의 프레임은 큐에 둔다. 지금 타임라인으로 PTS 를 풀면
                 // 지난 세대의 origin 으로 계산되어 엉뚱한 시각에 나간다.
-                if (head.Epoch != timeline.Epoch)
+                if (head.Epoch != state.Epoch)
                 {
                     break;
                 }
 
-                var playAtLocal = timeline.PlayAtLocalUnixMs(head.PtsMs, clock.OffsetMs, clock.TargetBufferMs);
+                var playAtLocal = state.PlayAtLocalUnixMs(head.PtsMs, clock.OffsetMs, clock.TargetBufferMs);
                 var wait = playAtLocal - ClockSync.UnixMs();
                 if (wait > 3)
                 {
@@ -446,7 +601,7 @@ void RenderLoop(CancellationToken ct)
 
                     var (dop, rate, depth, ch) = DopEncoder.Encode(frame.Payload, frame.SampleRate, frame.Channels);
                     if (dop.Length == 0) continue;
-                    PushAudio(new AudioBuffer(dop, 0, dop.Length, rate, depth, ch, false), volumePercent);
+                    PushAudio(new AudioBuffer(dop, 0, dop.Length, rate, depth, ch, false), fanOutVolume);
                     continue;
                 }
 
@@ -461,7 +616,7 @@ void RenderLoop(CancellationToken ct)
                 PushAudio(
                     new AudioBuffer(frame.Payload, 0, frame.Payload.Length,
                         frame.SampleRate, frame.BitDepth, frame.Channels, frame.IsDsd),
-                    volumePercent);
+                    fanOutVolume);
             }
 
             if (DateTimeOffset.UtcNow - lastLog > TimeSpan.FromSeconds(5) && clock.Samples > 0)
@@ -488,8 +643,6 @@ void RenderLoop(CancellationToken ct)
         // 1ms 타이머 해상도를 올려 뒀으므로 이 대기는 실제로 ~1ms 다.
         Thread.Sleep(1);
     }
-
-    local?.Dispose();
 }
 
 void PushAudio(AudioBuffer buffer, int volume)
@@ -509,38 +662,6 @@ async Task Send(MonoMessage message)
     {
         writeGate.Release();
     }
-}
-
-static int? VolumeFromSnapshot(string? body, string peerId)
-{
-    if (string.IsNullOrWhiteSpace(body))
-    {
-        return null;
-    }
-
-    try
-    {
-        using var doc = JsonDocument.Parse(body);
-        if (!doc.RootElement.TryGetProperty("outputs", out var outputs))
-        {
-            return null;
-        }
-
-        foreach (var output in outputs.EnumerateArray())
-        {
-            if (output.TryGetProperty("peerId", out var id) && id.GetString() == peerId
-                && output.TryGetProperty("volumePercent", out var vol))
-            {
-                return vol.GetInt32();
-            }
-        }
-    }
-    catch (JsonException)
-    {
-        return null;
-    }
-
-    return null;
 }
 
 string? Arg(string prefix) => args.FirstOrDefault(a => a.StartsWith(prefix))?[prefix.Length..];

@@ -1,3 +1,4 @@
+import { TrackTransition } from "./protocol"
 import { startOutput } from "./shell"
 
 // 첫 실행 마법사가 고른 값들. 이 PC 한 대에 매인 설정이다.
@@ -16,7 +17,20 @@ export interface AudioSetup {
   deviceName: string
   bufferSize: number
   exclusiveMode: boolean
+  /** ASIO 에서 소리를 내보낼 첫 출력 채널(0부터). 헤드폰 단자가 3/4 에 있다면 2. */
+  asioChannelOffset?: number
 }
+
+/**
+ * 곡이 끝까지 재생되어 다음 곡으로 넘어갈 때의 방식. 이 PC 의 취향이라 여기 두고,
+ * 방을 새로 만들 때마다 그 방에 적용한다(Core 는 방마다 기억한다).
+ */
+export interface PlaybackSetup {
+  transition: TrackTransition
+  crossfadeSec: number
+}
+
+export const DEFAULT_PLAYBACK: PlaybackSetup = { transition: TrackTransition.Gapless, crossfadeSec: 5 }
 
 export interface ProfileSetup {
   displayName: string
@@ -32,6 +46,7 @@ export interface SetupState {
   /** Core 의 7700 · 7701 을 LAN 에 열지. Core 가 뜰 때 읽는다(NetworkExposure.cs). */
   allowRemoteOutputs?: boolean
   audio?: AudioSetup
+  playback?: PlaybackSetup
   profile?: ProfileSetup
   savedAt?: string
 }
@@ -113,5 +128,20 @@ export function cachedSetup(): SetupState {
  */
 export async function startConfiguredOutput(roomId?: string | null) {
   const audio = cachedSetup().audio
-  return startOutput(roomId ?? null, backendFor(audio), audio?.deviceName)
+  // 채널은 ASIO 일 때 항상 보낸다. 보내지 않으면 셸이 앞서 쓰던 값을 그대로 둔다.
+  const channel = audio?.driverType === "ASIO" ? audio.asioChannelOffset ?? 0 : undefined
+  return startOutput(roomId ?? null, backendFor(audio), audio?.deviceName, channel)
+}
+
+/** 저장된 곡 전환 설정. 고른 적이 없으면 끊김 없이 잇기다. */
+export function playbackPrefs(): PlaybackSetup {
+  const saved = cachedSetup().playback
+  if (!saved) return DEFAULT_PLAYBACK
+  const sec = Number(saved.crossfadeSec)
+  return {
+    transition: saved.transition === TrackTransition.Off || saved.transition === TrackTransition.Crossfade
+      ? saved.transition
+      : TrackTransition.Gapless,
+    crossfadeSec: Number.isFinite(sec) ? Math.max(1, Math.min(12, Math.round(sec))) : DEFAULT_PLAYBACK.crossfadeSec,
+  }
 }

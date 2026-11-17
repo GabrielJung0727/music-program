@@ -436,6 +436,20 @@ public sealed class CommandProcessor
                     }
                 }));
 
+            case MessageTypes.SetTransition:
+                return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
+                {
+                    if (msg.Index is { } mode && Enum.IsDefined(typeof(TrackTransition), mode))
+                    {
+                        r.Transition = (TrackTransition)mode;
+                    }
+
+                    if (msg.MediaTimeMs is { } ms)
+                    {
+                        r.CrossfadeMs = (int)Math.Clamp(ms, RoomManager.MinCrossfadeMs, RoomManager.MaxCrossfadeMs);
+                    }
+                }));
+
             case MessageTypes.SetRoomFlags:
                 return From(_rooms.ApplyHostSettings(NeedRoom(peerId, msg), peerId, r =>
                 {

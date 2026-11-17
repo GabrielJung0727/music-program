@@ -99,3 +99,17 @@ public enum RepeatMode
     /// <summary>지금 곡만 반복한다.</summary>
     One
 }
+
+/// <summary>
+/// 곡이 끝까지 재생되어 다음 곡으로 넘어갈 때의 방식. 와이어에 숫자로 실리므로 새 값은 항상 뒤에 붙인다.
+/// 사용자가 직접 곡을 넘기거나 탐색할 때는 해당하지 않는다 — 그건 언제나 바로 끊고 옮긴다.
+/// </summary>
+public enum TrackTransition
+{
+    /// <summary>앞 곡을 끊고 장치를 다시 연 뒤 다음 곡을 시작한다.</summary>
+    Off,
+    /// <summary>곡 사이에 무음도 겹침도 없이 샘플 단위로 이어 붙인다.</summary>
+    Gapless,
+    /// <summary>앞 곡의 끝과 다음 곡의 처음을 겹쳐 서서히 바꾼다.</summary>
+    Crossfade
+}

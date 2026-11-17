@@ -126,13 +126,11 @@ public sealed class RoomBroadcaster
     public MonoMessage StateMessage(ListeningRoom room)
     {
         var track = room.CurrentTrack(_catalog.Tracks);
-        string? path = null;
-        if (room.SourceMode == PlaybackSourceMode.ClockSync && track is not null)
-        {
-            path = track.Source is StreamingProvider.Tidal or StreamingProvider.Qobuz
-                ? _streaming.ResolvePlayablePath(track)
-                : track.LocalPath;
-        }
+        var clockSync = room.SourceMode == PlaybackSourceMode.ClockSync;
+        var path = clockSync && track is not null ? PlayablePath(track) : null;
+
+        // 다음 곡을 미리 알려 준다. 출력이 끝나기 전에 열어 두어야 끊김 없이 잇거나 겹칠 수 있다.
+        var next = clockSync && track is not null ? _rooms.PeekNextTrack(room) : null;
 
         return new MonoMessage
         {
@@ -151,10 +149,20 @@ public sealed class RoomBroadcaster
             IsDsd = track?.IsDsd,
             DurationMs = track?.DurationMs,
             LocalPath = path,
+            NextTrackId = next?.Id,
+            NextLocalPath = next is null ? null : PlayablePath(next),
+            Transition = room.Transition,
+            CrossfadeMs = room.CrossfadeMs,
+            SeamlessEpoch = room.SeamlessEpoch,
             SourceMode = room.SourceMode,
             Body = _rooms.SnapshotJson(room)
         };
     }
+
+    private string? PlayablePath(Track track)
+        => track.Source is StreamingProvider.Tidal or StreamingProvider.Qobuz
+            ? _streaming.ResolvePlayablePath(track)
+            : track.LocalPath;
 
     public async Task PublishAsync(ListeningRoom room, CancellationToken ct = default)
     {

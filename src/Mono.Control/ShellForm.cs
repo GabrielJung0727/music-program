@@ -243,11 +243,12 @@ public sealed class ShellForm : Form
             pickFile: (title, filter) => call('pickFile', { title, filter }),
             openExternal: (url) => call('openExternal', { url }),
             output: {
-              start: (roomId, backend, device) => call('output.start', { roomId, backend, device }),
+              start: (roomId, backend, device, asioChannel) => call('output.start', { roomId, backend, device, asioChannel }),
               stop: () => call('output.stop'),
               restart: () => call('output.restart'),
               status: () => call('output.status'),
               devices: () => call('output.devices'),
+              asioChannels: (device) => call('output.asioChannels', { device }),
             },
             update: {
               check: () => call('update.check'),
@@ -338,6 +339,13 @@ public sealed class ShellForm : Form
                 if (!string.IsNullOrWhiteSpace(backend)) _supervisor.Backend = backend;
                 var device = Str("device");
                 if (device is not null) _supervisor.DeviceHint = device;
+                // 보내지 않았으면 그대로 둔다. 숫자가 오면 ASIO 의 첫 출력 채널(0부터)이다.
+                if (msg.TryGetProperty("asioChannel", out var channel) && channel.ValueKind == JsonValueKind.Number
+                    && channel.TryGetInt32(out var offset))
+                {
+                    _supervisor.AsioChannel = Math.Max(0, offset);
+                }
+
                 var ok = await Task.Run(() => _supervisor.StartOutput(Str("roomId")));
                 return new { ok, error = ok ? null : _supervisor.LastError };
             }
@@ -347,6 +355,13 @@ public sealed class ShellForm : Form
                 // 목록은 Output 워커가 만든 JSON 그대로다. 여기서 한 번 더 모양을 바꾸면
                 // 두 군데를 같이 고쳐야 하는 짝이 하나 더 생긴다.
                 var json = await _supervisor.ListAudioDevicesAsync(_life.Token);
+                return JsonDocument.Parse(json).RootElement.Clone();
+            }
+
+            case "output.asioChannels":
+            {
+                // 고른 ASIO 드라이버의 출력 채널 이름. 드라이버를 잠깐 열어야 알 수 있어 장치 목록과 따로 묻는다.
+                var json = await _supervisor.ListAsioChannelsAsync(Str("device"), _life.Token);
                 return JsonDocument.Parse(json).RootElement.Clone();
             }
 

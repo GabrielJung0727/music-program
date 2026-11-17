@@ -120,6 +120,7 @@ while (true)
             "retention" => new() { Type = MessageTypes.SetPolicy, Minutes = int.Parse(p[1]) },
             "anon" => new() { Type = MessageTypes.SetPolicy, Flag = p.ElementAtOrDefault(1) != "off" },
             "source" => new() { Type = MessageTypes.SetSourceMode, SourceMode = Enum.Parse<PlaybackSourceMode>(p[1], true) },
+            "transition" => new() { Type = MessageTypes.SetTransition, Index = (int)Enum.Parse<TrackTransition>(p[1], true), MediaTimeMs = long.TryParse(p.ElementAtOrDefault(2), out var fadeSec) ? fadeSec * 1000 : null },
             "flag" => new() { Type = MessageTypes.SetRoomFlags, Text = p[1], Flag = p.ElementAtOrDefault(2) != "off", Index = int.TryParse(p.ElementAtOrDefault(2), out var idx) ? idx : null },
             "vol" => new() { Type = MessageTypes.SetVolume, TargetPeerId = p.Length > 2 ? p[1] : null, Volume = int.Parse(p[^1]) },
 
@@ -222,7 +223,7 @@ static void Help() => Console.WriteLine("""
     ── 소셜      pin <ms> <메모> · unpin <핀ID> · chat <말> · heart · react <이모지> · follow <아티스트ID> · followhost [off] · liner <n>
     ── 호스트    dsp <off|headphones|speakers|roomir|crossfeed> · policy <requirebitperfect|lowestcommonformat|spectatorifincompatible>
                  source <clocksync|fanout> · flag <seek|comments|chat|queue_lock|auto_advance|dsp_lock|max> <on|off|숫자>
-                 retention <일> · anon [off] · vol [peer] <0-100>
+                 retention <일> · anon [off] · vol [peer] <0-100> · transition <off|gapless|crossfade> [겹치는 초]
     ── 라이브러리 catalog · search <말> · graph <아티스트ID> · scan [경로] · tidal [토큰] · qobuz [토큰]
     ── 개인      history · archives · playlists · makelist [아카이브ID] · load [플레이리스트ID] [replace] · m3u [ID] · share [아카이브ID]
     ── 운영      endpoints · pair · redeem <코드> · end <yes|no> · help · quit

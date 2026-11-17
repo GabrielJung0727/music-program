@@ -36,6 +36,22 @@ public sealed class ListeningRoom
     public RepeatMode Repeat { get; set; } = RepeatMode.Off;
     /// <summary>셔플이 이번 바퀴에 이미 튼 큐 인덱스. 한 바퀴를 돌면 비운다.</summary>
     public List<int> ShuffleHistory { get; } = [];
+    /// <summary>
+    /// 셔플이 다음에 틀기로 미리 정해 둔 큐 항목과, 그걸 정할 때 재생 중이던 항목.
+    /// 곡을 끊김 없이 잇거나 겹치려면 출력이 다음 곡을 미리 열어 둬야 하므로, 곡이 끝나는
+    /// 순간에 뽑던 것을 미리 뽑아 둔다. 재생 중인 항목이 바뀌면 이 계획은 버린다.
+    /// </summary>
+    public string? ShufflePlannedFromItemId { get; set; }
+    public string? ShufflePlannedItemId { get; set; }
+    /// <summary>곡이 끝까지 재생되어 다음 곡으로 넘어갈 때의 방식.</summary>
+    public TrackTransition Transition { get; set; } = TrackTransition.Gapless;
+    /// <summary>크로스페이드로 두 곡이 겹치는 길이(ms).</summary>
+    public int CrossfadeMs { get; set; } = 5000;
+    /// <summary>
+    /// 마지막으로 "끊지 않고 이어 가도 되는" 곡 전환이 일어난 세대. 출력은 세대가 바뀌면 버퍼를
+    /// 비우지만, 바뀐 세대가 이 값과 같으면 재생하던 것을 그대로 잇는다.
+    /// </summary>
+    public long SeamlessEpoch { get; set; } = -1;
     /// <summary>큐가 끝나갈 때 후보 3곡을 제시하는 스마트 오토플레이. 무응답이면 1번 후보를 재생한다.</summary>
     public bool SmartAutoplay { get; set; } = true;
     /// <summary>이번에 후보를 제시한 트랙 — 같은 트랙에 중복 제시하지 않기 위한 표식.</summary>

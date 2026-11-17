@@ -110,6 +110,12 @@ public sealed class ProcessSupervisor
     public string DeviceHint { get; set; } = "";
 
     /// <summary>
+    /// ASIO 에서 소리를 내보낼 첫 출력 채널(0부터). 출력이 여러 쌍인 인터페이스에서 헤드폰 단자처럼
+    /// 첫 쌍이 아닌 곳으로 내고 싶을 때 쓴다. ASIO 가 아닌 백엔드에서는 쓰지 않는다.
+    /// </summary>
+    public int AsioChannel { get; set; }
+
+    /// <summary>
     /// 이 PC 에 달린 출력 목록(JSON). 열거는 NAudio 를 든 Output 워커가 하고,
     /// 여기서는 잠깐 띄워 stdout 한 줄을 받아 온다. 실패하면 빈 배열이다.
     /// </summary>
@@ -144,6 +150,55 @@ public sealed class ProcessSupervisor
         {
             LastError = ex.Message;
             return "[]";
+        }
+    }
+
+    /// <summary>
+    /// ASIO 드라이버의 출력 채널 이름(JSON: { channels: [...], error }). 워커를 잠깐 띄워 드라이버에 묻는다.
+    /// </summary>
+    public async Task<string> ListAsioChannelsAsync(string? device, CancellationToken ct = default)
+    {
+        const string empty = "{\"channels\":[],\"error\":null}";
+        var exe = FindExe("Mono.Output.exe", "Mono.Output");
+        if (exe is null) return empty;
+
+        try
+        {
+            var arg = string.IsNullOrWhiteSpace(device)
+                ? "--list-asio-channels"
+                : $"--list-asio-channels=\"{device.Replace("\"", "")}\"";
+            var psi = new ProcessStartInfo(exe, arg)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                WorkingDirectory = Path.GetDirectoryName(exe)!,
+            };
+            using var p = Process.Start(psi);
+            if (p is null) return empty;
+
+            // 드라이버가 열리다 얼면 여기서 끝없이 기다리게 된다. 읽기까지 함께 시간 제한을 건다.
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            string json;
+            try
+            {
+                json = await p.StandardOutput.ReadToEndAsync(timeout.Token);
+                await p.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { p.Kill(entireProcessTree: true); } catch { /* 이미 죽었다 */ }
+                return empty;
+            }
+
+            json = json.Trim();
+            return json.StartsWith('{') ? json : empty;
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return empty;
         }
     }
 
@@ -217,7 +272,7 @@ public sealed class ProcessSupervisor
         var args = $"--host={host}";
         if (!string.IsNullOrWhiteSpace(roomId)) args += $" --room={roomId}";
         if (Backend == "shared") args += " --shared";
-        else if (Backend == "asio") args += " --asio";
+        else if (Backend == "asio") args += AsioChannel > 0 ? $" --asio --asio-channel={AsioChannel}" : " --asio";
         else if (Backend == "exclusive-strict") args += " --strict-exclusive";
         if (!string.IsNullOrWhiteSpace(DeviceHint)) args += $" --device=\"{DeviceHint}\"";
         return args;
