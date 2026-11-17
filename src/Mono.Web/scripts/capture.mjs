@@ -263,6 +263,19 @@ for (const [i, tab] of ["audio", "dsp", "library", "accounts", "general"].entrie
   await go(`#/settings/${tab}`)
   await wait(400)
   await shot(`${32 + i}-settings-${tab}`)
+
+  if (tab === "audio") {
+    // 곡 전환 그룹. 크로스페이드를 골라 길이 슬라이더까지 보이게 한 뒤, 그 그룹이 화면 가운데 오게 내린다.
+    await clickText("크로스페이드", ".set-group .seg button")
+    await page.evaluate(() => {
+      [...document.querySelectorAll(".set-group")]
+        .find((g) => g.querySelector(".label")?.textContent.trim() === "곡 전환")
+        ?.scrollIntoView({ block: "center" })
+    })
+    await wait(400)
+    await shot("32b-settings-transition")
+    await clickText("끊김 없이", ".set-group .seg button")
+  }
 }
 
 console.log("light theme")
