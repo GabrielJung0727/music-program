@@ -111,5 +111,18 @@ public interface IAudioOutputDevice : IDisposable
     void ReleaseDevice();
 
     void Flush();
+
+    /// <summary>
+    /// 재생 중인 소리를 몇 ms 에 걸쳐 0 으로 내린 뒤 비운다. 일시정지·탐색처럼 파형을 중간에서
+    /// 끊을 때 쓴다 — 그냥 비우면 끊긴 자리에서 딸깍 소리가 난다.
+    /// </summary>
+    void FadeOutAndFlush();
+
+    /// <summary>
+    /// 다음 재생 시작을 0 에서부터 올릴지 정한다. 곡 중간에서 다시 시작할 때만 켠다.
+    /// 곡이 처음부터 시작할 때는 꺼야 한다 — 첫 음의 어택을 깎으면 안 된다.
+    /// </summary>
+    void ArmFadeIn(bool armed);
+
     void SetHardwareVolume(int percent);
 }

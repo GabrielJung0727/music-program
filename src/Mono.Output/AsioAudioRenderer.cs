@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using Mono.Shared;
 using NAudio.Wave;
 
@@ -27,17 +28,36 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     private readonly object _gate = new();
     private readonly FrameAligner _aligner = new();
 
+    /// <summary>
+    /// 소리를 내보낼 첫 출력 채널(0부터). 스테레오는 여기서부터 두 채널을 쓴다.
+    /// 출력이 여러 쌍인 인터페이스에서 헤드폰 단자(예: 3/4)를 고를 수 있게 한다.
+    /// </summary>
+    private readonly int _channelOffset;
+
     private AsioOut? _asio;
     private BufferedWaveProvider? _buffer;
+    private FadeProvider? _fade;
+    private bool _fadeInArmed;
     private AudioDeviceState _state = AudioDeviceState.Idle;
     private long _releaseAtUnixMs;
     private int _sourceBitDepth = 16;
 
-    private AsioAudioRenderer(AsioStaHost sta, string name)
+    /// <summary>바로 앞 조각에 건 볼륨 게인. 다음 조각은 여기서부터 이어 올리거나 내린다.</summary>
+    private float _gain = 1f;
+    private bool _gainSet;
+
+    private AsioAudioRenderer(AsioStaHost sta, string name) : this(sta, name, 0)
+    {
+    }
+
+    private AsioAudioRenderer(AsioStaHost sta, string name, int channelOffset)
     {
         _sta = sta;
         _driverName = name;
-        DeviceName = "ASIO · " + name;
+        _channelOffset = Math.Max(0, channelOffset);
+        DeviceName = _channelOffset == 0
+            ? "ASIO · " + name
+            : $"ASIO · {name} · 출력 {_channelOffset + 1}/{_channelOffset + 2}";
         HardwareVolume = false;
         LatencyMs = 5;
         Exclusive = true;
@@ -55,11 +75,61 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
 
     public static AsioAudioRenderer? TryCreate(string? deviceHint) => TryCreate(deviceHint, out _);
 
+    public static AsioAudioRenderer? TryCreate(string? deviceHint, out string? error)
+        => TryCreate(deviceHint, 0, out error);
+
+    /// <summary>
+    /// 드라이버의 출력 채널 이름. 드라이버를 잠깐 열어 물어본다 — 설정 화면이 고른 장치 하나에
+    /// 대해서만 부른다. 열거할 때 모든 드라이버를 여는 건 위험하다(창을 띄우거나 멈추는 드라이버가 있다).
+    /// </summary>
+    public static string[] OutputChannelNames(string? deviceHint, out string? error)
+    {
+        error = null;
+        var drivers = DriverNames();
+        if (drivers.Length == 0)
+        {
+            error = "설치된 ASIO 드라이버가 없습니다.";
+            return [];
+        }
+
+        var name = deviceHint is null
+            ? drivers[0]
+            : drivers.FirstOrDefault(d => d.Contains(deviceHint, StringComparison.OrdinalIgnoreCase)) ?? drivers[0];
+
+        using var sta = new AsioStaHost();
+        if (sta.Failure is not null)
+        {
+            error = sta.Failure;
+            return [];
+        }
+
+        try
+        {
+            return sta.Invoke(() =>
+            {
+                using var driver = new AsioOut(name);
+                var names = new string[driver.DriverOutputChannelCount];
+                for (var i = 0; i < names.Length; i++)
+                {
+                    try { names[i] = driver.AsioOutputChannelName(i); }
+                    catch { names[i] = $"Output {i + 1}"; }
+                }
+
+                return names;
+            });
+        }
+        catch (Exception ex)
+        {
+            error = $"{name}: {ex.GetType().Name}: {ex.Message}";
+            return [];
+        }
+    }
+
     /// <summary>
     /// ASIO 드라이버를 연다. 실패하면 사유를 돌려준다 — 사유를 삼키면 드라이버가 설치돼
     /// 있는데도 왜 안 열리는지 알 수 없다.
     /// </summary>
-    public static AsioAudioRenderer? TryCreate(string? deviceHint, out string? error)
+    public static AsioAudioRenderer? TryCreate(string? deviceHint, int channelOffset, out string? error)
     {
         error = null;
         string[] drivers;
@@ -107,7 +177,7 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
             return null;
         }
 
-        return new AsioAudioRenderer(sta, name);
+        return new AsioAudioRenderer(sta, name, channelOffset);
     }
 
     public string DeviceName { get; }
@@ -188,14 +258,21 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                     BufferDuration = TimeSpan.FromMilliseconds(CapacityMs)
                 };
 
-                var buffer = _buffer;
+                // 드라이버는 버퍼가 아니라 페이드를 거쳐 읽는다. 평소에는 바이트를 그대로 넘긴다.
+                var fade = new FadeProvider(_buffer);
+                _fade = fade;
+                _gainSet = false;
                 _sta.Invoke(() =>
                 {
                     var driver = new AsioOut(_driverName);
                     _asio = driver;
                     if (!driver.IsSampleRateSupported(config.SampleRate))
                         throw new NotSupportedException($"ASIO 드라이버가 {config.SampleRate}Hz를 지원하지 않습니다.");
-                    driver.Init(buffer);
+                    if (_channelOffset + config.Channels > driver.DriverOutputChannelCount)
+                        throw new NotSupportedException(
+                            $"출력 {_channelOffset + 1}번부터 {config.Channels}채널을 쓸 수 없습니다 — 이 드라이버의 출력은 {driver.DriverOutputChannelCount}채널입니다.");
+                    driver.ChannelOffset = _channelOffset;
+                    driver.Init(fade);
                 });
 
                 // PlaybackLatency 는 "샘플" 단위다. 밀리초로 착각해서 쓰면 지연이 수백 ms 로
@@ -252,16 +329,30 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 payload = PcmSamples.ToDeviceDepth(payload, buffer.BitDepth, PcmEncoding.Integer, out _);
             }
 
-            if (volumePercent < 100)
-            {
-                payload = Attenuate(payload, bits, volumePercent);
-            }
-
             // 정렬은 원본 PCM 기준으로 잡는다 — 반 프레임을 float 로 바꾸면 어긋남이 굳어진다.
             var aligned = _aligner.Take(payload, channels * (bits / 8));
             if (aligned.Length == 0) return true;
 
             var floats = ToFloatBytes(aligned, bits);
+
+            // 볼륨은 float 로 바꾼 뒤에 건다. 드라이버가 float 를 받으므로 정수로 되돌리는 단계가
+            // 없고, 16bit 원본을 16bit 인 채로 줄여 하위 비트를 잃는 일도 없다. 게인은 앞 조각에서
+            // 이번 조각까지 프레임 단위로 이어 준다 — 조각마다 계단처럼 바꾸면 지퍼 소리가 난다.
+            // 100% 면 아무 계산도 하지 않는다.
+            if (!buffer.IsDsd)
+            {
+                var gain = PcmGain.FromPercent(volumePercent);
+                if (!_gainSet)
+                {
+                    // 재생을 막 시작한 조각은 처음부터 목표 볼륨이어야 한다.
+                    _gain = gain;
+                    _gainSet = true;
+                }
+
+                PcmGain.Apply(MemoryMarshal.Cast<byte, float>(floats.AsSpan()), channels, _gain, gain);
+                _gain = gain;
+            }
+
             try
             {
                 _buffer!.AddSamples(floats, 0, floats.Length);
@@ -277,6 +368,9 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 && _buffer.BufferedDuration.TotalMilliseconds >= PrimeMs)
             {
                 var driver = _asio;
+                if (_fadeInArmed) _fade?.ArmFadeIn();
+                else _fade?.Reset();
+                _fadeInArmed = false;
                 _sta.Invoke(() => driver.Play());
             }
 
@@ -312,7 +406,16 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
         return bytes;
     }
 
-    public void Flush()
+    public void Flush() => Flush(fadeOut: false);
+
+    public void FadeOutAndFlush() => Flush(fadeOut: true);
+
+    public void ArmFadeIn(bool armed)
+    {
+        lock (_gate) _fadeInArmed = armed;
+    }
+
+    private void Flush(bool fadeOut)
     {
         lock (_gate)
         {
@@ -322,13 +425,26 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
                 _state = AudioDeviceState.Idle;
                 LastError = null;
             }
+
+            // 드라이버가 페이드를 다 읽어 갈 때까지 잠깐 기다린다. 드라이버의 콜백은 이 잠금을
+            // 쓰지 않으므로 기다리는 동안에도 계속 읽어 간다. 읽어 가지 않으면 시간만 채우고 넘어간다.
+            if (fadeOut && _fade is { } fade && _buffer is { } queued
+                && _asio?.PlaybackState == PlaybackState.Playing
+                && queued.BufferedDuration.TotalMilliseconds > 0)
+            {
+                fade.BeginFadeOut();
+                fade.WaitSilent(FadeProvider.RampMs * 8);
+            }
+
             _buffer?.ClearBuffer();
             _aligner.Reset();
+            _gainSet = false;
             // 비운 직후 그대로 재생하면 빈 버퍼를 긁는다. 다시 프라임될 때까지 멈춘다.
             var driver = _asio;
             if (driver is null) return;
             try { _sta.Invoke(() => driver.Pause()); }
             catch { /* 장치가 이미 닫혔으면 무시 */ }
+            _fade?.Reset();
         }
     }
 
@@ -346,6 +462,8 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
             try { _sta.Invoke(() => driver.Pause()); } catch { /* 무시 */ }
             _buffer?.ClearBuffer();
             _aligner.Reset();
+            _gainSet = false;
+            _fade?.Reset();
             _state = AudioDeviceState.ReleaseWait;
             _releaseAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ReleaseHoldMs;
         }
@@ -370,6 +488,8 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
         var driver = _asio;
         _asio = null;
         _buffer = null;
+        _fade = null;
+        _gainSet = false;
         _releaseAtUnixMs = 0;
         if (driver is null) return;
 
@@ -394,33 +514,6 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
            && _buffer.WaveFormat.SampleRate == rate
            && _buffer.WaveFormat.Channels == channels
            && _sourceBitDepth == (bits >= 24 ? 24 : 16);
-
-    private static byte[] Attenuate(byte[] pcm, int bits, int percent)
-    {
-        var gain = Math.Clamp(percent, 0, 100) / 100f;
-        var copy = (byte[])pcm.Clone();
-        if (bits == 16)
-        {
-            for (var i = 0; i + 1 < copy.Length; i += 2)
-            {
-                var s = (short)(BitConverter.ToInt16(copy, i) * gain);
-                BitConverter.TryWriteBytes(copy.AsSpan(i), s);
-            }
-
-            return copy;
-        }
-
-        for (var i = 0; i + 2 < copy.Length; i += 3)
-        {
-            var v = copy[i] | (copy[i + 1] << 8) | ((sbyte)copy[i + 2] << 16);
-            v = (int)(v * gain);
-            copy[i] = (byte)v;
-            copy[i + 1] = (byte)(v >> 8);
-            copy[i + 2] = (byte)(v >> 16);
-        }
-
-        return copy;
-    }
 
     public void Dispose()
     {

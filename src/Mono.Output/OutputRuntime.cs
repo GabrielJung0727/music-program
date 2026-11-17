@@ -1,61 +1,122 @@
+using System.Text.Json;
 using Mono.Protocol;
 using Mono.Shared;
-using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace Mono.Output;
 
-/// <summary>Core가 방송한 재생 타임라인의 로컬 사본.</summary>
-public sealed class Timeline
+/// <summary>
+/// Core가 방송한 재생 타임라인의 한 순간. 바뀌지 않는다.
+///
+/// 수신 스레드가 메시지를 받을 때마다 새로 만들어 통째로 바꿔 끼운다. 렌더 스레드는 한 바퀴에
+/// 한 번 이걸 집어 들고 그 바퀴 내내 같은 것을 본다 — 필드를 하나씩 고쳐 쓰면 세대는 새것인데
+/// 원점은 옛것인 순간을 렌더 스레드가 읽을 수 있다.
+/// </summary>
+public sealed record TimelineState(
+    bool Playing,
+    long Epoch,
+    long SeamlessEpoch,
+    long OriginUnixMs,
+    long TimeAtOriginMs,
+    long DurationMs,
+    string? TrackId,
+    string? LocalPath,
+    string? NextTrackId,
+    string? NextLocalPath,
+    bool ClockSyncMode,
+    bool IsDsd,
+    RoomMode Mode,
+    TrackTransition Transition,
+    int CrossfadeMs)
 {
-    private long _originUnixMs;
-    private long _timeAtOriginMs;
+    public static TimelineState Empty { get; } = new(
+        false, 0, -1, 0, 0, 0, null, null, null, null, false, false,
+        RoomMode.OpenLounge, TrackTransition.Gapless, 5000);
 
-    public bool Playing { get; private set; }
-    public long Epoch { get; private set; }
-    public string? TrackId { get; private set; }
-    public string? LocalPath { get; private set; }
-    public long DurationMs { get; private set; }
-    public bool ClockSyncMode { get; private set; }
-    public bool IsDsd { get; private set; }
-
-    public void Apply(MonoMessage msg)
-    {
-        // A slow broadcast from before a seek must not rewind the output.
-        if (msg.Epoch is { } epoch && epoch < Epoch) return;
-        Playing = msg.Playing ?? Playing;
-        _originUnixMs = msg.MediaOriginUnixMs ?? _originUnixMs;
-        _timeAtOriginMs = msg.MediaTimeAtOriginMs ?? _timeAtOriginMs;
-        Epoch = msg.Epoch ?? Epoch;
-        DurationMs = msg.DurationMs ?? DurationMs;
-        if (msg.Type == MessageTypes.RoomState)
-        {
-            TrackId = msg.TrackId;
-            LocalPath = msg.LocalPath;
-            IsDsd = msg.IsDsd ?? false;
-        }
-
-        if (msg.SourceMode is { } mode)
-        {
-            ClockSyncMode = mode == PlaybackSourceMode.ClockSync;
-        }
-    }
+    /// <summary>
+    /// 이 세대는 곡이 끝까지 재생되어 넘어온 것인가. 그렇다면 재생하던 것을 끊지 않고 이어 간다.
+    /// </summary>
+    public bool Seamless => SeamlessEpoch == Epoch;
 
     /// <summary>현재 media_time. offset은 (Core 시계 − 로컬 시계).</summary>
     public long MediaTimeMs(double offsetMs)
     {
         if (!Playing)
         {
-            return _timeAtOriginMs;
+            return TimeAtOriginMs;
         }
 
         var coreNow = ClockSync.UnixMs() + (long)Math.Round(offsetMs);
-        return _timeAtOriginMs + (coreNow - _originUnixMs);
+        return TimeAtOriginMs + (coreNow - OriginUnixMs);
     }
 
     /// <summary>이 PTS를 로컬 시계 기준 언제 내보내야 하는가.</summary>
     public long PlayAtLocalUnixMs(long ptsMs, double offsetMs, int bufferMs)
-        => ClockSync.PlayAtUnixMs(_originUnixMs, _timeAtOriginMs, ptsMs, bufferMs) - (long)Math.Round(offsetMs);
+        => ClockSync.PlayAtUnixMs(OriginUnixMs, TimeAtOriginMs, ptsMs, bufferMs) - (long)Math.Round(offsetMs);
+}
+
+/// <summary>Core가 방송한 재생 타임라인의 로컬 사본.</summary>
+public sealed class Timeline
+{
+    private volatile TimelineState _state = TimelineState.Empty;
+
+    /// <summary>지금의 타임라인. 렌더 루프는 한 바퀴에 한 번만 읽어 그 바퀴 동안 쓴다.</summary>
+    public TimelineState State => _state;
+
+    public bool Playing => _state.Playing;
+    public long Epoch => _state.Epoch;
+    public string? TrackId => _state.TrackId;
+    public string? LocalPath => _state.LocalPath;
+    public long DurationMs => _state.DurationMs;
+    public bool ClockSyncMode => _state.ClockSyncMode;
+    public bool IsDsd => _state.IsDsd;
+
+    public void Apply(MonoMessage msg)
+    {
+        var s = _state;
+
+        // A slow broadcast from before a seek must not rewind the output.
+        if (msg.Epoch is { } epoch && epoch < s.Epoch) return;
+
+        s = s with
+        {
+            Playing = msg.Playing ?? s.Playing,
+            OriginUnixMs = msg.MediaOriginUnixMs ?? s.OriginUnixMs,
+            TimeAtOriginMs = msg.MediaTimeAtOriginMs ?? s.TimeAtOriginMs,
+            Epoch = msg.Epoch ?? s.Epoch,
+            DurationMs = msg.DurationMs ?? s.DurationMs
+        };
+
+        if (msg.Type == MessageTypes.RoomState)
+        {
+            s = s with
+            {
+                TrackId = msg.TrackId,
+                LocalPath = msg.LocalPath,
+                NextTrackId = msg.NextTrackId,
+                NextLocalPath = msg.NextLocalPath,
+                IsDsd = msg.IsDsd ?? false,
+                Mode = msg.Mode ?? s.Mode,
+                Transition = msg.Transition ?? s.Transition,
+                CrossfadeMs = msg.CrossfadeMs ?? s.CrossfadeMs,
+                SeamlessEpoch = msg.SeamlessEpoch ?? s.SeamlessEpoch
+            };
+        }
+
+        if (msg.SourceMode is { } mode)
+        {
+            s = s with { ClockSyncMode = mode == PlaybackSourceMode.ClockSync };
+        }
+
+        _state = s;
+    }
+
+    /// <summary>현재 media_time. offset은 (Core 시계 − 로컬 시계).</summary>
+    public long MediaTimeMs(double offsetMs) => _state.MediaTimeMs(offsetMs);
+
+    /// <summary>이 PTS를 로컬 시계 기준 언제 내보내야 하는가.</summary>
+    public long PlayAtLocalUnixMs(long ptsMs, double offsetMs, int bufferMs)
+        => _state.PlayAtLocalUnixMs(ptsMs, offsetMs, bufferMs);
 }
 
 /// <summary>NTP 스타일 오프셋·지터 추정. 적응형 지터 버퍼 목표를 함께 계산한다.</summary>
@@ -82,7 +143,133 @@ public sealed class ClockState
     }
 }
 
-/// <summary>WASAPI / ASIO 공통 출력 백엔드.</summary>
+/// <summary>
+/// 룸 스냅샷(room_state 의 body)에서 출력 워커가 쓰는 값만 꺼낸다 — 내 볼륨과 DSP 설정.
+/// </summary>
+public static class OutputSnapshot
+{
+    public static (int? Volume, DspSettings? Dsp) Parse(string? body, string peerId)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (null, null);
+
+            int? volume = null;
+            if (root.TryGetProperty("outputs", out var outputs) && outputs.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var output in outputs.EnumerateArray())
+                {
+                    if (output.TryGetProperty("peerId", out var id) && id.GetString() == peerId
+                        && output.TryGetProperty("volumePercent", out var vol) && vol.TryGetInt32(out var percent))
+                    {
+                        volume = percent;
+                    }
+                }
+            }
+
+            return (volume, ParseDsp(root));
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
+
+    private static DspSettings? ParseDsp(JsonElement root)
+    {
+        if (!root.TryGetProperty("dspEnabled", out var enabled)
+            || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            return null;
+        }
+
+        // 오디오파일 룸은 설정이 무엇이든 가공하지 않는다. Core 의 DspSettings.From 과 같은 규칙이다.
+        var mode = (RoomMode)Int(root, "mode", (int)RoomMode.OpenLounge);
+        if (mode == RoomMode.Audiophile) return DspSettings.Off;
+
+        var preset = Int(root, "dspPreset", 0);
+        return new DspSettings(
+            enabled.GetBoolean(),
+            Enum.IsDefined(typeof(DspPresetKind), preset) ? (DspPresetKind)preset : DspPresetKind.Off,
+            Float(root, "headroomDb"),
+            String(root, "easyEqJson"),
+            Float(root, "speakerDelayMsLeft"),
+            Float(root, "speakerDelayMsRight"),
+            Float(root, "speakerGainLeftDb"),
+            Float(root, "speakerGainRightDb"),
+            String(root, "deviceEqProfile"),
+            String(root, "convolutionIrPath"));
+    }
+
+    private static int Int(JsonElement root, string name, int fallback)
+        => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n : fallback;
+
+    private static float Float(JsonElement root, string name)
+        => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? (float)v.GetDouble() : 0f;
+
+    private static string? String(JsonElement root, string name)
+        => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+}
+
+/// <summary>PCM 스트림의 모양. 이게 같아야 두 곡을 한 장치 스트림에 이어 붙일 수 있다.</summary>
+public readonly record struct PcmFormat(int Rate, int Depth, int Channels)
+{
+    public int BytesPerFrame => Math.Max(1, Channels) * Math.Max(1, Depth / 8);
+
+    public double MsOf(long frames) => Rate <= 0 ? 0 : frames * 1000.0 / Rate;
+}
+
+/// <summary>
+/// Clock-sync 로컬 소스. 파일 하나를 프레임 단위로 이어 읽는다.
+///
+/// 소스는 자리만 지킨다. 언제 이어 읽고 언제 옮길지는 위(<see cref="LocalPlayer"/>)가 정한다 —
+/// 그 판단이 소스마다 따로 있으면 WAV 와 FLAC 이 같은 타임라인에서 다르게 움직인다.
+/// </summary>
+public interface ILocalChunkSource : IDisposable
+{
+    PcmFormat Format { get; }
+
+    /// <summary>전체 길이(프레임). 알 수 없으면 0.</summary>
+    long TotalFrames { get; }
+
+    /// <summary>다음에 내줄 프레임. 아직 자리를 잡지 않았으면 -1.</summary>
+    long Position { get; }
+
+    void Seek(long frame);
+
+    /// <summary>이어서 읽는다. 끝에 닿으면 요청보다 짧게, 더 없으면 빈 배열을 돌려준다.</summary>
+    byte[] ReadNext(int frames);
+}
+
+public static class LocalChunkSourceExtensions
+{
+    /// <summary>
+    /// media_time 을 주고 읽는 옛 방식. 이어 재생이면 그대로 이어 읽고, 타임라인에서 벗어났을 때만
+    /// 자리를 옮긴다(<see cref="RenderGate.LocalCursorLost"/>).
+    /// </summary>
+    public static byte[] Read(
+        this ILocalChunkSource source, long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
+    {
+        var f = source.Format;
+        format = (f.Rate, f.Depth, f.Channels);
+        if (f.Rate <= 0 || durationMs <= 0) return [];
+
+        var requested = Math.Max(0, mediaTimeMs) * f.Rate / 1000;
+        if (RenderGate.LocalCursorLost(source.Position, requested, f.Rate))
+        {
+            source.Seek(requested);
+        }
+
+        return source.ReadNext(Math.Max(1, durationMs * f.Rate / 1000));
+    }
+}
 
 /// <summary>
 /// Clock-sync 모드에서 이 엔드포인트가 자기 로컬 파일을 직접 여는 경로.
@@ -92,14 +279,22 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 {
     private readonly FileStream _fs;
     private readonly WavHeader _header;
-    private readonly PcmFrameCursor _cursor;
+    private readonly long _totalFrames;
+    private long _next = -1;
 
     private LocalFileRenderer(FileStream fs, WavHeader header)
     {
         _fs = fs;
         _header = header;
-        _cursor = new PcmFrameCursor(header.SampleRate, header.DataSize / header.SourceBytesPerFrame);
+        _totalFrames = header.DataSize / header.SourceBytesPerFrame;
+
+        // 뎁스는 장치가 여는 규격(16/24)으로 알린다 — 바이트도 ReadNext 에서 같은 규격으로 접는다.
+        Format = new PcmFormat(header.SampleRate, header.DeviceBits, header.Channels);
     }
+
+    public PcmFormat Format { get; }
+    public long TotalFrames => _totalFrames;
+    public long Position => _next;
 
     public static ILocalChunkSource? TryOpen(string path)
     {
@@ -140,19 +335,19 @@ public sealed class LocalFileRenderer : ILocalChunkSource
         }
     }
 
-    /// <summary>media_time에서 durationMs만큼. 이미 보낸 구간은 건너뛴다.</summary>
-    public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
+    public void Seek(long frame) => _next = Math.Clamp(frame, 0, _totalFrames);
+
+    public byte[] ReadNext(int frames)
     {
-        // 뎁스는 장치가 여는 규격(16/24)으로 알린다 — 바이트도 아래에서 같은 규격으로 접는다.
-        format = (_header.SampleRate, _header.DeviceBits, _header.Channels);
+        if (_next < 0) _next = 0;
 
         var bpf = _header.SourceBytesPerFrame;
-        var (startFrame, frames) = _cursor.Advance(mediaTimeMs, durationMs);
-        if (frames <= 0)
+        var count = (int)Math.Min(frames, _totalFrames - _next);
+        if (count <= 0)
             return [];
 
-        var buffer = new byte[frames * bpf];
-        _fs.Position = _header.DataPosition + startFrame * bpf;
+        var buffer = new byte[count * bpf];
+        _fs.Position = _header.DataPosition + _next * bpf;
         var read = 0;
         while (read < buffer.Length)
         {
@@ -163,6 +358,7 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 
         if (read <= 0) return [];
         if (read < buffer.Length) buffer = buffer[..(read / bpf * bpf)];
+        _next += buffer.Length / bpf;
 
         return PcmSamples.ToDeviceDepth(buffer, _header.SourceBits, _header.Encoding, out _);
     }
@@ -174,20 +370,38 @@ public sealed class LocalFileRenderer : ILocalChunkSource
 file sealed class MfStreamingLocalRenderer : ILocalChunkSource
 {
     private readonly WaveStream _reader;
-    private readonly ISampleProvider _samples;
+    private readonly ISampleProvider? _samples;
     private readonly object _gate = new();
-    private readonly int _rate;
-    private readonly int _channels;
-    /// <summary>디코더가 다음에 내줄 프레임. 아직 자리를 잡지 않았으면 -1.</summary>
-    private long _nextFrame = -1;
+    private readonly int _blockAlign;
+
+    /// <summary>
+    /// 디코더가 내주는 정수 PCM 의 뎁스. 0 이면 정수 PCM 이 아니라서 float 를 거쳐 받는다.
+    /// 정수로 받을 수 있으면 float 를 아예 거치지 않는다 — 비트퍼펙트 경로에 계산을 끼울 이유가 없다.
+    /// </summary>
+    private readonly int _pcmBits;
+
+    private long _next = -1;
 
     private MfStreamingLocalRenderer(WaveStream reader)
     {
         _reader = reader;
-        _samples = reader is AudioFileReader afr ? afr : reader.ToSampleProvider();
-        _rate = reader.WaveFormat.SampleRate;
-        _channels = Math.Max(reader.WaveFormat.Channels, 1);
+        var wf = reader.WaveFormat;
+        _blockAlign = Math.Max(1, wf.BlockAlign);
+        _pcmBits = reader is not AudioFileReader
+                   && wf.Encoding == WaveFormatEncoding.Pcm
+                   && wf.BitsPerSample is 16 or 24 or 32
+            ? wf.BitsPerSample
+            : 0;
+        _samples = _pcmBits != 0 ? null : reader as ISampleProvider ?? reader.ToSampleProvider();
+
+        // 어떤 원본이든 24bit 로 낸다. 16bit 는 하위 바이트를 0 으로 채우므로 값은 그대로다.
+        Format = new PcmFormat(wf.SampleRate, 24, Math.Max(wf.Channels, 1));
+        TotalFrames = reader.Length > 0 ? reader.Length / _blockAlign : 0;
     }
+
+    public PcmFormat Format { get; }
+    public long TotalFrames { get; }
+    public long Position => _next;
 
     public static MfStreamingLocalRenderer? TryOpen(string path)
     {
@@ -201,133 +415,59 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
         catch { return null; }
     }
 
-    public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
+    public void Seek(long frame)
     {
-        format = (_rate, 24, _channels);
         lock (_gate)
         {
-            // 이어 재생 중에는 디코더를 그대로 이어 읽는다. 자리를 옮기는 건 타임라인에서
-            // 정말로 벗어났을 때뿐이고, 그 판정은 RenderGate.LocalCursorLost 가 한다.
-            var requested = Math.Max(0, mediaTimeMs) * _rate / 1000;
-            if (RenderGate.LocalCursorLost(_nextFrame, requested, _rate))
-            {
-                _reader.Position = requested * _reader.WaveFormat.BlockAlign;
-                _nextFrame = requested;
-            }
-
-            var frames = Math.Max(1, durationMs * _rate / 1000);
-            var samplesNeeded = frames * _channels;
-            var floatBuf = new float[samplesNeeded];
-            var n = _samples.Read(floatBuf, 0, samplesNeeded);
-            if (n <= 0) return [];
-            _nextFrame += n / _channels;
-            if (n < samplesNeeded) Array.Resize(ref floatBuf, n);
-            return FloatToPcm24(floatBuf);
+            var target = Math.Max(0, frame);
+            _reader.Position = target * _blockAlign;
+            _next = target;
         }
     }
 
-    private static byte[] FloatToPcm24(float[] samples)
+    public byte[] ReadNext(int frames)
     {
-        var bytes = new byte[samples.Length * 3];
-        for (var i = 0; i < samples.Length; i++)
+        if (frames <= 0) return [];
+
+        lock (_gate)
         {
-            var v = (int)Math.Clamp(samples[i] * 8388607f, -8388608, 8388607);
-            bytes[i * 3] = (byte)v;
-            bytes[i * 3 + 1] = (byte)(v >> 8);
-            bytes[i * 3 + 2] = (byte)(v >> 16);
+            if (_next < 0)
+            {
+                _reader.Position = 0;
+                _next = 0;
+            }
+
+            if (_pcmBits != 0)
+            {
+                var raw = new byte[frames * _blockAlign];
+                var read = 0;
+                while (read < raw.Length)
+                {
+                    var n = _reader.Read(raw, read, raw.Length - read);
+                    if (n <= 0) break;
+                    read += n;
+                }
+
+                read -= read % _blockAlign;
+                if (read <= 0) return [];
+                _next += read / _blockAlign;
+                return PcmMath.Widen24(raw.AsSpan(0, read), _pcmBits);
+            }
+
+            var wanted = frames * Format.Channels;
+            var floats = new float[wanted];
+            var got = _samples!.Read(floats, 0, wanted);
+            got -= got % Format.Channels;
+            if (got <= 0) return [];
+            _next += got / Format.Channels;
+
+            // 계산을 거치지 않은 신호다. 같은 눈금으로 되돌리면 정수 원본은 한 비트도 달라지지 않는다.
+            return PcmMath.FromFloatExact(floats.AsSpan(0, got), 24);
         }
-        return bytes;
     }
 
     public void Dispose()
     {
         lock (_gate) _reader.Dispose();
     }
-}
-
-/// <summary>DSF → DoP 로컬 Clock-sync 경로 (채널 인터리브 검증용).</summary>
-file sealed class DsfLocalRenderer : ILocalChunkSource
-{
-    private readonly FileStream _fs;
-    private readonly long _dataPos;
-    private readonly long _dataSize;
-    private readonly int _blockSize;
-    private readonly int _dsdRate;
-    private readonly int _channels;
-    private long _cursorMs = -1;
-
-    private DsfLocalRenderer(FileStream fs, long dataPos, long dataSize, int blockSize, int dsdRate, int channels)
-    {
-        _fs = fs;
-        _dataPos = dataPos;
-        _dataSize = dataSize;
-        _blockSize = blockSize;
-        _dsdRate = dsdRate;
-        _channels = channels;
-    }
-
-    public static DsfLocalRenderer? TryOpen(string path)
-    {
-        try
-        {
-            var fs = File.OpenRead(path);
-            using var br = new BinaryReader(fs, System.Text.Encoding.ASCII, leaveOpen: true);
-            if (new string(br.ReadChars(4)) != "DSD ") { fs.Dispose(); return null; }
-            br.ReadInt64(); br.ReadInt64(); br.ReadInt64();
-            if (new string(br.ReadChars(4)) != "fmt ") { fs.Dispose(); return null; }
-            var fmtSize = br.ReadInt64();
-            br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
-            var channels = br.ReadInt32();
-            var rate = br.ReadInt32();
-            br.ReadInt32();
-            br.ReadInt64();
-            var blockSize = br.ReadInt32();
-            br.ReadInt32();
-            fs.Position = 28 + fmtSize;
-            var dataId = new string(br.ReadChars(4));
-            var dataSize = br.ReadInt64();
-            var dataPos = fs.Position;
-            var size = dataId == "data" ? Math.Min(dataSize - 12, fs.Length - dataPos) : fs.Length - dataPos;
-            return new DsfLocalRenderer(fs, dataPos, size, blockSize, rate, Math.Max(channels, 1));
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    public byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format)
-    {
-        var start = _cursorMs < 0 || Math.Abs(_cursorMs - mediaTimeMs) > 500 ? mediaTimeMs : _cursorMs;
-        var bytesPerMsPerChannel = _dsdRate / 8.0 / 1000.0;
-        var blockBytes = (long)_blockSize * _channels;
-        var startByte = (long)(start * bytesPerMsPerChannel * _channels);
-        if (blockBytes > 0) startByte -= startByte % blockBytes;
-        startByte = Math.Clamp(startByte, 0, _dataSize);
-        var want = (long)(durationMs * bytesPerMsPerChannel * _channels);
-        if (blockBytes > 0) want = Math.Max(blockBytes, want - want % blockBytes);
-        want = Math.Min(want, _dataSize - startByte);
-        if (want <= 0)
-        {
-            format = (176400, 24, _channels);
-            return [];
-        }
-
-        var dsd = new byte[want];
-        _fs.Position = _dataPos + startByte;
-        var read = _fs.Read(dsd, 0, (int)want);
-        if (read < want) Array.Resize(ref dsd, Math.Max(read, 0));
-        _cursorMs = start + durationMs;
-        var encoded = DopEncoder.Encode(dsd, _dsdRate, _channels);
-        format = (encoded.Rate, encoded.Depth, encoded.Channels);
-        return encoded.Pcm;
-    }
-
-    public void Dispose() => _fs.Dispose();
-}
-
-/// <summary>Clock-sync 로컬 소스 공용 인터페이스.</summary>
-public interface ILocalChunkSource : IDisposable
-{
-    byte[] Read(long mediaTimeMs, int durationMs, out (int rate, int depth, int channels) format);
 }
