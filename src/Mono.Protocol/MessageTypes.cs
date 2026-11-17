@@ -36,6 +36,8 @@ public static class MessageTypes
     public const string SetDeviceEq = "set_device_eq";
     public const string SyncProbe = "sync_probe";
     public const string SetSourceMode = "set_source_mode";
+    /// <summary>곡 전환 방식. index = TrackTransition, mediaTimeMs = 크로스페이드 길이(ms).</summary>
+    public const string SetTransition = "set_transition";
     public const string SetRoomFlags = "set_room_flags";
 
     // 큐 · 트랜스포트

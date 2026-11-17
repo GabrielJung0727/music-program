@@ -887,6 +887,7 @@ public sealed class RoomManager
 
             room.Shuffle = on;
             room.ShuffleHistory.Clear();
+            ForgetShufflePlan(room);
             return (room, null);
         }
     }
@@ -906,6 +907,7 @@ public sealed class RoomManager
             }
 
             room.Repeat = mode;
+            ForgetShufflePlan(room);
             return (room, null);
         }
     }
@@ -922,15 +924,50 @@ public sealed class RoomManager
             return null;
         }
 
+        // 미리 정해 둔 칸이 있으면 그걸 쓴다. 출력은 그 곡을 이미 열어 두고 이어 붙일 준비를 했다 —
+        // 여기서 다시 뽑으면 준비한 곡과 실제로 트는 곡이 달라진다.
+        var planned = PeekShuffleIndex(room);
+
+        var lapDone = Enumerable.Range(0, room.Queue.Count)
+            .All(i => i == room.QueueIndex || room.ShuffleHistory.Contains(i));
         room.ShuffleHistory.Add(room.QueueIndex);
+        if (lapDone)
+        {
+            // 한 바퀴 돌았다. 반복이 꺼져 있으면 planned 는 null 이고 여기서 멈춘다.
+            room.ShuffleHistory.Clear();
+        }
+
+        ForgetShufflePlan(room);
+        return planned;
+    }
+
+    /// <summary>
+    /// 셔플이 다음에 틀 칸을 미리 본다. 처음 물을 때 뽑아서 적어 두고, 재생 중인 항목이 그대로인
+    /// 동안에는 같은 답을 준다. 순회 기록은 건드리지 않는다 — 그건 실제로 넘어갈 때 한다.
+    /// </summary>
+    private static int? PeekShuffleIndex(ListeningRoom room)
+    {
+        if (!room.Shuffle || room.Queue.Count <= 1 || room.QueueIndex < 0 || room.QueueIndex >= room.Queue.Count)
+        {
+            return null;
+        }
+
+        var currentId = room.Queue[room.QueueIndex].Id;
+        if (room.ShufflePlannedFromItemId == currentId && room.ShufflePlannedItemId is { } plannedId)
+        {
+            var kept = room.Queue.FindIndex(q => q.Id == plannedId);
+            if (kept >= 0 && kept != room.QueueIndex)
+            {
+                return kept;
+            }
+        }
+
         var remaining = Enumerable.Range(0, room.Queue.Count)
-            .Where(i => !room.ShuffleHistory.Contains(i))
+            .Where(i => i != room.QueueIndex && !room.ShuffleHistory.Contains(i))
             .ToList();
 
         if (remaining.Count == 0)
         {
-            // 한 바퀴 돌았다. 반복이 꺼져 있으면 여기서 멈춘다.
-            room.ShuffleHistory.Clear();
             if (room.Repeat == RepeatMode.Off)
             {
                 return null;
@@ -943,8 +980,98 @@ public sealed class RoomManager
             }
         }
 
-        return remaining[Random.Shared.Next(remaining.Count)];
+        var pick = remaining[Random.Shared.Next(remaining.Count)];
+        room.ShufflePlannedFromItemId = currentId;
+        room.ShufflePlannedItemId = room.Queue[pick].Id;
+        return pick;
     }
+
+    private static void ForgetShufflePlan(ListeningRoom room)
+    {
+        room.ShufflePlannedFromItemId = null;
+        room.ShufflePlannedItemId = null;
+    }
+
+    /// <summary>
+    /// 지금 곡이 끝까지 재생되면 이어질 곡. <see cref="AdvanceFinished"/> 가 고를 곡과 같아야 한다 —
+    /// 출력은 이 답을 믿고 다음 곡을 미리 열어 끊김 없이 잇거나 겹친다.
+    /// 아직 정해지지 않았으면 null 이다(큐의 끝인데 자동 재생 후보를 아직 뽑지 않았을 때 등).
+    /// </summary>
+    public Track? PeekNextTrack(ListeningRoom room)
+    {
+        lock (_gate)
+        {
+            return PlannedNext(room);
+        }
+    }
+
+    private Track? PlannedNext(ListeningRoom room)
+    {
+        if (room.QueueIndex < 0 || room.QueueIndex >= room.Queue.Count)
+        {
+            return null;
+        }
+
+        string? id;
+        if (room.Repeat == RepeatMode.One)
+        {
+            id = room.Queue[room.QueueIndex].TrackId;
+        }
+        else if (!room.AutoAdvance)
+        {
+            id = null;
+        }
+        else if (PeekShuffleIndex(room) is { } shuffled)
+        {
+            id = room.Queue[shuffled].TrackId;
+        }
+        else if (room.QueueIndex + 1 < room.Queue.Count)
+        {
+            id = room.Queue[room.QueueIndex + 1].TrackId;
+        }
+        else if (room.Repeat == RepeatMode.All)
+        {
+            id = room.Queue[0].TrackId;
+        }
+        else if (room.SmartAutoplay && room.AutoplayCandidateIds.Count > 0)
+        {
+            // 후보를 뽑는 건 PickAutoplayNext 의 일이다. 여기서 뽑으면 방송할 때마다 카탈로그를 훑는다.
+            id = room.AutoplayChosenId is { } chosen && room.AutoplayCandidateIds.Contains(chosen)
+                ? chosen
+                : room.AutoplayCandidateIds[0];
+        }
+        else
+        {
+            id = null;
+        }
+
+        return id is not null && _catalog.Tracks.TryGetValue(id, out var track) ? track : null;
+    }
+
+    /// <summary>두 곡을 한 스트림에 이어 붙일 수 있는가. 샘플레이트나 채널 수가 다르면 장치를 다시 열어야 한다.</summary>
+    private static bool SameStreamShape(Track a, Track b)
+        => !a.IsDsd && !b.IsDsd && a.SampleRate == b.SampleRate && a.Channels == b.Channels;
+
+    /// <summary>
+    /// 크로스페이드로 두 곡이 실제로 겹칠 길이. 설정값이 곡 길이의 절반을 넘으면 절반까지만 —
+    /// 그러지 않으면 짧은 곡이 들어오자마자 다시 나가기 시작한다.
+    /// </summary>
+    public static long CrossfadeOverlapMs(int crossfadeMs, long outgoingMs, long incomingMs)
+    {
+        long overlap = Math.Clamp(crossfadeMs, 0, MaxCrossfadeMs);
+        if (outgoingMs > 0) overlap = Math.Min(overlap, outgoingMs / 2);
+        if (incomingMs > 0) overlap = Math.Min(overlap, incomingMs / 2);
+        return Math.Max(0, overlap);
+    }
+
+    public const int MinCrossfadeMs = 1_000;
+    public const int MaxCrossfadeMs = 12_000;
+
+    /// <summary>
+    /// 곡이 끝난 걸 이보다 늦게 알아챘으면 끊김 없이 잇기를 포기한다. PC 가 잠들었다 깨어난 경우처럼
+    /// 타임라인이 한참 지나가 버렸을 때, 지나간 만큼을 건너뛴 자리에서 이어 붙이는 건 잇는 게 아니다.
+    /// </summary>
+    private const long SeamlessLateLimitMs = 1_500;
 
     /// <summary>버퍼가 풀렸을 때의 명시적 재동기화. Output은 epoch가 바뀌면 버퍼를 비운다.</summary>
     public (ListeningRoom? Room, string? Error) Resync(string roomId, string peerId)
@@ -998,17 +1125,37 @@ public sealed class RoomManager
                 }
 
                 var duration = track.DurationMs;
-                if (room.CurrentMediaTimeMs() < duration)
+
+                // 끊김 없이 잇기·크로스페이드는 출력이 파일을 직접 여는 클럭싱크 경로에서만 한다.
+                // 출력은 다음 곡을 미리 열어 두고 자기 버퍼 안에서 두 곡을 이어 붙이므로, Core 는
+                // 곡이 끝난 "그 순간"을 새 타임라인의 원점으로 준다. 지금 시각을 원점으로 주면 틱
+                // 간격(250ms)만큼 늦게 알아챈 시간이 그대로 곡 사이의 틈으로 남는다.
+                var next = PlannedNext(room);
+                var joins = room.Transition != TrackTransition.Off
+                            && room.SourceMode == PlaybackSourceMode.ClockSync
+                            && next is not null;
+
+                // 크로스페이드는 다음 곡이 겹치는 길이만큼 먼저 시작한다.
+                var overlap = joins && room.Transition == TrackTransition.Crossfade && SameStreamShape(track, next!)
+                    ? CrossfadeOverlapMs(room.CrossfadeMs, duration, next!.DurationMs)
+                    : 0;
+                var endsAt = duration - overlap;
+                if (room.CurrentMediaTimeMs() < endsAt)
                 {
                     continue;
                 }
+
+                var endedAtUnixMs = room.MediaOriginUnixMs + (endsAt - room.MediaTimeAtOriginMs);
+                long? seamlessOrigin = joins && ClockSync.UnixMs() - endedAtUnixMs <= SeamlessLateLimitMs
+                    ? endedAtUnixMs
+                    : null;
 
                 MarkComplete(room, forceComplete: true);
 
                 // 한 곡 반복은 큐를 건드리지 않는다 — 같은 칸을 처음부터 다시 연다.
                 if (room.Repeat == RepeatMode.One)
                 {
-                    StartTrackTimeline(room, 0);
+                    StartTrackTimeline(room, 0, seamlessOrigin);
                     changed.Add(room);
                     continue;
                 }
@@ -1016,7 +1163,7 @@ public sealed class RoomManager
                 if (room.AutoAdvance && NextQueueIndex(room) is { } shuffled)
                 {
                     room.QueueIndex = shuffled;
-                    StartTrackTimeline(room, 0);
+                    StartTrackTimeline(room, 0, seamlessOrigin);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                     changed.Add(room);
                     continue;
@@ -1026,20 +1173,20 @@ public sealed class RoomManager
                 if (room.AutoAdvance && !isLastQueued)
                 {
                     room.QueueIndex++;
-                    StartTrackTimeline(room, 0);
+                    StartTrackTimeline(room, 0, seamlessOrigin);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                 }
                 else if (room.AutoAdvance && isLastQueued && room.Repeat == RepeatMode.All && room.Queue.Count > 0)
                 {
                     room.QueueIndex = 0;
-                    StartTrackTimeline(room, 0);
+                    StartTrackTimeline(room, 0, seamlessOrigin);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                 }
                 else if (room.AutoAdvance && isLastQueued && room.SmartAutoplay && PickAutoplayNext(room) is { } nextTrackId)
                 {
                     room.Queue.Add(new QueueItem { Id = Guid.NewGuid().ToString("n")[..8], TrackId = nextTrackId, AddedByPeerId = "autoplay" });
                     room.QueueIndex++;
-                    StartTrackTimeline(room, 0);
+                    StartTrackTimeline(room, 0, seamlessOrigin);
                     NoteNowPlaying(room, room.CurrentTrack(_catalog.Tracks));
                 }
                 else
@@ -1846,6 +1993,8 @@ public sealed class RoomManager
             room.AutoAdvance,
             room.Shuffle,
             room.Repeat,
+            room.Transition,
+            room.CrossfadeMs,
             room.LinerPage,
             room.LinerScrollY,
             room.MaxMembers,
@@ -2072,11 +2221,21 @@ public sealed class RoomManager
         }
     }
 
-    private void StartTrackTimeline(ListeningRoom room, long mediaTimeMs)
+    /// <summary>
+    /// 지금 칸의 타임라인을 새로 연다. <paramref name="seamlessOriginUnixMs"/> 는 앞 곡이 끝까지
+    /// 재생되어 넘어온 경우에만 준다 — 앞 곡이 끝난 그 시각이 새 곡의 원점이 되고, 출력은 이
+    /// 세대를 버퍼를 비우지 않고 이어 가도 되는 세대로 읽는다.
+    /// </summary>
+    private void StartTrackTimeline(ListeningRoom room, long mediaTimeMs, long? seamlessOriginUnixMs = null)
     {
         room.MediaTimeAtOriginMs = Math.Max(0, mediaTimeMs);
-        room.MediaOriginUnixMs = ClockSync.UnixMs();
+        room.MediaOriginUnixMs = seamlessOriginUnixMs ?? ClockSync.UnixMs();
         room.ResyncEpoch++;
+        if (seamlessOriginUnixMs is not null)
+        {
+            room.SeamlessEpoch = room.ResyncEpoch;
+        }
+
         room.AutoplayProposedForTrackId = null;
         room.AutoplayCandidateIds.Clear();
         room.AutoplayDeadlineUnixMs = null;

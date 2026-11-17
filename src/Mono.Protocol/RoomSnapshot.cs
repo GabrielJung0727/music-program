@@ -39,6 +39,8 @@ public sealed class RoomSnapshot
     public bool SmartAutoplay { get; set; }
     public bool Shuffle { get; set; }
     public RepeatMode Repeat { get; set; }
+    public TrackTransition Transition { get; set; }
+    public int CrossfadeMs { get; set; }
     public int LinerPage { get; set; }
     public double LinerScrollY { get; set; }
     public int MaxMembers { get; set; }

@@ -113,6 +113,29 @@ public sealed class MonoMessage
     [JsonPropertyName("localPath")]
     public string? LocalPath { get; set; }
 
+    /// <summary>
+    /// 지금 곡이 끝까지 재생되면 이어질 곡. 출력이 미리 열어 두었다가 끊김 없이 잇거나 겹친다.
+    /// 정해지지 않았으면(큐의 끝, 자동 재생 후보를 아직 고르지 않음) 비어 있다.
+    /// </summary>
+    [JsonPropertyName("nextTrackId")]
+    public string? NextTrackId { get; set; }
+
+    [JsonPropertyName("nextLocalPath")]
+    public string? NextLocalPath { get; set; }
+
+    [JsonPropertyName("transition")]
+    public TrackTransition? Transition { get; set; }
+
+    [JsonPropertyName("crossfadeMs")]
+    public int? CrossfadeMs { get; set; }
+
+    /// <summary>
+    /// 재생하던 것을 끊지 않고 이어 가도 되는 세대. <see cref="Epoch"/> 와 같을 때만 뜻이 있다 —
+    /// 그 세대는 사용자가 곡을 넘긴 게 아니라 곡이 끝까지 재생되어 넘어간 것이다.
+    /// </summary>
+    [JsonPropertyName("seamlessEpoch")]
+    public long? SeamlessEpoch { get; set; }
+
     [JsonPropertyName("inviteCode")]
     public string? InviteCode { get; set; }
 
