@@ -56,6 +56,46 @@ public static class RenderGate
     public static bool ShouldFlush(double bufferedMs, double ceilingMs) => bufferedMs > ceilingMs + 200;
 
     /// <summary>
+    /// Clock-sync 로컬 디코더가 타임라인보다 이만큼 넘게 뒤처지면 그 사이를 건너뛰어 따라잡는다.
+    /// 프라임 중이거나 드라이버가 스트림을 여는 동안에는 정상 재생에서도 수십 ms 뒤처지므로
+    /// 그보다 넉넉해야 한다 — 좁으면 멀쩡한 재생 도중에 건너뛰어 딸깍 소리를 낸다.
+    /// </summary>
+    public const int LocalCatchUpMs = 150;
+
+    /// <summary>
+    /// 디코더가 타임라인보다 이만큼 넘게 앞서 있으면 타임라인이 되감긴 것으로 본다.
+    /// 디코더는 장치 버퍼 깊이만큼 늘 앞서 있으므로 버퍼 용량보다는 커야 한다.
+    /// </summary>
+    public const int LocalAheadLimitMs = 500;
+
+    /// <summary>
+    /// Clock-sync 로컬 디코더가 이어 읽지 말고 요청한 자리로 옮겨 가야 하는가.
+    ///
+    /// 디코더의 자리는 "지난번에 부른 시각"이 아니라 디코더가 실제로 내준 프레임 수로 센다.
+    /// 예전에는 부를 때마다 커서를 타임라인에 다시 맞추고 80ms 넘게 벌어지면 탐색했는데,
+    /// 그러면 읽기 한 번이 오래 걸렸다는 이유만으로 탐색이 다시 걸린다. 탐색 직후의 첫 읽기가
+    /// 바로 그렇게 오래 걸리고, 다시 건 탐색은 디코더를 새로 여느라 더 오래 걸려서, 30ms 조각
+    /// 하나를 낼 때마다 디코더를 다시 여는 고리에 빠졌다(탐색하면 소리가 뚝뚝 끊기던 원인).
+    /// </summary>
+    public static bool LocalCursorLost(long nextFrame, long requestedFrame, int sampleRate)
+    {
+        if (nextFrame < 0) return true;
+
+        var behind = requestedFrame - nextFrame;
+        return behind > (long)LocalCatchUpMs * sampleRate / 1000
+               || -behind > (long)LocalAheadLimitMs * sampleRate / 1000;
+    }
+
+    /// <summary>
+    /// 방금 읽은 조각이 읽는 사이에 이미 지난 소리가 되었는가.
+    ///
+    /// 탐색 직후의 첫 읽기는 디코더가 자리를 찾느라 오래 걸리고, 그동안 타임라인은 흘러간다.
+    /// 그 조각을 그대로 넣으면 지난 소리가 잠깐 났다가 제자리로 건너뛴다. 기준은
+    /// <see cref="LocalCursorLost"/> 와 같다 — 이게 참이면 다음 읽기는 어차피 따라잡으러 건너뛴다.
+    /// </summary>
+    public static bool IsStaleLocalRead(double readMs, double chunkMs) => readMs - chunkMs > LocalCatchUpMs;
+
+    /// <summary>
     /// epoch 가 바뀌었을 때 큐에서 살릴 프레임을 고른다.
     ///
     /// 곡을 넘기면 Core 는 새 곡의 룩어헤드(약 320ms)를 한 번에 보낸다. 수신 루프는 이미

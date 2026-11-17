@@ -178,7 +178,8 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
     private readonly object _gate = new();
     private readonly int _rate;
     private readonly int _channels;
-    private long _cursorMs = -1;
+    /// <summary>디코더가 다음에 내줄 프레임. 아직 자리를 잡지 않았으면 -1.</summary>
+    private long _nextFrame = -1;
 
     private MfStreamingLocalRenderer(WaveStream reader)
     {
@@ -205,18 +206,21 @@ file sealed class MfStreamingLocalRenderer : ILocalChunkSource
         format = (_rate, 24, _channels);
         lock (_gate)
         {
-            var target = Math.Max(0, mediaTimeMs);
-            if (_cursorMs < 0 || Math.Abs(_cursorMs - target) > 80)
+            // 이어 재생 중에는 디코더를 그대로 이어 읽는다. 자리를 옮기는 건 타임라인에서
+            // 정말로 벗어났을 때뿐이고, 그 판정은 RenderGate.LocalCursorLost 가 한다.
+            var requested = Math.Max(0, mediaTimeMs) * _rate / 1000;
+            if (RenderGate.LocalCursorLost(_nextFrame, requested, _rate))
             {
-                _reader.CurrentTime = TimeSpan.FromMilliseconds(target);
+                _reader.Position = requested * _reader.WaveFormat.BlockAlign;
+                _nextFrame = requested;
             }
 
             var frames = Math.Max(1, durationMs * _rate / 1000);
             var samplesNeeded = frames * _channels;
             var floatBuf = new float[samplesNeeded];
             var n = _samples.Read(floatBuf, 0, samplesNeeded);
-            _cursorMs = target + durationMs;
             if (n <= 0) return [];
+            _nextFrame += n / _channels;
             if (n < samplesNeeded) Array.Resize(ref floatBuf, n);
             return FloatToPcm24(floatBuf);
         }
