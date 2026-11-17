@@ -103,7 +103,8 @@ function makeRoom({ id, name, mode, hostPeerId, hostName }) {
   const room = {
     id: id ?? `room-${roomSeq++}`,
     name, mode,
-    sourceMode: 0, qualityPolicy: 0,
+    // Core 의 ListeningRoom.ForMode 와 같다: 공개 라운지(0)와 호스트 큐(2)는 팬아웃(1), 나머지는 클럭싱크(0).
+    sourceMode: mode === 0 || mode === 2 ? 1 : 0, qualityPolicy: 0,
     dspPreset: 0, dspEnabled: false, dspLocked: false,
     convolutionIrPath: null, easyEqJson: null, easyEqGraphicMode: false,
     headroomDb: -3, speakerDelayMsLeft: 0, speakerDelayMsRight: 0, speakerGainLeftDb: 0, speakerGainRightDb: 0,
@@ -195,7 +196,9 @@ function snapshot(room) {
     ...pub,
     mediaTimeMs: Math.round(pos),
     bitPerfect: !room.dspEnabled && !!t,
-    srcApplied: false,
+    // Core 의 UpsamplingApplies 와 같다: 헤드폰·스피커 프리셋이고, 팬아웃이거나 장치가 2배 레이트를 받을 때만.
+    srcApplied: !!t && room.dspEnabled && (room.dspPreset === 1 || room.dspPreset === 2)
+      && (room.sourceMode === 1 || room.outputs.some((o) => o.maxSampleRate >= t.sampleRate * 2)),
     pathBadge: pathBadge(t),
     catalogCount: CATALOG.tracks.length,
     heatmap: [],
@@ -217,7 +220,8 @@ function snapshot(room) {
 
 const OUTPUT = (volume = 62) => ({
   peerId: "out-local", displayName: "Mono Output · 이 PC",
-  maxSampleRate: 768000, maxBitDepth: 32, supportsDsd: true, exclusiveMode: true,
+  // MOCK_MAX_RATE=48000 처럼 주면 2배 레이트를 못 받는 장치를 흉내 낸다(신호 경로의 SRC 표시 확인용).
+  maxSampleRate: Number(process.env.MOCK_MAX_RATE ?? 768000), maxBitDepth: 32, supportsDsd: true, exclusiveMode: true,
   reportedLatencyMs: 5.8, hardwareVolume: true, volumePercent: volume,
   device: "RME ADI-2 DAC FS", spectator: false, badge: "WASAPI Exclusive", note: null,
   stats: { offsetMs: 0.02, jitterMs: 0.11, rttMs: 0.4, bufferMs: 180, resyncs: 0, locked: true, deviceState: 1, deviceError: null },

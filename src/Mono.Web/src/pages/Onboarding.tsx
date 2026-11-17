@@ -28,7 +28,7 @@ export default function Onboarding() {
 
   const [devices, setDevices] = useState<AudioDeviceListing[]>([])
   const [scanning, setScanning] = useState(false)
-  const [audio, setAudio] = useState<AudioSetup>({ driverType: "WASAPI_EXCLUSIVE", deviceId: "", deviceName: "", bufferSize: 256, exclusiveMode: true })
+  const [audio, setAudio] = useState<AudioSetup>({ driverType: "WASAPI_EXCLUSIVE", deviceId: "", deviceName: "", exclusiveMode: true })
 
   const [profile, setProfile] = useState<ProfileSetup>({
     displayName: displayName === "Listener" ? "" : displayName,
@@ -175,12 +175,6 @@ export default function Onboarding() {
                   <div className="setrow__text"><h4>배타 모드</h4><p>장치를 Mono 가 독점해 윈도우 믹서를 건너뜁니다. 비트 퍼펙트의 조건입니다.</p></div>
                   <Toggle label="배타 모드" value={audio.exclusiveMode} onChange={(v) => setAudio((a) => ({ ...a, exclusiveMode: v }))} />
                 </div>
-                <div className="setrow">
-                  <div className="setrow__text"><h4>버퍼 크기</h4><p><span className="mono">{audio.bufferSize}</span> 샘플 ≈ <span className="mono">{((audio.bufferSize / 44100) * 1000).toFixed(1)} ms</span>. 끊기면 키우세요.</p></div>
-                  <div className="seg">
-                    {[128, 256, 512, 1024].map((b) => <button key={b} className={`mono ${audio.bufferSize === b ? "is-on" : ""}`} onClick={() => setAudio((a) => ({ ...a, bufferSize: b }))}>{b}</button>)}
-                  </div>
-                </div>
               </div>
             </>
           )}
@@ -255,7 +249,7 @@ export default function Onboarding() {
               <h1 className="t-display" style={{ fontSize: 52, marginTop: 16 }}>이제 들을 차례입니다.</h1>
               <dl className="kv ob__summary">
                 <dt>음악 폴더</dt><dd>{folders.length > 0 ? folders.join("\n") : "나중에 추가"}</dd>
-                <dt>출력 장치</dt><dd>{audio.deviceName ? `${audio.deviceName} · ${audio.exclusiveMode ? "배타" : "공유"} · ${audio.bufferSize} 샘플` : "시스템 기본 출력"}</dd>
+                <dt>출력 장치</dt><dd>{audio.deviceName ? `${audio.deviceName} · ${audio.exclusiveMode ? "배타" : "공유"}` : "시스템 기본 출력"}</dd>
                 <dt>스트리밍</dt><dd>{connected.length > 0 ? connected.map((s) => s.name).join(", ") : "연결 안 함"}</dd>
                 <dt>이름</dt><dd>{profile.displayName.trim() || "Listener"}</dd>
               </dl>

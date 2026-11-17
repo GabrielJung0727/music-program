@@ -15,7 +15,11 @@ export interface AudioSetup {
   driverType: "ASIO" | "WASAPI_EXCLUSIVE"
   deviceId: string
   deviceName: string
-  bufferSize: number
+  /**
+   * 더 쓰지 않는다. 예전 마법사가 저장하던 값인데 출력 워커에는 한 번도 전달되지 않았다.
+   * 버퍼는 ASIO 에서는 드라이버가, WASAPI 에서는 워커가 정한다. 옛 setup.json 을 읽을 수 있게 형만 남긴다.
+   */
+  bufferSize?: number
   exclusiveMode: boolean
   /** ASIO 에서 소리를 내보낼 첫 출력 채널(0부터). 헤드폰 단자가 3/4 에 있다면 2. */
   asioChannelOffset?: number

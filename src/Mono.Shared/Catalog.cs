@@ -122,6 +122,12 @@ public sealed class OutputCapability
     public required string PeerId { get; init; }
     public required string DisplayName { get; set; }
     public int MaxSampleRate { get; set; } = 192000;
+
+    /// <summary>
+    /// 장치가 실제로 여는 샘플레이트 목록. 비어 있으면 보고하지 않은 것이다(옛 워커).
+    /// 최댓값만으로는 알 수 없는 게 있다 — 96kHz 까지 받는 장치가 88.2kHz 는 받지 않을 수 있다.
+    /// </summary>
+    public List<int> SampleRates { get; init; } = [];
     public int MaxBitDepth { get; set; } = 32;
     public bool SupportsDsd { get; set; }
     public bool ExclusiveMode { get; set; } = true;
@@ -129,6 +135,10 @@ public sealed class OutputCapability
     public bool HardwareVolume { get; set; }
     public int VolumePercent { get; set; } = 100;
     public string? Device { get; set; }
+
+    /// <summary>이 장치가 그 샘플레이트로 열리는가. 목록을 보고하지 않은 워커는 최댓값으로 짐작한다.</summary>
+    public bool AcceptsRate(int rate)
+        => SampleRates.Count > 0 ? SampleRates.Contains(rate) : MaxSampleRate >= rate;
 }
 
 /// <summary>Output이 보고하는 동기화 품질. 측정 UI(오프셋·지터)의 원천.</summary>

@@ -135,6 +135,8 @@ await Send(new MonoMessage
     DisplayName = displayName,
     Device = renderer.DeviceName,
     MaxSampleRate = caps.SampleRates.Count > 0 ? caps.SampleRates.Max() : 48000,
+    // 목록째로 알린다. Core 가 "2배 업샘플링이 실제로 되는가"를 이 워커와 같은 기준으로 판정한다.
+    SampleRates = caps.SampleRates.ToList(),
     MaxBitDepth = caps.BitDepths.Count > 0 ? caps.BitDepths.Max() : 16,
     SupportsDsd = claimDsd,
     ExclusiveMode = deviceMode == DeviceMode.BitPerfectExclusive,
