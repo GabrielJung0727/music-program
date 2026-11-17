@@ -131,10 +131,19 @@ public sealed class OutputCapability
     public int MaxBitDepth { get; set; } = 32;
     public bool SupportsDsd { get; set; }
     public bool ExclusiveMode { get; set; } = true;
-    public long ReportedLatencyMs { get; set; } = 5;
+
+    /// <summary>
+    /// 장치의 재생 지연(ms). 0 은 "아직 모른다"는 뜻이다 — 워커는 접속할 때 장치를 열기 전이라
+    /// 지연을 알 수 없고, 연 뒤에 clock_report 로 알려 온다. 모르는 값을 5 같은 숫자로 채워 두면
+    /// 화면이 재 보지도 않은 지연을 잰 것처럼 보여 준다.
+    /// </summary>
+    public long ReportedLatencyMs { get; set; }
     public bool HardwareVolume { get; set; }
     public int VolumePercent { get; set; } = 100;
     public string? Device { get; set; }
+
+    /// <summary>드라이버 종류("ASIO" · "WASAPI"). 알리지 않는 옛 워커는 null.</summary>
+    public string? Driver { get; set; }
 
     /// <summary>이 장치가 그 샘플레이트로 열리는가. 목록을 보고하지 않은 워커는 최댓값으로 짐작한다.</summary>
     public bool AcceptsRate(int rate)
@@ -151,7 +160,7 @@ public sealed class PeerStats
     public int Resyncs { get; set; }
     public bool Locked { get; set; }
 
-    /// <summary>출력 장치 상태 머신의 현재 값. 0=Idle 2=ExclusiveStreaming 4=DeviceBusyLocked 6=DeviceLostSuspend.</summary>
+    /// <summary>출력 장치 상태 머신의 현재 값. 0=Idle 2=ExclusiveStreaming 3=SharedStreaming 4=DeviceBusyLocked 6=DeviceLostSuspend.</summary>
     public int DeviceState { get; set; }
 
     /// <summary>재생을 보류한 사유. 점유 충돌·장치 분리처럼 사용자가 조치해야 하는 것만 담는다.</summary>

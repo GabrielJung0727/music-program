@@ -134,13 +134,15 @@ await Send(new MonoMessage
     Role = "output",
     DisplayName = displayName,
     Device = renderer.DeviceName,
+    Driver = renderer.Driver,
     MaxSampleRate = caps.SampleRates.Count > 0 ? caps.SampleRates.Max() : 48000,
     // 목록째로 알린다. Core 가 "2배 업샘플링이 실제로 되는가"를 이 워커와 같은 기준으로 판정한다.
     SampleRates = caps.SampleRates.ToList(),
     MaxBitDepth = caps.BitDepths.Count > 0 ? caps.BitDepths.Max() : 16,
     SupportsDsd = claimDsd,
     ExclusiveMode = deviceMode == DeviceMode.BitPerfectExclusive,
-    LatencyMs = renderer.LatencyMs,
+    // 아직 장치를 열지 않았다. 지연은 열고 나서 clock_report 로 올린다.
+    LatencyMs = renderer.LatencyMs > 0 ? renderer.LatencyMs : null,
     HardwareVolume = renderer.HardwareVolume,
     Volume = volumePercent
 });
@@ -300,6 +302,8 @@ async Task ClockLoopAsync(CancellationToken ct)
                     JitterMs = clock.JitterMs,
                     RttMs = clock.RttMs,
                     BufferMs = (int)renderer.BufferedMs,
+                    // 장치를 실제로 연 뒤의 지연. 접속할 때는 아직 열기 전이라 알 수 없었다.
+                    LatencyMs = renderer.LatencyMs > 0 ? renderer.LatencyMs : null,
                     Resyncs = resyncs + drops,
                     Locked = renderer.Playing && Math.Abs(renderer.BufferedMs - clock.TargetBufferMs) < 40,
                     DeviceState = (int)renderer.GetCurrentState(),

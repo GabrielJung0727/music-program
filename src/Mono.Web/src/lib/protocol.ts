@@ -241,6 +241,8 @@ export interface SnapshotOutput {
   hardwareVolume: boolean
   volumePercent: number
   device?: string | null
+  /** 드라이버 종류("ASIO" · "WASAPI"). 알리지 않는 옛 출력 워커에서는 비어 있다. */
+  driver?: string | null
   spectator: boolean
   badge?: string | null
   note?: string | null

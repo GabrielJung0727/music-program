@@ -1665,18 +1665,25 @@ public sealed class RoomManager
 
             cap.VolumePercent = wanted;
             _endpoints?.SetVolume(targetPeerId, wanted);
+            RefreshPath(room);
             return (room, null);
         }
     }
 
     /// <summary>Output이 보고한 클럭 품질. 측정 UI가 이 값을 그린다.</summary>
-    public ListeningRoom? ReportClock(string roomId, string peerId, double offsetMs, double jitterMs, double rttMs, int bufferMs, int resyncs, bool locked, int deviceState = 0, string? deviceError = null)
+    public ListeningRoom? ReportClock(string roomId, string peerId, double offsetMs, double jitterMs, double rttMs, int bufferMs, int resyncs, bool locked, int deviceState = 0, string? deviceError = null, long? latencyMs = null)
     {
         lock (_gate)
         {
             if (!_rooms.TryGetValue(roomId, out var room))
             {
                 return null;
+            }
+
+            // 장치를 연 뒤의 실제 지연. 접속할 때 온 값은 열기 전의 것이라 비어 있거나 낡았다.
+            if (latencyMs is > 0 && room.Outputs.TryGetValue(peerId, out var cap))
+            {
+                cap.ReportedLatencyMs = latencyMs.Value;
             }
 
             room.Stats[peerId] = new PeerStats
@@ -1691,6 +1698,9 @@ public sealed class RoomManager
                 DeviceError = deviceError,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
+
+            // 장치가 공유 모드로 내려갔는지는 이 보고로만 알 수 있다. 비트퍼펙트 표시를 다시 계산한다.
+            RefreshPath(room);
             return room;
         }
     }
@@ -2079,6 +2089,7 @@ public sealed class RoomManager
                 c.HardwareVolume,
                 c.VolumePercent,
                 c.Device,
+                c.Driver,
                 spectator = room.SpectatorPeerIds.Contains(c.PeerId),
                 badge = track is null ? "Idle" : QualityPolicyEngine.Evaluate(room, track, c).Badge,
                 note = track is null ? null : QualityPolicyEngine.Evaluate(room, track, c).Error,
@@ -2286,17 +2297,44 @@ public sealed class RoomManager
             return;
         }
 
+        // 샘플레이트 변환은 Mono 가 실제로 하는 것만 말한다. 지금 하는 변환은 DSP 프리셋의 2배 업샘플링뿐이다.
+        //
+        // 예전에는 "최저 공통 포맷" 정책에서 장치의 최대 규격이 곡보다 낮으면 여기서 SRC 를 켰다.
+        // 그런데 장치 규격에 맞춰 내려 주는 리샘플러는 어디에도 없다. 그 경우에 실제로 일어나는 일은
+        // 워커가 원래 규격으로 열려다 거절당하는 것이고(WASAPI 는 공유 모드로 내려가 Windows 가 변환한다),
+        // 그건 Mono 의 변환이 아니다. 화면이 하지 않은 변환을 했다고 말하게 두지 않는다.
         var src = UpsamplingApplies(room, track);
-        if (room.QualityPolicy == QualityPolicy.LowestCommonFormat && room.Outputs.Count > 0)
-        {
-            var (rate, depth) = QualityPolicyEngine.CommonFormat(room.Outputs.Values, track);
-            src = src || rate < track.SampleRate || depth < track.BitDepth;
-        }
+        var bitPerfect = !src && !room.DspEnabled && OutputsPassAudioUntouched(room, track);
 
         room.SrcApplied = src;
-        room.BitPerfect = !src && !room.DspEnabled;
-        room.PathBadge = QualityPolicyEngine.Badge(track, src);
+        room.BitPerfect = bitPerfect;
+        room.PathBadge = QualityPolicyEngine.Badge(track, src, bitPerfect);
     }
+
+    /// <summary>
+    /// 듣고 있는 모든 출력이 원본 샘플을 그대로 장치에 넘기고 있는가. 하나라도 아니면 비트퍼펙트가 아니다.
+    ///  - 장치가 이 곡의 규격을 그대로 받지 못한다(배타로 열리지 않는다).
+    ///  - 공유 모드다. 처음부터 공유로 골랐거나, 배타가 거절되어 내려갔다(워커가 보고한 상태로 안다).
+    ///  - 하드웨어 볼륨이 없는 장치에서 볼륨을 줄였다. 디지털로 줄이면 샘플이 바뀐다.
+    /// 출력이 하나도 없으면 따질 것이 없으므로 참이다.
+    /// </summary>
+    private static bool OutputsPassAudioUntouched(ListeningRoom room, Track track)
+    {
+        foreach (var cap in room.Outputs.Values)
+        {
+            if (room.SpectatorPeerIds.Contains(cap.PeerId)) continue;
+
+            if (!QualityPolicyEngine.NativeOk(track, cap)) return false;
+            if (!cap.ExclusiveMode) return false;
+            if (room.Stats.TryGetValue(cap.PeerId, out var stats) && stats.DeviceState == SharedStreamingState) return false;
+            if (!cap.HardwareVolume && cap.VolumePercent < 100) return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>출력 워커의 AudioDeviceState.SharedStreaming. 워커 쪽 enum 을 Core 가 참조하지 않으므로 값을 적는다.</summary>
+    private const int SharedStreamingState = 3;
 
     /// <summary>
     /// 헤드폰·스피커 프리셋의 2배 업샘플링이 지금 실제로 일어나는가.

@@ -223,6 +223,10 @@ public sealed class MonoMessage
     [JsonPropertyName("device")]
     public string? Device { get; set; }
 
+    /// <summary>출력 장치의 드라이버 종류("ASIO" · "WASAPI"). output_hello 에 실린다.</summary>
+    [JsonPropertyName("driver")]
+    public string? Driver { get; set; }
+
     [JsonPropertyName("pairingCode")]
     public string? PairingCode { get; set; }
 

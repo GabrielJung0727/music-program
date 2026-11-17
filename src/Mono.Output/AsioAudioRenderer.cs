@@ -59,7 +59,6 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
             ? "ASIO · " + name
             : $"ASIO · {name} · 출력 {_channelOffset + 1}/{_channelOffset + 2}";
         HardwareVolume = false;
-        LatencyMs = 5;
         Exclusive = true;
     }
 
@@ -181,7 +180,9 @@ public sealed class AsioAudioRenderer : IAudioOutputDevice
     }
 
     public string DeviceName { get; }
+    public string Driver => "ASIO";
     public bool HardwareVolume { get; }
+    /// <summary>드라이버가 알려 준 재생 지연. 장치를 열기 전에는 알 수 없으므로 0 이다.</summary>
     public long LatencyMs { get; private set; }
     public int PrimeMs { get; set; } = 50;
     public bool Exclusive { get; }

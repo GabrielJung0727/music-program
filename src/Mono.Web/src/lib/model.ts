@@ -3,7 +3,7 @@
 // 이전 UI 는 제목 문자열로 곡과 앨범을 되찾았다(findTrackId(title, artist)). 같은 제목의
 // 곡이 둘이면 엉뚱한 쪽이 재생된다. 여기서는 처음부터 끝까지 id 를 들고 다닌다.
 
-import { RoomMode, StreamingProvider, type CatalogTrack, type HistoryEntry, type RoomSnapshot } from "./protocol"
+import { RoomMode, StreamingProvider, type CatalogTrack, type HistoryEntry, type RoomSnapshot, type SnapshotOutput } from "./protocol"
 
 // ── 표시 형식 ────────────────────────────────────────────────────────────────
 
@@ -265,6 +265,34 @@ export function sessionRole(room: RoomSnapshot | null, peerId: string | null): S
   if (!room) return "idle"
   if (room.mode === RoomMode.Solo) return "solo"
   return room.hostPeerId === peerId ? "host" : "guest"
+}
+
+/** 출력 워커의 AudioDeviceState. 화면이 쓰는 값만 적는다. */
+const DEVICE_SHARED_STREAMING = 3
+
+/**
+ * 이 출력이 실제로 어떤 방식으로 장치에 붙어 있는가.
+ *
+ * 예전에는 exclusiveMode 하나만 보고 "WASAPI 배타 모드"라고 썼다. 그 값은 워커를 띄울 때 고른
+ * 방식일 뿐이라, ASIO 출력에도 WASAPI 라고 나왔고, 배타가 거절되어 공유로 내려간 뒤에도 배타라고 나왔다.
+ * 드라이버는 워커가 알려 준 값으로, 공유로 내려갔는지는 워커가 매초 보고하는 장치 상태로 본다.
+ */
+export function outputMode(o: SnapshotOutput): { driver: "ASIO" | "WASAPI"; shared: boolean; label: string; short: string } {
+  // driver 를 보내지 않는 옛 워커는 장치 이름으로 가린다(ASIO 렌더러의 이름은 "ASIO · " 로 시작한다).
+  const asio = o.driver ? o.driver.toUpperCase() === "ASIO" : (o.device ?? "").startsWith("ASIO")
+  if (asio) return { driver: "ASIO", shared: false, label: "ASIO", short: "ASIO" }
+  const shared = !o.exclusiveMode || o.stats?.deviceState === DEVICE_SHARED_STREAMING
+  return shared
+    ? { driver: "WASAPI", shared: true, label: "WASAPI 공유 모드", short: "공유" }
+    : { driver: "WASAPI", shared: false, label: "WASAPI 배타 모드", short: "배타" }
+}
+
+/**
+ * 장치의 재생 지연. 워커가 장치를 열고 나서 알려 준 값만 보여 준다 — 0 은 "아직 모른다"는 뜻이다.
+ * 예전에는 열기 전의 자리표시값(5ms)을 잰 값처럼 보여 줬다.
+ */
+export function outputLatency(o: SnapshotOutput): string | null {
+  return o.reportedLatencyMs > 0 ? `지연 ${o.reportedLatencyMs} ms` : null
 }
 
 export const ROOM_MODE_LABEL: Record<number, string> = {

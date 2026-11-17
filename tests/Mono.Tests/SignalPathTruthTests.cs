@@ -174,4 +174,124 @@ public class SignalPathTruthTests
 
         Assert.True(room.SrcApplied);
     }
+
+    // ── 하지 않은 변환, 아닌 비트퍼펙트 ──────────────────────────────────────
+
+    /// <summary>
+    /// 장치가 곡의 규격을 받지 못할 때. Mono 에는 규격을 맞춰 주는 리샘플러가 없으므로 변환했다고
+    /// 하지 않는다. 그렇다고 비트퍼펙트도 아니다 — 재생되지 않거나, 공유 모드에서 Windows 가 변환한다.
+    /// </summary>
+    [Fact]
+    public void ADeviceThatCannotTakeTheFormatIsNeitherConvertedNorBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 192_000);
+        Attach(rooms, room, 44_100, 48_000);
+
+        Assert.False(room.SrcApplied);
+        Assert.False(room.BitPerfect);
+        Assert.DoesNotContain("SRC", room.PathBadge);
+        Assert.DoesNotContain("Bit-perfect", room.PathBadge);
+    }
+
+    [Fact]
+    public void ACapableExclusiveDeviceAtFullVolumeIsBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 96_000);
+        Attach(rooms, room, 44_100, 48_000, 88_200, 96_000);
+
+        Assert.True(room.BitPerfect);
+        Assert.False(room.SrcApplied);
+        Assert.Contains("Bit-perfect", room.PathBadge);
+    }
+
+    /// <summary>배타가 거절되어 공유로 내려간 것은 워커의 보고로만 안다. 보고가 오면 표시가 내려간다.</summary>
+    [Fact]
+    public void FallingBackToSharedModeEndsBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        Attach(rooms, room, 44_100, 48_000);
+        Assert.True(room.BitPerfect);
+
+        rooms.ReportClock(room.Id, "out-1", 0, 0, 1, 100, 0, true, deviceState: 3);
+        Assert.False(room.BitPerfect);
+
+        rooms.ReportClock(room.Id, "out-1", 0, 0, 1, 100, 0, true, deviceState: 2);
+        Assert.True(room.BitPerfect);
+    }
+
+    [Fact]
+    public void AnOutputStartedInSharedModeIsNotBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        rooms.RegisterOutput(room.Id, new OutputCapability
+        {
+            PeerId = "out-1", DisplayName = "DAC", MaxSampleRate = 48_000, MaxBitDepth = 24, ExclusiveMode = false
+        });
+
+        Assert.False(room.BitPerfect);
+    }
+
+    /// <summary>하드웨어 볼륨이 없는 장치(ASIO)에서 볼륨을 줄이면 샘플이 바뀐다. 100% 로 돌아오면 다시 그대로다.</summary>
+    [Fact]
+    public void DigitalVolumeEndsBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        Attach(rooms, room, 44_100, 48_000);
+
+        rooms.SetVolume(room.Id, "me", "out-1", 60);
+        Assert.False(room.BitPerfect);
+
+        rooms.SetVolume(room.Id, "me", "out-1", 100);
+        Assert.True(room.BitPerfect);
+    }
+
+    [Fact]
+    public void HardwareVolumeKeepsBitPerfect()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        rooms.RegisterOutput(room.Id, new OutputCapability
+        {
+            PeerId = "out-1", DisplayName = "DAC", MaxSampleRate = 48_000, MaxBitDepth = 24, HardwareVolume = true
+        });
+
+        rooms.SetVolume(room.Id, "me", "out-1", 60);
+
+        Assert.True(room.BitPerfect);
+    }
+
+    // ── 지연과 드라이버 ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 워커는 접속할 때 장치를 열기 전이라 지연을 모른다. 모르는 동안은 0 이고(화면은 표시하지 않는다),
+    /// 장치를 연 뒤의 보고로 실제 값이 들어온다.
+    /// </summary>
+    [Fact]
+    public void LatencyIsUnknownUntilTheDeviceReportsIt()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        Attach(rooms, room, 44_100, 48_000);
+        Assert.Equal(0, room.Outputs["out-1"].ReportedLatencyMs);
+
+        rooms.ReportClock(room.Id, "out-1", 0, 0, 1, 100, 0, true, deviceState: 2, latencyMs: 12);
+        Assert.Equal(12, room.Outputs["out-1"].ReportedLatencyMs);
+
+        // 값을 싣지 않은 보고가 알고 있던 값을 지우지 않는다.
+        rooms.ReportClock(room.Id, "out-1", 0, 0, 1, 100, 0, true, deviceState: 2);
+        Assert.Equal(12, room.Outputs["out-1"].ReportedLatencyMs);
+    }
+
+    [Fact]
+    public void TheSnapshotSaysWhichDriverTheOutputUses()
+    {
+        var (rooms, room) = Playing(RoomMode.Solo, 44_100);
+        rooms.RegisterOutput(room.Id, new OutputCapability
+        {
+            PeerId = "out-1", DisplayName = "Babyface", MaxSampleRate = 192_000, MaxBitDepth = 24, Driver = "ASIO"
+        });
+
+        using var doc = System.Text.Json.JsonDocument.Parse(rooms.SnapshotJson(room));
+        var output = doc.RootElement.GetProperty("outputs")[0];
+
+        Assert.Equal("ASIO", output.GetProperty("driver").GetString());
+    }
 }

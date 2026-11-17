@@ -503,7 +503,7 @@ public class RoomAndClockTests
     }
 
     [Fact]
-    public void LowestCommonFormatMarksSrcInsteadOfSpectating()
+    public void LowestCommonFormatKeepsTheOutputButClaimsNoConversion()
     {
         var track = new Track { Id = "t", Title = "hi-res", AlbumId = "a", ArtistId = "r", SampleRate = 192000, BitDepth = 24 };
         var cap = new OutputCapability { PeerId = "o", DisplayName = "48k dac", MaxSampleRate = 48000, MaxBitDepth = 24 };
@@ -512,8 +512,14 @@ public class RoomAndClockTests
 
         var decision = QualityPolicyEngine.Evaluate(room, track, cap);
         Assert.True(decision.CanHear);
-        Assert.True(decision.NeedSrc);
-        Assert.Contains("SRC", decision.Badge);
+        Assert.False(decision.Spectator);
+
+        // Mono 에는 장치 규격에 맞춰 내려 주는 리샘플러가 없다. 하지 않는 변환을 했다고 표시하지 않고,
+        // 비트퍼펙트라고도 하지 않으며, 무슨 일이 생기는지를 알린다.
+        Assert.False(decision.NeedSrc);
+        Assert.DoesNotContain("SRC", decision.Badge);
+        Assert.DoesNotContain("Bit-perfect", decision.Badge);
+        Assert.NotNull(decision.Error);
         Assert.Equal((48000, 24), QualityPolicyEngine.CommonFormat([cap], track));
     }
 

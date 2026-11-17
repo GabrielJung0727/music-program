@@ -79,7 +79,12 @@ public sealed record Capabilities(
 public interface IAudioOutputDevice : IDisposable
 {
     string DeviceName { get; }
+
+    /// <summary>드라이버 종류. 화면이 "WASAPI 배타 모드" 같은 말을 장치와 무관하게 쓰지 않도록 Core 에 알린다.</summary>
+    string Driver { get; }
     bool HardwareVolume { get; }
+
+    /// <summary>장치의 재생 지연(ms). 장치를 열기 전에는 알 수 없으므로 0 이다.</summary>
     long LatencyMs { get; }
 
     /// <summary>재생을 시작하기 전에 채워 둘 버퍼 깊이(ms).</summary>

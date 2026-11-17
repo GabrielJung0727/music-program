@@ -93,8 +93,10 @@ public sealed class WasapiOutputDevice : IAudioOutputDevice
     }
 
     public string DeviceName { get; }
+    public string Driver => "WASAPI";
     public bool HardwareVolume { get; }
-    public long LatencyMs { get; private set; } = 10;
+    /// <summary>장치 스트림의 지연. 배타로 열렸는지 공유로 열렸는지에 따라 다르므로, 열기 전에는 0(모름)이다.</summary>
+    public long LatencyMs { get; private set; }
     public int PrimeMs { get; set; } = 50;
     public bool Exclusive { get; private set; }
     public string? LastError { get; private set; }

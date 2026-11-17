@@ -6,7 +6,7 @@ import {
 import { useApp } from "../state/app"
 import { useMediaClock, useMono, useMonoCommands } from "../state/MonoProvider"
 import { QualityPolicy, RepeatMode, StreamingProvider, type RoomSnapshot } from "../lib/protocol"
-import { fmtTime, qualityOf, sourceName } from "../lib/model"
+import { fmtTime, outputLatency, outputMode, qualityOf, sourceName } from "../lib/model"
 import { hasShell, restartOutput, stopOutput, useOutputStatus } from "../lib/shell"
 import { cachedSetup, startConfiguredOutput } from "../lib/setup"
 import { toggleDsp } from "../lib/dsp"
@@ -326,9 +326,7 @@ function SignalFlyout({ onClose }: { onClose: () => void }) {
               <div>
                 <div className="sp__name">샘플레이트 변환<i className="lamp lamp--warn" /></div>
                 <div className="sp__spec">
-                  {upsampling && t
-                    ? `DSP 프리셋의 2배 업샘플링 · ${t.sampleRate / 1000} → ${doubledKhz} kHz`
-                    : "출력 장치가 받을 수 있는 규격으로 맞춤"}
+                  {t ? `DSP 프리셋의 2배 업샘플링 · ${t.sampleRate / 1000} → ${doubledKhz} kHz` : "DSP 프리셋의 2배 업샘플링"}
                 </div>
               </div>
             </li>
@@ -367,12 +365,15 @@ function SignalFlyout({ onClose }: { onClose: () => void }) {
               <div className="sp__spec">
                 {out ? (
                   <>
-                    {out.exclusiveMode ? "WASAPI 배타 모드" : "공유 모드"} · 지연 {out.reportedLatencyMs} ms
-                    {out.stats?.bufferMs != null ? ` · 버퍼 ${out.stats.bufferMs} ms` : ""}
+                    {[outputMode(out).label, outputLatency(out), out.stats?.bufferMs != null ? `버퍼 ${out.stats.bufferMs} ms` : null].filter(Boolean).join(" · ")}
                     <br />
                     {out.stats?.locked ? "클럭 잠김" : "클럭 맞추는 중"}
                     {out.stats?.jitterMs != null ? ` · 지터 ${out.stats.jitterMs.toFixed(2)} ms` : ""}
                     {out.hardwareVolume ? " · 하드웨어 볼륨" : " · 소프트웨어 볼륨"}
+                    {/* 장치가 이 곡을 그대로 받지 못하거나 열리지 않았으면, 변환했다고 하지 않고 그 사실을 적는다. */}
+                    {(out.stats?.deviceError || out.note) && (
+                      <span style={{ display: "block", marginTop: 4, color: "var(--warn-text)" }}>{out.stats?.deviceError ?? out.note}</span>
+                    )}
                   </>
                 ) : "플레이어 바의 스피커 버튼에서 출력을 연결하세요"}
               </div>
@@ -429,7 +430,7 @@ function OutputFlyout({ onClose }: { onClose: () => void }) {
               <div className="grow">
                 <div className="t-small clip" style={{ fontWeight: 620 }}>{o.device ?? o.displayName ?? "출력"}</div>
                 <div className="chain__spec clip" style={{ marginTop: 1 }}>
-                  {[o.exclusiveMode ? "배타" : "공유", o.maxSampleRate ? `최대 ${o.maxBitDepth}/${Math.round(o.maxSampleRate / 1000)}` : null, o.supportsDsd ? "DSD" : null].filter(Boolean).join(" · ")}
+                  {[outputMode(o).short, o.maxSampleRate ? `최대 ${o.maxBitDepth}/${Math.round(o.maxSampleRate / 1000)}` : null, o.supportsDsd ? "DSD" : null].filter(Boolean).join(" · ")}
                 </div>
               </div>
               <div className="out-row__vol">

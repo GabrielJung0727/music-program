@@ -10,6 +10,7 @@ import {
   applyUpdate, checkForUpdate, closeToTrayStatus, discordActivityStatus, hasShell, listAsioChannels, listAudioDevices, onUpdateProgress, openExternal, pickFolder,
   restartOutput, setCloseToTray, setDiscordActivityEnabled, setDiscordApplicationId, shell, useOutputStatus, type AudioDeviceListing, type UpdateStatus,
 } from "../lib/shell"
+import { outputLatency, outputMode } from "../lib/model"
 import { clearSetup, playbackPrefs, saveSetup, startConfiguredOutput, type AudioSetup, type PlaybackSetup } from "../lib/setup"
 import { selectDsp, toggleDsp } from "../lib/dsp"
 import { Slider, Toggle } from "../ui"
@@ -168,10 +169,10 @@ function AudioTab() {
             <div className="chain__spec">
               {connected
                 ? [
-                    connected.exclusiveMode ? "배타 모드" : "공유 모드",
+                    outputMode(connected).label,
                     `최대 ${connected.maxBitDepth}-bit / ${Math.round(connected.maxSampleRate / 1000)} kHz`,
                     connected.supportsDsd ? "DSD" : null,
-                    `지연 ${connected.reportedLatencyMs} ms`,
+                    outputLatency(connected),
                   ].filter(Boolean).join(" · ")
                 : worker?.running ? `출력 워커 실행 중 (${worker.backend}). 재생하면 이 장치에 붙습니다` : "아직 연결되지 않았습니다"}
             </div>
