@@ -34,7 +34,7 @@ dotnet test Mono.slnx
 | 브랜치 | 내용 | 상태 |
 | --- | --- | --- |
 | `development` | 탐색 시 끊김 · 대기열 삭제 중 자동 재생 수정(PR #13)까지 들어 있다 | 기준 |
-| `feature/playback-engine` | 이 문서의 작업. `development` 보다 커밋 6개 앞, 머지 커밋 1개 뒤 | **이어서 할 곳. 아직 합치지 않는다** |
+| `feature/playback-engine` | 이 문서의 작업. `development` 보다 커밋 7개 앞, 머지 커밋 1개 뒤 | **이어서 할 곳. 아직 합치지 않는다** |
 
 커밋(오래된 순):
 
@@ -44,6 +44,7 @@ dotnet test Mono.slnx
 4. `Add track transition and ASIO output channel settings.` 셸과 설정 화면.
 5. 이 문서.
 6. `Make the UI say what the signal path does.` 4.1 의 세 곳.
+7. `Stop claiming conversions, modes and latencies that are not real.` 4.2 의 세 곳.
 
 회사 PC 에서 확인한 것: 솔루션 빌드 오류 0, 웹 타입 검사와 프로덕션 빌드, 설정 화면(모의 Core + 헤드리스 Chrome 으로 눌러 봄), 업샘플러 설계(파이썬 검산).
 
@@ -128,11 +129,34 @@ dotnet test Mono.slnx
 - [ ] Babyface(최대 192kHz)에서 헤드폰 EQ 를 켜고 96kHz 곡을 틀면 팝오버에 "96 → 192 kHz"가 뜨고, 192kHz 곡을 틀면 SRC 단계가 사라지고 DSP 단계에 "384 kHz 를 받지 않아 업샘플링은 하지 않습니다"가 뜬다. 로그의 `asio open:` 레이트와 맞는지 본다.
 - [ ] `SignalPathTruthTests` 통과.
 
-이 작업을 하다가 본, 같은 종류의 어긋남. **고치지 않았다.**
+### 4.2 같은 종류의 어긋남 세 곳 더
 
-- 룸 정책이 "최저 공통 포맷"(기본값)일 때 장치의 최대 레이트 · 뎁스가 곡보다 낮으면 `SrcApplied` 가 켜지고 팝오버가 "출력 장치가 받을 수 있는 규격으로 맞춤"이라고 한다. 그런데 저장소 어디에도 리샘플러가 없다. 실제로는 워커가 원래 레이트로 열려다 실패한다. 리샘플링을 구현할지, "이 장치로는 재생할 수 없음"으로 표시를 바꿀지 정해야 한다(`RoomManager.RefreshPath`, `QualityPolicyEngine.Evaluate`).
-- 신호 경로 팝오버가 ASIO 출력에도 "WASAPI 배타 모드"라고 쓴다(`PlayerBar.tsx`, `out.exclusiveMode` 만 본다).
-- "지연 N ms"는 워커가 접속할 때 한 번 보낸 값이다. ASIO 는 장치를 열기 전이라 자리표시값 5ms 가 간다. 연 뒤의 실제 값은 Core 로 올라가지 않는다.
+위 작업을 하다가 본 것들이고, 이어서 고쳤다(커밋 `Stop claiming conversions, modes and latencies that are not real.`).
+
+| 어긋나던 곳 | 고친 방식 |
+| --- | --- |
+| 장치의 최대 규격이 곡보다 낮으면 "샘플레이트 변환 · 출력 장치가 받을 수 있는 규격으로 맞춤"이라고 했다. 저장소에 리샘플러는 없다 | **리샘플러를 만들지 않고 표시를 사실에 맞췄다.** `SrcApplied` 는 Mono 가 실제로 하는 변환(DSP 프리셋의 2배 업샘플링)에만 켜진다. 그 장치의 출력 항목에는 "이 장치는 24/192 를 그대로 받지 못합니다. Mono 는 규격을 바꿔 주지 않습니다…"라는 안내가 붙고, 워커가 실제 오류를 보고하면 그 문구가 대신 나온다 |
+| ASIO 출력에도 "WASAPI 배타 모드", 공유로 내려간 뒤에도 "배타" | 워커가 `output_hello` 에 드라이버 종류(`driver`)를 싣는다. 화면은 드라이버는 그 값으로, 공유로 내려갔는지는 워커가 매초 보고하는 장치 상태(3 = 공유)로 쓴다(`lib/model.ts` 의 `outputMode`) |
+| "지연 5 ms"는 장치를 열기 전의 자리표시값이었다 | 렌더러의 지연은 장치를 열기 전까지 0(모름)이다. 워커가 연 뒤의 값을 `clock_report` 에 싣고 Core 가 받아 적는다. 화면은 값이 있을 때만 지연을 쓴다(`outputLatency`) |
+
+첫째를 고치려면 "비트퍼펙트"가 언제 참인지도 정해야 했다. 변환했다는 표시를 빼기만 하면 받지 못하는 장치에 초록 "Bit-Perfect" 가 켜지기 때문이다. `RoomManager.OutputsPassAudioUntouched` 가 듣고 있는 모든 출력에 대해 넷을 본다. 하나라도 아니면 비트퍼펙트가 아니다.
+
+- 장치가 곡의 규격을 그대로 받는다(샘플레이트는 장치가 보고한 목록으로 본다).
+- 배타로 붙었다. 공유로 골랐거나, 배타가 거절되어 공유로 내려갔으면 아니다.
+- 하드웨어 볼륨이 없는 장치(ASIO)에서 볼륨이 100% 다. 디지털로 줄이면 샘플이 바뀐다.
+- (앞서부터) DSP 와 업샘플링이 꺼져 있다.
+
+**그래서 달라지는 것**: ASIO 에서 볼륨을 100% 아래로 두면 플레이어 바의 칩이 초록 "BIT-PERFECT" 에서 "재생 중"으로 바뀐다. 예전 표시가 틀렸던 것이다.
+
+확인할 것:
+
+- [ ] Babyface 에서 볼륨 100% · DSP 끔: 칩이 `BIT-PERFECT`. 볼륨을 80% 로 내리면 `재생 중`, 다시 100% 로 올리면 돌아온다.
+- [ ] 신호 경로 팝오버의 출력 단계가 "ASIO · 지연 N ms"로 나온다. N 은 로그의 `asio open: … latency=…(N ms)` 와 같다. 재생 전에는 지연이 아예 나오지 않는다.
+- [ ] WASAPI 배타를 거절하는 장치에서: 워커가 공유로 내려가면 "WASAPI 공유 모드"로 바뀌고 칩이 `BIT-PERFECT` 에서 내려간다.
+- [ ] 44.1/48kHz 만 받는 장치에 96kHz 곡: SRC 단계가 뜨지 않고, 출력 항목에 받지 못한다는 안내나 워커의 오류가 뜬다.
+- [ ] `SignalPathTruthTests`, 이름을 바꾼 `RoomAndClockTests.LowestCommonFormatKeepsTheOutputButClaimsNoConversion` 통과.
+
+남은 결정 하나: 장치가 받지 못하는 규격을 Mono 가 직접 내려 주는 리샘플링을 넣을지. 넣는다면 `LocalPlayer.Finish` 가 자리다. 지금은 넣지 않았고, 화면은 넣지 않았다는 사실을 말한다. `QualityPolicyEngine.CommonFormat` 은 그때를 위해 남아 있다(지금은 테스트만 부른다).
 
 그 밖에 하지 않은 것:
 

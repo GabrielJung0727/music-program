@@ -160,10 +160,11 @@ public sealed class CoreHostedService : BackgroundService
                                 MaxBitDepth = msg.MaxBitDepth ?? 32,
                                 SupportsDsd = msg.SupportsDsd ?? false,
                                 ExclusiveMode = msg.ExclusiveMode ?? true,
-                                ReportedLatencyMs = msg.LatencyMs ?? 5,
+                                ReportedLatencyMs = msg.LatencyMs ?? 0,
                                 HardwareVolume = msg.HardwareVolume ?? true,
                                 VolumePercent = msg.Volume ?? 100,
-                                Device = msg.Device
+                                Device = msg.Device,
+                                Driver = msg.Driver
                             };
                             _endpoints.Announce(cap, msg.RoomId);
 
@@ -237,7 +238,8 @@ public sealed class CoreHostedService : BackgroundService
                                 msg.Resyncs ?? 0,
                                 msg.Locked ?? false,
                                 msg.DeviceState ?? 0,
-                                msg.DeviceError);
+                                msg.DeviceError,
+                                msg.LatencyMs);
                             if (room is not null)
                             {
                                 await _broadcaster.PublishAsync(room, ct);
@@ -257,10 +259,11 @@ public sealed class CoreHostedService : BackgroundService
                                 MaxBitDepth = msg.MaxBitDepth ?? 32,
                                 SupportsDsd = msg.SupportsDsd ?? false,
                                 ExclusiveMode = msg.ExclusiveMode ?? true,
-                                ReportedLatencyMs = msg.LatencyMs ?? 5,
+                                ReportedLatencyMs = msg.LatencyMs ?? 0,
                                 HardwareVolume = msg.HardwareVolume ?? true,
                                 VolumePercent = msg.Volume ?? 100,
-                                Device = msg.Device
+                                Device = msg.Device,
+                                Driver = msg.Driver
                             };
                             var updated = _rooms.RegisterOutput(msg.RoomId, cap);
                             if (updated.Room is not null)

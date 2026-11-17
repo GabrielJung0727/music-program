@@ -195,7 +195,9 @@ function snapshot(room) {
   return {
     ...pub,
     mediaTimeMs: Math.round(pos),
-    bitPerfect: !room.dspEnabled && !!t,
+    // Core 의 OutputsPassAudioUntouched 와 같다: 공유 모드이거나 디지털로 볼륨을 줄였으면 비트퍼펙트가 아니다.
+    bitPerfect: !room.dspEnabled && !!t && room.outputs.every((o) =>
+      o.exclusiveMode && o.stats?.deviceState !== 3 && (o.hardwareVolume || o.volumePercent >= 100)),
     // Core 의 UpsamplingApplies 와 같다: 헤드폰·스피커 프리셋이고, 팬아웃이거나 장치가 2배 레이트를 받을 때만.
     srcApplied: !!t && room.dspEnabled && (room.dspPreset === 1 || room.dspPreset === 2)
       && (room.sourceMode === 1 || room.outputs.some((o) => o.maxSampleRate >= t.sampleRate * 2)),
@@ -222,9 +224,10 @@ const OUTPUT = (volume = 62) => ({
   peerId: "out-local", displayName: "Mono Output · 이 PC",
   // MOCK_MAX_RATE=48000 처럼 주면 2배 레이트를 못 받는 장치를 흉내 낸다(신호 경로의 SRC 표시 확인용).
   maxSampleRate: Number(process.env.MOCK_MAX_RATE ?? 768000), maxBitDepth: 32, supportsDsd: true, exclusiveMode: true,
-  reportedLatencyMs: 5.8, hardwareVolume: true, volumePercent: volume,
-  device: "RME ADI-2 DAC FS", spectator: false, badge: "WASAPI Exclusive", note: null,
-  stats: { offsetMs: 0.02, jitterMs: 0.11, rttMs: 0.4, bufferMs: 180, resyncs: 0, locked: true, deviceState: 1, deviceError: null },
+  // MOCK_DRIVER=ASIO, MOCK_LATENCY=0(아직 모름), MOCK_DEVICE_STATE=3(공유로 내려감) 으로 화면의 표시를 확인한다.
+  reportedLatencyMs: Number(process.env.MOCK_LATENCY ?? 10), hardwareVolume: true, volumePercent: volume,
+  device: "RME ADI-2 DAC FS", driver: process.env.MOCK_DRIVER ?? "WASAPI", spectator: false, badge: "WASAPI Exclusive", note: null,
+  stats: { offsetMs: 0.02, jitterMs: 0.11, rttMs: 0.4, bufferMs: 180, resyncs: 0, locked: true, deviceState: Number(process.env.MOCK_DEVICE_STATE ?? 2), deviceError: null },
 })
 
 // ── 미리 열려 있는 라운지들 ──────────────────────────────────────────────────
