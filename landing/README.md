@@ -74,9 +74,16 @@ landing/
 | `setup-1-*` · `setup-2-*` · `setup-3-*` | `60-onboarding-welcome` · `61-onboarding-folders` · `65-onboarding-done` |
 | `signal-clean-*` · `signal-dsp-*` | 플레이어 바의 신호 경로 팝오버만 오려 낸 것 (DSP 끔 / 켬) |
 
-## 올리기 전에 정할 것
+## 배포
 
-- **다운로드 링크.** GitHub 릴리스(`GabrielJung0727/music-program`)를 가리킵니다. 저장소가 비공개면 방문자에게는 404 가 납니다. 저장소를 공개하거나, 설치 파일을 다른 곳에 올리고 `index.html` 의 `data-download` 링크 네 곳을 바꾸세요.
+GitHub Pages 에 올립니다. 주소는 `https://gabrieljung0727.github.io/music-program/` 입니다.
+
+- `.github/workflows/landing.yml` 이 `development` 에 `landing/` 이 바뀐 커밋이 들어올 때마다 이 폴더를 그대로 올립니다.
+- 처음 한 번은 저장소 Settings → Pages → Build and deployment → Source 를 **GitHub Actions** 로 바꿔 두어야 합니다.
+- 수동으로 다시 올리려면 Actions → landing → Run workflow.
+
+## 아직 남은 것
+
 - **개인정보처리방침 · 이용약관.** 푸터의 두 링크는 아직 `#` 입니다. 문서가 생기면 주소를 넣으세요.
 - **macOS.** 지금은 "아직 없음" 으로 적혀 있습니다. Mac 용이 나오면 첫 화면의 메뉴와 설치 방법의 macOS 탭을 채우면 됩니다.
-- **og:image.** 공유 미리보기 이미지는 상대 경로입니다. 도메인이 정해지면 절대 주소로 바꾸세요.
+- **도메인.** 자체 도메인을 붙이면 `index.html` 의 `og:url` 과 `og:image` 두 줄을 그 주소로 바꾸세요.
