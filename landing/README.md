@@ -36,8 +36,25 @@ landing/
 
 - 색, 글꼴, 모서리(카드 9px, 버튼 8px, 커버 3px)는 앱의 값 그대로입니다.
 - 앱에 없는 값은 `site.css` 에 "파생" 이라고 적어 두었습니다. 헤드라인 크기, 섹션 간격, 네비게이션 높이처럼 웹 페이지라서 필요한 치수입니다.
-- 호버는 색만 바뀝니다(120ms). 그 밖의 움직임은 없습니다.
 - 앱 화면은 전부 실제 캡처입니다. CSS 로 그린 가짜 화면은 없습니다.
+- 번갈아 깔리는 섹션 표면 `#101014` 와 아래 모션은 앱의 규칙(모션 다섯 곳)과 따로, 이 페이지용으로 정한 값입니다.
+
+## 모션
+
+라이브러리 없이 CSS 와 `IntersectionObserver` 로만 만들었습니다. 값은 `site.css` 맨 위 토큰과 맨 아래 "모션" 단락에 모여 있습니다.
+
+| 어디 | 무엇 | 값 |
+| --- | --- | --- |
+| 첫 화면 글자 | 가려 둔 창 아래에서 올라옴 (`.mask`) | 800ms `cubic-bezier(0.22, 1, 0.36, 1)`, 줄마다 90~120ms 간격 |
+| 첫 화면 앱 화면 | `scale(0.95)` 투명 → 제자리 (`.settle`) | 800ms 같은 곡선 |
+| 프레임 뒤의 빛 | 투명도 0.6 ↔ 1 (`.glow`) | 12초 주기 |
+| 섹션 등장 | `translateY(30px)` 투명 → 제자리 (`data-reveal`) | 600ms `cubic-bezier(0.25, 1, 0.5, 1)` |
+| 목록 등장 | 자식이 차례로 (`data-reveal-group`) | 100ms 간격 |
+| DSP 토글 | 글자, 램프, 팝오버가 겹쳐서 바뀜 (`.swap`) | 300ms `ease-out` |
+| 버튼 호버 | `scale(1.02)` | 200ms `ease-out` |
+
+운영체제에서 움직임을 줄여 달라고 설정한 사람(Windows 의 "애니메이션 효과" 끔, macOS 의 "동작 줄이기")에게는 이동과 확대를 빼고 투명도와 색만 바뀝니다.
+전체 모션을 보려면 그 설정을 켜거나, Chrome 개발자 도구의 Rendering 탭에서 `prefers-reduced-motion` 을 `no-preference` 로 바꾸세요.
 
 ## 고칠 일이 생기면
 
@@ -57,9 +74,16 @@ landing/
 | `setup-1-*` · `setup-2-*` · `setup-3-*` | `60-onboarding-welcome` · `61-onboarding-folders` · `65-onboarding-done` |
 | `signal-clean-*` · `signal-dsp-*` | 플레이어 바의 신호 경로 팝오버만 오려 낸 것 (DSP 끔 / 켬) |
 
-## 올리기 전에 정할 것
+## 배포
 
-- **다운로드 링크.** GitHub 릴리스(`GabrielJung0727/music-program`)를 가리킵니다. 저장소가 비공개면 방문자에게는 404 가 납니다. 저장소를 공개하거나, 설치 파일을 다른 곳에 올리고 `index.html` 의 `data-download` 링크 네 곳을 바꾸세요.
+GitHub Pages 에 올립니다. 주소는 `https://gabrieljung0727.github.io/music-program/` 입니다.
+
+- `.github/workflows/landing.yml` 이 `development` 에 `landing/` 이 바뀐 커밋이 들어올 때마다 이 폴더를 그대로 올립니다.
+- 처음 한 번은 저장소 Settings → Pages → Build and deployment → Source 를 **GitHub Actions** 로 바꿔 두어야 합니다.
+- 수동으로 다시 올리려면 Actions → landing → Run workflow.
+
+## 아직 남은 것
+
 - **개인정보처리방침 · 이용약관.** 푸터의 두 링크는 아직 `#` 입니다. 문서가 생기면 주소를 넣으세요.
 - **macOS.** 지금은 "아직 없음" 으로 적혀 있습니다. Mac 용이 나오면 첫 화면의 메뉴와 설치 방법의 macOS 탭을 채우면 됩니다.
-- **og:image.** 공유 미리보기 이미지는 상대 경로입니다. 도메인이 정해지면 절대 주소로 바꾸세요.
+- **도메인.** 자체 도메인을 붙이면 `index.html` 의 `og:url` 과 `og:image` 두 줄을 그 주소로 바꾸세요.

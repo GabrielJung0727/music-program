@@ -19,9 +19,9 @@
   }
 
   const OS_NOTE = {
-    macos: "macOS 에서 보고 계십니다. Mono 는 아직 Windows 용만 있습니다. 설치 파일은 Windows PC 에서 실행하세요.",
-    mobile: "휴대 기기에서 보고 계십니다. Mono 는 Windows PC 에 설치하는 앱입니다. 설치 파일은 PC 에서 받으세요.",
-    other: "Mono 는 아직 Windows 용만 있습니다. 설치 파일은 Windows 10 · 11 PC 에서 실행하세요.",
+    macos: "macOS에서 보고 계십니다. Mono는 아직 Windows용만 있습니다. 설치 파일은 Windows PC에서 실행하세요.",
+    mobile: "휴대 기기에서 보고 계십니다. Mono는 Windows PC에 설치하는 앱입니다. 설치 파일은 PC에서 받으세요.",
+    other: "Mono는 아직 Windows용만 있습니다. 설치 파일은 Windows 10 · 11 PC에서 실행하세요.",
   }
 
   /** 누른 버튼만 켜고, 같은 묶음의 나머지는 끈다. */
@@ -104,6 +104,25 @@
   if (note && OS_NOTE[os]) {
     note.textContent = OS_NOTE[os]
     note.hidden = false
+  }
+
+  // ── 스크롤 등장 ────────────────────────────────────────────────────
+  // 화면에 들어온 요소에 is-in 을 한 번 붙이고 그만 지켜본다. 움직임 자체는 CSS 가 한다.
+  for (const group of $$("[data-reveal-group]")) {
+    [...group.children].forEach((child, i) => child.style.setProperty("--i", i))
+  }
+  const reveals = $$("[data-reveal], [data-reveal-group]")
+  if (!("IntersectionObserver" in window)) {
+    reveals.forEach((el) => el.classList.add("is-in"))
+  } else {
+    const seen = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        entry.target.classList.add("is-in")
+        seen.unobserve(entry.target)
+      }
+    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" })
+    reveals.forEach((el) => seen.observe(el))
   }
 
   // ── 다른 운영체제 메뉴: 바깥을 누르거나 Esc 를 누르면 닫는다 ───────
