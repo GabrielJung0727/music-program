@@ -58,6 +58,9 @@ public class LocalPlayerTests
         }
 
         public void Dispose() => Disposed = true;
+
+        /// <summary>같은 곡을 다시 연 것. 실제 디코더처럼 자리를 잡기 전 상태에서 시작한다.</summary>
+        public FakeSource Reopen() => new(Format, frames, offset, value) { OnRead = OnRead };
     }
 
     private const int A = 1_000_000;
@@ -73,11 +76,24 @@ public class LocalPlayerTests
         public readonly Dictionary<string, FakeSource> Sources = [];
         public readonly LocalPlayer Player;
         public long Now;
+        private readonly HashSet<string> _opened = [];
 
         public Rig(params (TrackRef Track, FakeSource Source)[] tracks)
         {
             foreach (var (track, source) in tracks) Sources[track.Path] = source;
-            Player = new LocalPlayer(path => Sources.GetValueOrDefault(path), backgroundOpen: false);
+            Player = new LocalPlayer(Open, backgroundOpen: false);
+        }
+
+        /// <summary>
+        /// 실제 <c>_open</c> 은 열 때마다 새 디코더를 준다. 같은 곡을 두 번째로 열면 새 사본을 주고,
+        /// <see cref="Sources"/> 도 그 사본을 가리키게 한다. 미리 열면서 끝까지 읽어 둔 소스를 다시 주면
+        /// 처음부터 낼 수 없다.
+        /// </summary>
+        private FakeSource? Open(string path)
+        {
+            if (!Sources.TryGetValue(path, out var source)) return null;
+            if (!_opened.Add(path)) Sources[path] = source = source.Reopen();
+            return source;
         }
 
         public LocalChunk? Read(TrackRef current, TrackRef? next, int wantMs = 30, bool top = false, bool empty = false)

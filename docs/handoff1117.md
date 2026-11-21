@@ -7,6 +7,13 @@
 회사 PC 의 애플리케이션 제어 정책이 새로 빌드한 테스트 DLL 을 막았고(0x800711C7), ASIO 장치도 없었다.
 그러니 아래 0장과 3장을 끝내기 전에는 릴리스하지 않는다.
 
+> **2026-11-21 갱신.** 0장은 끝났다. 집 PC 에서 처음 돌렸을 때 테스트 쪽 잘못 셋이 나왔고, 고친 뒤 461개가 모두 통과한다(Release).
+> - `PcmMathTests.SixteenBitSurvivesFloatUnchanged`: 반복 변수가 `short` 라 `v <= short.MaxValue` 가 늘 참이었다. 끝나지 않아 테스트 실행 전체가 멈췄다. `int` 로 센다.
+> - `PcmMathTests.FlacDecodesToTheExactSampleValue`: 픽스처는 오른쪽 채널이 왼쪽의 음수다(L = +n/8, R = −n/8, ffmpeg 로 확인). 두 채널을 각자의 부호로 정확히 비교한다. 디코더는 맞았다.
+> - `LocalPlayerTests.UnjoinableSuccessorIsReportedAsBehind`: 테스트 장치가 같은 곡을 다시 열 때 미리 열며 끝까지 읽어 둔 소스를 그대로 돌려줬다. 실제 `_open` 처럼 새 사본을 준다.
+>
+> 3장(실제 장치로 듣기)은 하지 않았다. 이 PC 에는 ASIO 장치가 없다. 사용자 결정으로 이 상태에서 0.7.0 으로 릴리스한다.
+
 같은 날 만든 랜딩 사이트(`landing/`)와 그 배포는 6장에 따로 적었다. 앱 릴리스와는 따로 올릴 수 있다.
 
 ## 0. 맨 먼저 할 일
