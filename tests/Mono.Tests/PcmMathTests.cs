@@ -35,7 +35,8 @@ public class PcmMathTests
     public void SixteenBitSurvivesFloatUnchanged()
     {
         var pcm = new byte[65536 * 2];
-        for (var v = short.MinValue; v <= short.MaxValue; v++)
+        // int 로 센다. short 로 세면 32767 다음이 -32768 이라 v <= short.MaxValue 가 늘 참이고 끝나지 않는다.
+        for (int v = short.MinValue; v <= short.MaxValue; v++)
         {
             BitConverter.TryWriteBytes(pcm.AsSpan((v - short.MinValue) * 2), (short)v);
         }
@@ -165,7 +166,10 @@ public class PcmMathTests
         Assert.InRange(error / 2000, -0.08, 0.08);
     }
 
-    /// <summary>실제 FLAC 디코드 경로: 픽스처의 n초대 값은 정확히 (n+1)/8 이다. 1 LSB 도 틀리면 안 된다.</summary>
+    /// <summary>
+    /// 실제 FLAC 디코드 경로: 픽스처(16bit 스테레오)의 n초대 값은 왼쪽이 정확히 +(n+1)/8, 오른쪽이 -(n+1)/8 이다.
+    /// 1 LSB 도, 부호(극성)도 틀리면 안 된다. 두 채널의 부호가 반대라는 것은 ffmpeg 로 디코드해 확인했다.
+    /// </summary>
     [Theory]
     [InlineData(500, 1)]
     [InlineData(1500, 2)]
@@ -180,10 +184,12 @@ public class PcmMathTests
         var pcm = source.Read(positionMs, 20, out var format);
 
         Assert.Equal(24, format.depth);
-        Assert.True(pcm.Length >= 3);
-        for (var i = 0; i + 2 < pcm.Length; i += 3)
+        Assert.Equal(2, format.channels);
+        Assert.True(pcm.Length >= 6);
+        for (var i = 0; i + 5 < pcm.Length; i += 6)
         {
             Assert.Equal(eighths * 1048576, PcmMath.Read24(pcm, i));
+            Assert.Equal(-eighths * 1048576, PcmMath.Read24(pcm, i + 3));
         }
     }
 }
