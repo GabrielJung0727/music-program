@@ -303,11 +303,14 @@ function ShareModal({ onClose }: { onClose: () => void }) {
   const { room } = useMono()
   if (!room) return null
   const key = room.inviteCode ? `&key=${encodeURIComponent(room.inviteCode)}` : ""
+  // 링크는 이 PC 의 Core 주소(127.0.0.1)다. Core 는 기본으로 이 PC 에서 온 연결만 받고, 다른 기기가
+  // 남의 Core 에 붙는 길(페어링 화면, 라운지 허브의 원격 연결)도 아직 없다. 휴대폰이나 다른 PC 에서
+  // 열면 그 기기 자신을 가리킬 뿐이라, 되는 것처럼 말하지 않는다.
   const link = `${location.origin}${location.pathname}?lounge=${encodeURIComponent(room.id)}${key}`
   return (
     <Modal
       title="라운지 초대"
-      subtitle={<>「{room.name}」에 들어올 수 있는 링크입니다. 받는 사람도 Mono 가 설치돼 있어야 같은 음질로 들을 수 있습니다.</>}
+      subtitle={<>「{room.name}」에 들어오는 {room.inviteCode ? "링크와 코드" : "링크"}입니다. 지금은 이 PC 의 Mono 에서만 열립니다. 다른 PC 나 휴대폰에서 들어오는 기능은 아직 없습니다.</>}
       onClose={onClose}
       footer={<button className="btn btn--primary" onClick={onClose}>완료</button>}
     >
