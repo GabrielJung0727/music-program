@@ -181,6 +181,9 @@ public class TrackTransitionTests
     /// <summary>
     /// 곡이 끝난 걸 100ms 늦게 알아챘다(틱 간격). 새 타임라인은 지금이 아니라 곡이 끝난 그 순간을
     /// 원점으로 삼아야 한다 — 그러면 새 곡은 이미 100ms 진행된 것으로 보인다.
+    ///
+    /// 읽은 값에는 그사이 흐른 벽시계 시간이 더해진다. 고정된 윗한계(예전 400ms)는 느린 CI 에서
+    /// 빗나갔으므로, 실제로 흐른 시간을 재서 그만큼만 허용한다.
     /// </summary>
     [Fact]
     public void NaturalAdvanceIsSeamlessAndStartsWhereTheTrackEnded()
@@ -188,15 +191,18 @@ public class TrackTransitionTests
         var s = NewStack();
         var ids = Album(s, 3, durationMs: 10_000);
         var room = Playing(s, ids);
+        var before = ClockSync.UnixMs();
         At(room, 10_100);
 
         var changed = s.Rooms.AdvanceFinished();
+        var position = room.CurrentMediaTimeMs();
+        var elapsed = ClockSync.UnixMs() - before;
 
         Assert.Single(changed);
         Assert.Equal(ids[1], Current(s, room));
         Assert.Equal(room.ResyncEpoch, room.SeamlessEpoch);
         Assert.Equal(0, room.MediaTimeAtOriginMs);
-        Assert.InRange(room.CurrentMediaTimeMs(), 100, 400);
+        Assert.InRange(position, 100, 100 + elapsed);
     }
 
     [Fact]
@@ -233,11 +239,16 @@ public class TrackTransitionTests
         room.Transition = TrackTransition.Off;
         At(room, 10_100);
 
+        // 예전처럼 "지금"을 원점으로 삼는다. 그러면 읽은 값은 넘긴 뒤 흐른 시간뿐이다.
+        // 곡이 끝난 순간을 원점으로 삼았다면 100ms 가 더 붙는다.
+        var before = ClockSync.UnixMs();
         s.Rooms.AdvanceFinished();
+        var position = room.CurrentMediaTimeMs();
+        var elapsed = ClockSync.UnixMs() - before;
 
         Assert.Equal(ids[1], Current(s, room));
         Assert.NotEqual(room.ResyncEpoch, room.SeamlessEpoch);
-        Assert.InRange(room.CurrentMediaTimeMs(), 0, 80);
+        Assert.InRange(position, 0, elapsed);
     }
 
     /// <summary>팬아웃 룸은 Core 가 오디오를 보낸다. 출력이 직접 잇는 경로가 아니므로 예전처럼 끊고 넘긴다.</summary>
@@ -262,10 +273,13 @@ public class TrackTransitionTests
         var room = Playing(s, Album(s, 3));
         At(room, 10_000 + 30_000);
 
+        var before = ClockSync.UnixMs();
         s.Rooms.AdvanceFinished();
+        var position = room.CurrentMediaTimeMs();
+        var elapsed = ClockSync.UnixMs() - before;
 
         Assert.NotEqual(room.ResyncEpoch, room.SeamlessEpoch);
-        Assert.InRange(room.CurrentMediaTimeMs(), 0, 80);
+        Assert.InRange(position, 0, elapsed);
     }
 
     [Fact]
@@ -297,12 +311,15 @@ public class TrackTransitionTests
         At(room, 5_500);
         Assert.Empty(s.Rooms.AdvanceFinished());
 
+        var before = ClockSync.UnixMs();
         At(room, 6_100);
         s.Rooms.AdvanceFinished();
+        var position = room.CurrentMediaTimeMs();
+        var elapsed = ClockSync.UnixMs() - before;
 
         Assert.Equal(ids[1], Current(s, room));
         Assert.Equal(room.ResyncEpoch, room.SeamlessEpoch);
-        Assert.InRange(room.CurrentMediaTimeMs(), 100, 400);
+        Assert.InRange(position, 100, 100 + elapsed);
     }
 
     /// <summary>샘플레이트가 다른 두 곡은 겹칠 수 없다. 끝까지 재생한 뒤에 넘어간다.</summary>
