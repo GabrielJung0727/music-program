@@ -1,11 +1,12 @@
 // 메뉴 · 토스트 · 모달. 앱 어디서든 useApp() 으로 띄우고, 그리는 건 여기 한 곳이다.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { Check, Copy, ExternalLink, Globe, Lock, Radio } from "lucide-react"
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { Check, Copy, ExternalLink, Globe, Lock, Radio, Sparkles } from "lucide-react"
 import { useApp, type ModalState } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { RoomMode, StreamingProvider } from "../lib/protocol"
 import { openExternal } from "../lib/shell"
+import { releaseNotes } from "../lib/changelog"
 import { Modal } from "../ui"
 
 // ── 메뉴 ────────────────────────────────────────────────────────────────────
@@ -97,7 +98,103 @@ export function ModalHost() {
     case "login": return <LoginModal service={modal.service} onClose={close} />
     case "playlist": return <PlaylistModal trackIds={modal.trackIds} onClose={close} />
     case "confirm": return <ConfirmModal modal={modal} onClose={close} />
+    case "releaseNotes": return <ReleaseNotesModal version={modal.version} afterUpdate={modal.afterUpdate} onClose={close} />
   }
+}
+
+// ── 이번 버전에서 바뀐 것 ───────────────────────────────────────────────────
+
+const RELEASES_URL = "https://github.com/GabrielJung0727/music-program/releases"
+
+function ReleaseNotesModal({ version, afterUpdate, onClose }: { version: string; afterUpdate?: boolean; onClose: () => void }) {
+  const notes = releaseNotes(version)
+  // "확인"에 초점을 두되 스크롤은 움직이지 않는다. autoFocus 를 쓰면 긴 노트의 맨 아래부터 보인다.
+  const ok = useRef<HTMLButtonElement>(null)
+  useEffect(() => { ok.current?.focus({ preventScroll: true }) }, [])
+  return (
+    <Modal
+      title={`Mono ${version} 변경 내역`}
+      subtitle={afterUpdate ? "Mono 를 업데이트했습니다. 이번 버전에서 바뀐 것은 설정 › 일반 › Mono 에서 다시 볼 수 있습니다." : undefined}
+      icon={<Sparkles size={20} style={{ color: "var(--accent)", marginTop: 3 }} />}
+      onClose={onClose}
+      width={620}
+      footer={
+        <>
+          <button className="btn btn--quiet" onClick={() => openExternal(`${RELEASES_URL}/tag/v${version}`)}>
+            <ExternalLink size={14} />GitHub 에서 보기
+          </button>
+          <button ref={ok} className="btn btn--primary" onClick={onClose}>확인</button>
+        </>
+      }
+    >
+      {notes ? <NotesText text={notes} /> : <p className="t-small dim">이 버전의 변경 내역이 앱에 실려 있지 않습니다.</p>}
+    </Modal>
+  )
+}
+
+/**
+ * CHANGELOG.md 의 한 절을 그린다. 그 파일이 쓰는 만큼만 읽는다: 문단, "**제목**" 줄, "- " 목록(들여 쓰면 한 단계 아래),
+ * 줄 안의 **굵게** · `코드` · [링크](http…). HTML 로 넣지 않고 요소로 만든다.
+ */
+function NotesText({ text }: { text: string }) {
+  type Block = { kind: "p"; text: string } | { kind: "h"; text: string } | { kind: "ul"; items: { text: string; sub: string[] }[] }
+  const blocks: Block[] = []
+  let para: string[] = []
+  const flush = () => { if (para.length) { blocks.push({ kind: "p", text: para.join(" ") }); para = [] } }
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, "")
+    const bullet = /^(\s*)- (.*)$/.exec(line)
+    if (!line.trim()) { flush(); continue }
+    if (bullet) {
+      flush()
+      const last = blocks[blocks.length - 1]
+      const list = last?.kind === "ul" ? last : (blocks.push({ kind: "ul", items: [] }), blocks[blocks.length - 1] as Extract<Block, { kind: "ul" }>)
+      if (bullet[1].length >= 2 && list.items.length) list.items[list.items.length - 1].sub.push(bullet[2])
+      else list.items.push({ text: bullet[2], sub: [] })
+      continue
+    }
+    const heading = /^\*\*([^*]+)\*\*$/.exec(line.trim())
+    if (heading) { flush(); blocks.push({ kind: "h", text: heading[1] }); continue }
+    para.push(line.trim())
+  }
+  flush()
+
+  return (
+    <div className="notes">
+      {blocks.map((b, i) =>
+        b.kind === "h" ? <h3 key={i} className="notes__h">{b.text}</h3>
+          : b.kind === "p" ? <p key={i}>{inline(b.text)}</p>
+            : (
+              <ul key={i}>
+                {b.items.map((it, j) => (
+                  <li key={j}>
+                    {inline(it.text)}
+                    {it.sub.length > 0 && <ul>{it.sub.map((s, k) => <li key={k}>{inline(s)}</li>)}</ul>}
+                  </li>
+                ))}
+              </ul>
+            ),
+      )}
+    </div>
+  )
+}
+
+function inline(text: string): ReactNode {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/).map((part, i) => {
+    const bold = /^\*\*([^*]+)\*\*$/.exec(part)
+    if (bold) return <b key={i}>{bold[1]}</b>
+    const code = /^`([^`]+)`$/.exec(part)
+    if (code) return <code key={i} className="mono">{code[1]}</code>
+    const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part)
+    if (link) {
+      // 저장소 안의 상대 경로(docs/…)는 앱에서 열 곳이 없다. 글자만 남긴다.
+      return /^https?:\/\//.test(link[2])
+        ? <span key={i} className="link accent" onClick={() => openExternal(link[2])}>{link[1]}</span>
+        : <Fragment key={i}>{link[1]}</Fragment>
+    }
+    return <Fragment key={i}>{part}</Fragment>
+  })
 }
 
 function ConfirmModal({ modal, onClose }: { modal: Extract<ModalState, { kind: "confirm" }>; onClose: () => void }) {

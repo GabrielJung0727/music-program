@@ -3,6 +3,7 @@ import { AppProvider, useApp } from "./state/app"
 import { useMono, useMonoCommands } from "./state/MonoProvider"
 import { hasShell, outputStatus } from "./lib/shell"
 import { startConfiguredOutput } from "./lib/setup"
+import { APP_VERSION, hasUnseenReleaseNotes, markReleaseNotesSeen } from "./lib/changelog"
 import Sidebar from "./shell/Sidebar"
 import TopBar from "./shell/TopBar"
 import PlayerBar from "./shell/PlayerBar"
@@ -51,6 +52,20 @@ function Shell() {
       })()
     }
   }, [setup, cmd])
+
+  // ── 업데이트한 뒤 처음 켰으면 이번 버전에서 바뀐 것을 한 번 보여 준다 ──────────
+  // 막 설치해서 마법사를 거친 사람에게는 띄우지 않는다. 그 사람에게는 전부 새것이다.
+  const setupAtStart = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (!setup) return
+    if (setupAtStart.current === null) setupAtStart.current = setup.completed
+    if (!setup.completed) return
+    if (!setupAtStart.current) { markReleaseNotesSeen(); return }
+    if (!hasUnseenReleaseNotes()) return
+    markReleaseNotesSeen()
+    app.openModal({ kind: "releaseNotes", version: APP_VERSION, afterUpdate: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setup?.completed])
 
   // 출력 워커는 룸 하나에 붙는다. 곡을 틀어 룸이 생기면 그 룸으로 다시 붙여 준다.
   useEffect(() => {

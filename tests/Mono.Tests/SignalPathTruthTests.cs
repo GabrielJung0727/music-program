@@ -294,4 +294,17 @@ public class SignalPathTruthTests
 
         Assert.Equal("ASIO", output.GetProperty("driver").GetString());
     }
+
+    /// <summary>
+    /// Mono 는 아직 DSD 를 내지 못한다(Native DSD 도 DoP 도). 장치 목록이 ASIO 드라이버마다
+    /// "DSD Capable" 이라고 쓰면 DoP 로 재생될 것처럼 보인다 — 0.7.0 에서 실제로 그렇게 오해됐다.
+    /// </summary>
+    [Fact]
+    public void TheDeviceListNeverPromisesDsd()
+    {
+        var asio = Mono.Output.DeviceCatalog.ForAsio("Babyface Pro");
+
+        Assert.Null(asio.DsdSupport);
+        Assert.DoesNotContain(asio.Specs, s => s.Contains("DSD", StringComparison.OrdinalIgnoreCase));
+    }
 }

@@ -13,6 +13,7 @@ import {
 import { outputLatency, outputMode } from "../lib/model"
 import { clearSetup, playbackPrefs, saveSetup, startConfiguredOutput, type AudioSetup, type PlaybackSetup } from "../lib/setup"
 import { selectDsp, toggleDsp } from "../lib/dsp"
+import { APP_VERSION, releaseNotes } from "../lib/changelog"
 import { Slider, Toggle } from "../ui"
 import { DSP_PRESETS } from "../shell/PlayerBar"
 import { SERVICES, ServiceGlyph } from "./Explore"
@@ -689,7 +690,14 @@ function GeneralTab() {
       <Group title="Mono">
         <Row
           title={update?.available ? `새 버전 ${update.version ?? ""} 이 나왔습니다` : "업데이트"}
-          desc={phase === "applying" ? `내려받는 중… ${percent}%` : update ? update.message : `현재 버전 ${version ?? "확인 안 됨"}`}
+          desc={phase === "applying" ? `내려받는 중… ${percent}%`
+            : update?.available && update.version ? (
+              <>
+                {update.message}{" "}
+                <span className="link accent" onClick={() => openExternal(`https://github.com/GabrielJung0727/music-program/releases/tag/v${update.version}`)}>무엇이 바뀌나요?</span>
+              </>
+            )
+              : update ? update.message : `현재 버전 ${version ?? "확인 안 됨"}`}
         >
           {update?.available ? (
             <button
@@ -701,6 +709,15 @@ function GeneralTab() {
           ) : (
             <button className="btn btn--sm btn--line" onClick={check} disabled={phase !== "idle"}>{phase === "checking" ? "확인하는 중…" : "업데이트 확인"}</button>
           )}
+        </Row>
+        <Row title="변경 내역" desc={`지금 쓰고 있는 Mono ${APP_VERSION} 에서 바뀐 것을 봅니다.`}>
+          <button
+            className="btn btn--sm btn--line"
+            disabled={!releaseNotes()}
+            onClick={() => app.openModal({ kind: "releaseNotes", version: APP_VERSION })}
+          >
+            보기
+          </button>
         </Row>
         <Row title="처음 설정 다시 하기" desc="폴더·출력 장치·프로필을 고르는 마법사를 처음부터 다시 엽니다. 라이브러리와 재생 기록은 지워지지 않습니다.">
           <button

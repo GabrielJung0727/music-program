@@ -73,6 +73,7 @@ export type ModalState =
   | { kind: "login"; service: "tidal" | "qobuz" }
   | { kind: "playlist"; trackIds: string[] }
   | { kind: "confirm"; title: string; body: string; confirmLabel: string; danger?: boolean; onConfirm: () => void }
+  | { kind: "releaseNotes"; version: string; afterUpdate?: boolean }
 
 export type Panel = "queue" | "lyrics" | null
 
