@@ -10,6 +10,7 @@ import { fmtTime, outputLatency, outputMode, qualityOf, sourceName } from "../li
 import { hasShell, restartOutput, stopOutput, useOutputStatus } from "../lib/shell"
 import { cachedSetup, startConfiguredOutput } from "../lib/setup"
 import { toggleDsp } from "../lib/dsp"
+import { rememberVolume, seedVolume, unmuteVolume } from "../lib/volume"
 import { Art, Slider, Toggle, useDismiss } from "../ui"
 import { PlayPause } from "../ui/motion"
 
@@ -69,6 +70,15 @@ export default function PlayerBar() {
     if (!force && now - lastVolumeSent.current < 70) return
     lastVolumeSent.current = now
     cmd.setVolume(v * 100, output?.peerId)
+  }
+  useEffect(() => { seedVolume(output?.peerId, volume) }, [output?.peerId, volume])
+  const toggleMute = () => {
+    if (volume > 0) {
+      rememberVolume(output?.peerId, volume)
+      sendVolume(0, true)
+    } else {
+      sendVolume(unmuteVolume(output?.peerId), true)
+    }
   }
 
   const [flyout, setFlyout] = useState<"signal" | "output" | null>(null)
@@ -224,10 +234,16 @@ export default function PlayerBar() {
         </button>
 
         <div className="vol">
-          <button className="icon-btn" onClick={() => sendVolume(volume > 0 ? 0 : 0.6, true)} disabled={!output} aria-label="음소거">
+          <button className="icon-btn" onClick={toggleMute} disabled={!output} aria-label="음소거">
             <VolIcon size={18} />
           </button>
-          <Slider value={volume} disabled={!output} label="볼륨" onInput={(v) => sendVolume(v)} onCommit={(v) => sendVolume(v, true)} />
+          <Slider
+            value={volume}
+            disabled={!output}
+            label="볼륨"
+            onInput={(v) => sendVolume(v)}
+            onCommit={(v) => { rememberVolume(output?.peerId, v); sendVolume(v, true) }}
+          />
         </div>
 
         <span className="sep" />
@@ -439,7 +455,7 @@ function OutputFlyout({ onClose }: { onClose: () => void }) {
                   value={o.volumePercent / 100}
                   disabled={!app.canControl && o.peerId !== "out-local"}
                   label={`${o.device ?? "출력"} 볼륨`}
-                  onCommit={(v) => cmd.setVolume(v * 100, o.peerId)}
+                  onCommit={(v) => { rememberVolume(o.peerId, v); cmd.setVolume(v * 100, o.peerId) }}
                 />
                 <span className="mono num">{Math.round(o.volumePercent)}%</span>
               </div>

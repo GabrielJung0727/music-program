@@ -33,16 +33,7 @@ public static class DeviceCatalog
         // ASIO 가 먼저다 — 배타 경로가 있는 장치를 위에 보여 주는 편이 고르기 쉽다.
         foreach (var driver in AsioAudioRenderer.DriverNames())
         {
-            list.Add(new DeviceListing(
-                Id: "asio:" + driver,
-                Name: driver,
-                DriverType: "ASIO",
-                Architecture: "ASIO Direct",
-                Subtitle: "ASIO Direct · 드라이버 버퍼 직접 접근",
-                Specs: ["32-Bit", "DSD Capable"],
-                DsdSupport: "DSD",
-                BitPerfectVerified: true,
-                IsDefault: false));
+            list.Add(ForAsio(driver));
         }
 
         try
@@ -78,6 +69,22 @@ public static class DeviceCatalog
 
         return list;
     }
+
+    /// <summary>
+    /// ASIO 드라이버 하나. DSD 는 말하지 않는다 — Mono 는 아직 어떤 경로로도 DSD 를 내지 못한다
+    /// (Native DSD · DoP 모두 <c>Program.cs</c> 의 <c>claimDsd</c> 가 꺼져 있다). 0.7.0 까지는 모든 ASIO
+    /// 드라이버에 "DSD Capable" 을 붙여서, DoP 로 재생될 것처럼 보였다.
+    /// </summary>
+    public static DeviceListing ForAsio(string driver) => new(
+        Id: "asio:" + driver,
+        Name: driver,
+        DriverType: "ASIO",
+        Architecture: "ASIO Direct",
+        Subtitle: "ASIO Direct · 드라이버 버퍼 직접 접근",
+        Specs: ["32-Bit"],
+        DsdSupport: null,
+        BitPerfectVerified: true,
+        IsDefault: false);
 
     public static string ToJson() =>
         JsonSerializer.Serialize(Enumerate(), new JsonSerializerOptions { WriteIndented = false });
