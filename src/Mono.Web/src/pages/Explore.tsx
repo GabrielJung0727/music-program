@@ -3,6 +3,7 @@ import { Check, Compass, Plus } from "lucide-react"
 import { useApp } from "../state/app"
 import { useMono } from "../state/MonoProvider"
 import { StreamingProvider } from "../lib/protocol"
+import { NOT_READY_BLURB, serviceReady } from "../lib/streaming"
 import { Empty } from "../ui"
 import { AlbumCard, TrackHead, TrackRow } from "../ui/tracks"
 
@@ -57,6 +58,7 @@ export default function Explore() {
         {SERVICES.map((s) => {
           const account = streamingAccounts.find((a) => a.provider === s.provider)
           const on = !!account?.connected
+          const ready = serviceReady(account)
           return (
             <div key={s.id} className={`panel svc-card ${on ? "is-on" : ""}`}>
               <ServiceGlyph id={s.id} size={44} />
@@ -64,14 +66,17 @@ export default function Explore() {
                 <div className="row gap-8">
                   <span className="t-h3" style={{ fontSize: 16 }}>{s.name}</span>
                   {on && <span className="badge badge--ok"><Check size={11} />연결됨</span>}
+                  {!on && !ready && <span className="badge">준비 중</span>}
                 </div>
                 <p className="t-small dimmer" style={{ marginTop: 4, lineHeight: 1.5 }}>
-                  {on ? `${account?.displayName ?? "계정"} · 가져온 곡 ${account?.imported ?? 0}개` : s.blurb}
+                  {on ? `${account?.displayName ?? "계정"} · 가져온 곡 ${account?.imported ?? 0}개` : ready ? s.blurb : NOT_READY_BLURB}
                 </p>
               </div>
               {on
                 ? <button className="btn btn--sm btn--line" onClick={() => app.go({ page: "settings", tab: "accounts" })}>관리</button>
-                : <button className="btn btn--sm btn--primary" onClick={() => app.openModal({ kind: "login", service: s.id })}><Plus size={14} />연결</button>}
+                : ready
+                  ? <button className="btn btn--sm btn--primary" onClick={() => app.openModal({ kind: "login", service: s.id })}><Plus size={14} />연결</button>
+                  : <button className="btn btn--sm btn--line" disabled>준비 중</button>}
             </div>
           )
         })}

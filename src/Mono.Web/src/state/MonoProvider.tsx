@@ -74,6 +74,10 @@ export interface StreamingAccount {
   imported: number
   note?: string | null
   authMode: string
+  /** 지금 연결할 수 있는가. false 면 화면은 "준비 중"을 보인다. 옛 Core 는 이 값을 보내지 않는다. */
+  available?: boolean
+  /** 어느 출처의 키를 쓰는가. 값은 나오지 않는다. */
+  keySource?: "override" | "build" | "default" | "none"
 }
 
 /** link_streaming 의 oauth 시작 응답. */

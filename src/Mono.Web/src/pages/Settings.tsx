@@ -17,6 +17,7 @@ import { APP_VERSION, releaseNotes } from "../lib/changelog"
 import { Slider, Toggle } from "../ui"
 import { DSP_PRESETS } from "../shell/PlayerBar"
 import { SERVICES, ServiceGlyph } from "./Explore"
+import { keySourceLabel, NOT_READY_BLURB, serviceReady } from "../lib/streaming"
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Cpu; desc: string }[] = [
   { id: "audio", label: "오디오 엔진", icon: Waves, desc: "어느 장치로, 어떤 방식으로 소리를 내보낼지 정합니다." },
@@ -543,12 +544,24 @@ function AccountsTab() {
       {SERVICES.map((s) => {
         const account = streamingAccounts.find((a) => a.provider === s.provider)
         const on = !!account?.connected
+        const ready = serviceReady(account)
+        // 어느 키로 연결하는지 보여 준다. 키 값은 화면에 오지 않고 출처만 온다.
+        const keyNote = ready && account?.liveSdk ? keySourceLabel(account) : null
         return (
           <div className="setrow" key={s.id}>
             <ServiceGlyph id={s.id} size={40} />
             <div className="setrow__text">
-              <h4 className="row gap-8">{s.name}{on && <span className="badge badge--ok"><Check size={11} />연결됨</span>}</h4>
-              <p>{on ? `${account?.displayName ?? "계정"} · 가져온 곡 ${account?.imported ?? 0}개${account?.note ? ` · ${account.note}` : ""}` : s.blurb}</p>
+              <h4 className="row gap-8">
+                {s.name}
+                {on && <span className="badge badge--ok"><Check size={11} />연결됨</span>}
+                {!on && !ready && <span className="badge">준비 중</span>}
+              </h4>
+              <p>
+                {on
+                  ? `${account?.displayName ?? "계정"} · 가져온 곡 ${account?.imported ?? 0}개${account?.note ? ` · ${account.note}` : ""}`
+                  : ready ? s.blurb : NOT_READY_BLURB}
+                {keyNote ? ` · ${keyNote}` : ""}
+              </p>
             </div>
             {on ? (
               <button
@@ -562,8 +575,10 @@ function AccountsTab() {
               >
                 연결 끊기
               </button>
-            ) : (
+            ) : ready ? (
               <button className="btn btn--sm btn--primary" onClick={() => app.openModal({ kind: "login", service: s.id })}>연결</button>
+            ) : (
+              <button className="btn btn--sm btn--line" disabled>준비 중</button>
             )}
           </div>
         )

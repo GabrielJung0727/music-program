@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
+using Mono.Shared;
 
 namespace Mono.Control;
 
@@ -54,7 +55,7 @@ public sealed class ProcessSupervisor
                 return false;
             }
 
-            try { _core = StartSilent(exe); }
+            try { _core = StartSilent(exe, ProcessKind.Core); }
             catch (Exception ex)
             {
                 LastError = ex.Message;
@@ -251,7 +252,7 @@ public sealed class ProcessSupervisor
         try
         {
             _outputIntentionallyStopped = false;
-            _output = StartSilent(exe, args);
+            _output = StartSilent(exe, ProcessKind.Output, args);
             _outputArgs = args;
             _lastOutputArgs = args;
             OutputRoomId = roomId;
@@ -389,7 +390,7 @@ public sealed class ProcessSupervisor
         TryKill(ref _core);
     }
 
-    private static Process StartSilent(string exePath, string args = "")
+    private static Process StartSilent(string exePath, ProcessKind kind, string args = "")
     {
         var psi = new ProcessStartInfo
         {
@@ -403,9 +404,9 @@ public sealed class ProcessSupervisor
             RedirectStandardInput = true,
             RedirectStandardError = true
         };
-        // Control이 오래된 환경으로 떠 있어도 User 범위 MONO_* 는 Core/Output에 다시 실어 준다.
-        InjectUserEnv(psi, "MONO_TIDAL_CLIENT_ID", "MONO_TIDAL_CLIENT_SECRET", "MONO_OAUTH_REDIRECT",
-            "MONO_QOBUZ_APP_ID", "MONO_QOBUZ_APP_SECRET", "MONO_TIDAL_DEMO");
+        // Control이 오래된 환경으로 떠 있어도 User 범위 MONO_* 는 다시 실어 준다 — 그것이 필요한 프로세스에만.
+        // 스트리밍 키는 Core 만 쓴다. Output 에는 실지 않는다(PartnerEnv).
+        InjectUserEnv(psi, PartnerEnv.For(kind));
         var p = Process.Start(psi) ?? throw new InvalidOperationException("프로세스 기동 실패: " + exePath);
 
         // 파이프를 반드시 비워 준다. 읽지 않으면 4KB 버퍼가 차는 순간 자식이 Console.WriteLine 에서 멈춘다.
@@ -418,7 +419,7 @@ public sealed class ProcessSupervisor
         return p;
     }
 
-    private static void InjectUserEnv(ProcessStartInfo psi, params string[] keys)
+    private static void InjectUserEnv(ProcessStartInfo psi, IReadOnlyList<string> keys)
     {
         foreach (var key in keys)
         {

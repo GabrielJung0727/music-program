@@ -78,6 +78,12 @@ jobs:
           # 매 실행마다 새로 만든 자체 서명 인증서는 SmartScreen에 도움이 되지 않는다.
           MONO_SIGN_PFX_BASE64: ${{ secrets.MONO_SIGN_PFX_BASE64 }}
           MONO_SIGN_PFX_PASSWORD: ${{ secrets.MONO_SIGN_PFX_PASSWORD }}
+          # 스트리밍 파트너 키. Mono.Core 빌드에 들어간다(docs/09-스트리밍-키-설계.md).
+          # 시크릿이 없으면 빈 값이라 키 없는 빌드로 나간다 — Qobuz 는 "준비 중".
+          # 위의 "빌드 · 테스트" 단계에는 일부러 넣지 않는다: 테스트는 언제나 키 없는 빌드로 돈다.
+          MONO_BUILD_TIDAL_CLIENT_ID: ${{ secrets.MONO_BUILD_TIDAL_CLIENT_ID }}
+          MONO_BUILD_QOBUZ_APP_ID: ${{ secrets.MONO_BUILD_QOBUZ_APP_ID }}
+          MONO_BUILD_QOBUZ_APP_SECRET: ${{ secrets.MONO_BUILD_QOBUZ_APP_SECRET }}
         run: |
           ./publish.ps1 -Version '${{ steps.ver.outputs.version }}' `
                         -SkipZip -GitHubRelease -NoSign -NoTokenSave

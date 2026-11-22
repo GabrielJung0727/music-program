@@ -27,9 +27,10 @@ public static class AppLog
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
                 Roll();
+                // 사용자가 이 파일을 그대로 첨부한다. 토큰 · 시크릿이 줄에 섞여 있어도 값은 남기지 않는다.
                 File.AppendAllText(
                     FilePath,
-                    $"{DateTimeOffset.Now:HH:mm:ss.fff} [{source}] {line}{Environment.NewLine}");
+                    $"{DateTimeOffset.Now:HH:mm:ss.fff} [{source}] {LogRedact.Line(line)}{Environment.NewLine}");
             }
         }
         catch
