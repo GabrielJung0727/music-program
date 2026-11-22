@@ -9,7 +9,7 @@ namespace Mono.Core;
 /// <summary>
 /// 스트리밍 서비스 어댑터. 토큰은 Core에만 보관.
 /// Tidal은 임베디드 QA Client ID + PKCE로 실 OAuth를 타고,
-/// Qobuz는 env 키가 있을 때만 실경로, 없으면 데모로 폴백한다.
+/// Qobuz는 <see cref="PartnerKeys"/> 에 키가 있을 때만 실경로를 탄다. 키가 없으면 연결 자체를 열지 않는다(<see cref="IsAvailable"/>).
 /// </summary>
 public sealed class StreamingHub
 {
@@ -42,9 +42,21 @@ public sealed class StreamingHub
     {
         // Tidal QA Client ID는 바이너리에 포함. 데모는 MONO_TIDAL_DEMO=1 일 때만.
         StreamingProvider.Tidal => !TidalClient.DemoForced,
-        StreamingProvider.Qobuz => !string.IsNullOrWhiteSpace(Env("MONO_QOBUZ_APP_ID")),
+        StreamingProvider.Qobuz => !string.IsNullOrWhiteSpace(PartnerKeys.QobuzAppId),
         StreamingProvider.Local => false,
         _ => throw Unexpected(provider)
+    };
+
+    /// <summary>
+    /// 사용자가 지금 이 서비스를 연결할 수 있는가. 아니면 화면은 "준비 중"을 보인다.
+    /// Qobuz 는 키가 없으면 연결해도 실제 곡이 아니라 시험용 곡이 들어오므로, 연결 자체를 열지 않는다.
+    /// 개발자는 MONO_QOBUZ_DEMO=1 로 시험용 곡을 쓸 수 있다.
+    /// </summary>
+    public bool IsAvailable(StreamingProvider provider) => provider switch
+    {
+        StreamingProvider.Tidal => true,
+        StreamingProvider.Qobuz => HasLiveCredentials(provider) || PartnerKeys.QobuzDemoAllowed,
+        _ => false
     };
 
     public string? LastImportNote { get; private set; }
@@ -60,18 +72,26 @@ public sealed class StreamingHub
     {
         get
         {
+            // 연결하지 않은 서비스도 한 줄씩 나간다. 화면이 "연결할 수 있나 / 준비 중인가"를 알아야 하기 때문이다.
+            // 값(키)은 나가지 않고, 어느 출처의 키를 쓰는지만 나간다.
             lock (_gate)
             {
-                return _accounts.Values
-                    .Select(a => (object)new
+                return new[] { StreamingProvider.Tidal, StreamingProvider.Qobuz }
+                    .Select(p =>
                     {
-                        provider = a.Provider,
-                        connected = a.Connected,
-                        displayName = a.DisplayName,
-                        liveSdk = HasLiveCredentials(a.Provider),
-                        imported = a.Provider == StreamingProvider.Tidal ? LiveTrackCount() : 0,
-                        note = a.Provider == StreamingProvider.Tidal ? LastImportNote : null,
-                        authMode = a.Provider == StreamingProvider.Tidal ? "oauth_browser" : "password_or_token"
+                        _accounts.TryGetValue(p, out var a);
+                        return (object)new
+                        {
+                            provider = p,
+                            connected = a?.Connected ?? false,
+                            displayName = a?.DisplayName,
+                            liveSdk = HasLiveCredentials(p),
+                            imported = p == StreamingProvider.Tidal ? LiveTrackCount() : 0,
+                            note = p == StreamingProvider.Tidal ? LastImportNote : null,
+                            authMode = p == StreamingProvider.Tidal ? "oauth_browser" : "password_or_token",
+                            available = IsAvailable(p),
+                            keySource = PartnerKeys.Label(PartnerKeys.SourceOf(p))
+                        };
                     })
                     .ToList();
             }
@@ -562,7 +582,7 @@ public sealed class StreamingHub
 
     private static string BuildQobuzAuthUrl(string state)
     {
-        var appId = Env("MONO_QOBUZ_APP_ID") ?? "MONO_QOBUZ_CLIENT";
+        var appId = PartnerKeys.QobuzAppId ?? "MONO_QOBUZ_CLIENT";
         var redirect = Env("MONO_OAUTH_REDIRECT") ?? TidalClient.DefaultRedirect;
         return $"https://www.qobuz.com/login?state={state}&client_id={Uri.EscapeDataString(appId)}"
                + $"&redirect_uri={Uri.EscapeDataString(redirect)}";
@@ -570,8 +590,8 @@ public sealed class StreamingHub
 
     private static string? ExchangeQobuz(string code)
     {
-        var appId = Env("MONO_QOBUZ_APP_ID");
-        var secret = Env("MONO_QOBUZ_APP_SECRET");
+        var appId = PartnerKeys.QobuzAppId;
+        var secret = PartnerKeys.QobuzAppSecret;
         if (string.IsNullOrWhiteSpace(appId)) return null;
 
         var url = $"https://www.qobuz.com/api.json/0.2/user/login?app_id={Uri.EscapeDataString(appId)}"
@@ -601,7 +621,7 @@ public sealed class StreamingHub
 
     private async Task ImportQobuzFavoritesAsync(string token)
     {
-        var appId = Env("MONO_QOBUZ_APP_ID");
+        var appId = PartnerKeys.QobuzAppId;
         if (string.IsNullOrWhiteSpace(appId)) return;
         var url = $"https://www.qobuz.com/api.json/0.2/favorite/getUserFavorites?app_id={Uri.EscapeDataString(appId)}"
                   + $"&user_auth_token={Uri.EscapeDataString(token)}&type=tracks&limit=20";
@@ -662,7 +682,7 @@ public sealed class StreamingHub
 
     private string? FetchQobuzFileUrl(Track track, string? token)
     {
-        var appId = Env("MONO_QOBUZ_APP_ID");
+        var appId = PartnerKeys.QobuzAppId;
         if (string.IsNullOrWhiteSpace(appId) || string.IsNullOrWhiteSpace(token)) return null;
         var id = track.StreamingId ?? track.Id.Replace("tr-qobuz-", "", StringComparison.OrdinalIgnoreCase);
         var url = $"https://www.qobuz.com/api.json/0.2/track/getFileUrl?app_id={Uri.EscapeDataString(appId)}"

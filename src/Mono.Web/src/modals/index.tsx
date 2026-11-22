@@ -6,6 +6,7 @@ import { useApp, type ModalState } from "../state/app"
 import { useMono, useMonoCommands } from "../state/MonoProvider"
 import { RoomMode, StreamingProvider } from "../lib/protocol"
 import { openExternal } from "../lib/shell"
+import { serviceReady } from "../lib/streaming"
 import { releaseNotes } from "../lib/changelog"
 import { Modal } from "../ui"
 
@@ -377,6 +378,8 @@ function LoginModal({ service, onClose }: { service: "tidal" | "qobuz"; onClose:
   const [note, setNote] = useState<string | null>(null)
   const [token, setToken] = useState("")
   const connected = streamingAccounts.some((a) => a.provider === provider && a.connected)
+  // 키가 없는 빌드의 Qobuz. 토큰을 넣게 하지 않는다 — 넣어도 실제 곡이 아니라 시험용 곡이 들어왔다.
+  const ready = serviceReady(streamingAccounts.find((a) => a.provider === provider))
 
   // 브라우저에서 로그인을 마쳤는지 Core 에 주기적으로 묻는다.
   useEffect(() => {
@@ -425,12 +428,16 @@ function LoginModal({ service, onClose }: { service: "tidal" | "qobuz"; onClose:
   return (
     <Modal
       title={`${name} 연결`}
-      subtitle={service === "tidal"
-        ? "브라우저에서 TIDAL 에 로그인하면 Mono Core 가 계정을 넘겨받습니다. 비밀번호는 Mono 를 거치지 않습니다."
-        : "Qobuz 계정의 앱 토큰을 넣으면 Core 가 스트리밍 카탈로그를 라이브러리에 합칩니다."}
+      subtitle={!ready
+        ? `${name} 연결은 준비 중입니다.`
+        : service === "tidal"
+          ? "브라우저에서 TIDAL 에 로그인하면 Mono Core 가 계정을 넘겨받습니다. 비밀번호는 Mono 를 거치지 않습니다."
+          : "Qobuz 계정의 앱 토큰을 넣으면 Core 가 스트리밍 카탈로그를 라이브러리에 합칩니다."}
       onClose={onClose}
       footer={
-        service === "tidal" ? (
+        !ready ? (
+          <button className="btn btn--primary" onClick={onClose}>확인</button>
+        ) : service === "tidal" ? (
           <>
             <button className="btn btn--quiet" onClick={onClose}>닫기</button>
             <button className="btn btn--primary" onClick={startOAuth} disabled={busy || waiting}>
@@ -445,7 +452,12 @@ function LoginModal({ service, onClose }: { service: "tidal" | "qobuz"; onClose:
         )
       }
     >
-      {service === "qobuz" && (
+      {!ready && (
+        <p className="t-small dim" style={{ lineHeight: 1.6 }}>
+          지금 버전에서는 {name} 계정을 연결할 수 없습니다. 연결이 열리면 이 창에서 바로 연결할 수 있습니다.
+        </p>
+      )}
+      {ready && service === "qobuz" && (
         <label className="field">
           <span>앱 토큰</span>
           <input className="input mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === "Enter") void submitToken() }} />

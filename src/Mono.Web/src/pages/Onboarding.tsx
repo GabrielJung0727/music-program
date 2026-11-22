@@ -8,6 +8,7 @@ import { Avatar, Toggle } from "../ui"
 import { BrandMark } from "../shell/Sidebar"
 import { ModalHost } from "../modals"
 import { SERVICES, ServiceGlyph } from "./Explore"
+import { NOT_READY_BLURB, serviceReady } from "../lib/streaming"
 
 const STEPS = ["시작", "음악 폴더", "출력 장치", "스트리밍", "프로필", "완료"]
 const COLORS = ["#6D6DF6", "#22C55E", "#F59E0B", "#EF4444", "#38BDF8", "#E4E4E7"]
@@ -187,16 +188,23 @@ export default function Onboarding() {
                 {SERVICES.map((s) => {
                   const account = streamingAccounts.find((a) => a.provider === s.provider)
                   const on = !!account?.connected
+                  const ready = serviceReady(account)
                   return (
                     <div key={s.id} className="panel svc-card">
                       <ServiceGlyph id={s.id} size={44} />
                       <div className="grow">
-                        <div className="row gap-8"><span className="t-h3" style={{ fontSize: 16 }}>{s.name}</span>{on && <span className="badge badge--ok"><Check size={11} />연결됨</span>}</div>
-                        <p className="t-small dimmer" style={{ marginTop: 4 }}>{on ? account?.displayName ?? "계정 연결됨" : s.blurb}</p>
+                        <div className="row gap-8">
+                          <span className="t-h3" style={{ fontSize: 16 }}>{s.name}</span>
+                          {on && <span className="badge badge--ok"><Check size={11} />연결됨</span>}
+                          {!on && !ready && <span className="badge">준비 중</span>}
+                        </div>
+                        <p className="t-small dimmer" style={{ marginTop: 4 }}>{on ? account?.displayName ?? "계정 연결됨" : ready ? s.blurb : NOT_READY_BLURB}</p>
                       </div>
                       {on
                         ? <button className="btn btn--sm btn--line" onClick={() => { void cmd.unlinkStreaming(s.provider) }}>연결 끊기</button>
-                        : <button className="btn btn--sm btn--primary" onClick={() => app.openModal({ kind: "login", service: s.id })}>연결</button>}
+                        : ready
+                          ? <button className="btn btn--sm btn--primary" onClick={() => app.openModal({ kind: "login", service: s.id })}>연결</button>
+                          : <button className="btn btn--sm btn--line" disabled>준비 중</button>}
                     </div>
                   )
                 })}

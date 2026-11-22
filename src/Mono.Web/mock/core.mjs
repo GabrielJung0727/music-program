@@ -37,9 +37,10 @@ let setup = structuredClone(DEFAULT_SETUP)
 
 // ── 스트리밍 계정 ────────────────────────────────────────────────────────────
 
+// 실제 Core 와 같은 모양: 서비스마다 한 줄, available · keySource 포함. Qobuz 는 키가 없는 빌드처럼 "준비 중".
 const accounts = [
-  { provider: 1, connected: true, displayName: "gabriel@tidal", liveSdk: true, imported: 12, note: null, authMode: "oauth" },
-  { provider: 2, connected: false, displayName: null, liveSdk: false, imported: 0, note: null, authMode: "token" },
+  { provider: 1, connected: true, displayName: "gabriel@tidal", liveSdk: true, imported: 12, note: null, authMode: "oauth", available: true, keySource: "default" },
+  { provider: 2, connected: false, displayName: null, liveSdk: false, imported: 0, note: null, authMode: "token", available: false, keySource: "none" },
 ]
 
 // ── 이력 · 플레이리스트 · 아카이브 ───────────────────────────────────────────
@@ -387,6 +388,10 @@ function handle(ws, msg) {
 
     case "link_streaming": {
       const acc = accounts.find((a) => a.provider === msg.provider)
+      // 실제 Core 처럼: 연결하려는 요청만 거절하고, 끊는 요청(토큰 없음)은 받는다.
+      if (acc && acc.available === false && (msg.text === "oauth" || msg.token)) {
+        return send(ws, { type: "link_streaming", ok: false, provider: msg.provider, error: "Qobuz 연동은 준비 중입니다." })
+      }
       if (msg.text === "oauth") {
         return reply("link_streaming", { provider: msg.provider, state: "mock", authUrl: "https://example.invalid/oauth", liveSdk: false, demo: true })
       }

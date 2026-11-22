@@ -204,6 +204,26 @@ $commonArgs = @(
 
 Write-Host ">>> 버전 $Version" -ForegroundColor Cyan
 
+# 파트너 키는 환경변수 MONO_BUILD_* 로 Mono.Core 빌드에 들어간다(Mono.Core.csproj 의 GeneratePartnerKeys).
+# 여기서는 "있나 없나"만 알린다. 값은 어디에도 출력하지 않는다.
+# 키 없이 나가도 막지 않는다 — Qobuz 가 "준비 중"으로 나갈 뿐이다. 다만 모르고 나가지 않게 눈에 띄게 알린다.
+$keyChecks = [ordered]@{
+    'Tidal Client ID (선택: 비면 시험용 기본 키)' = $env:MONO_BUILD_TIDAL_CLIENT_ID
+    'Qobuz App ID'                                = $env:MONO_BUILD_QOBUZ_APP_ID
+    'Qobuz App Secret'                            = $env:MONO_BUILD_QOBUZ_APP_SECRET
+}
+Write-Host '>>> 파트너 키' -ForegroundColor Cyan
+foreach ($k in $keyChecks.Keys) {
+    $state = if ([string]::IsNullOrWhiteSpace($keyChecks[$k])) { '없음' } else { '있음' }
+    Write-Host ("    {0}: {1}" -f $k, $state)
+}
+if ([string]::IsNullOrWhiteSpace($env:MONO_BUILD_QOBUZ_APP_ID)) {
+    Write-Host '    ! Qobuz 키 없이 빌드합니다. 이 릴리스에서 Qobuz 는 "준비 중"으로 나갑니다.' -ForegroundColor Yellow
+}
+elseif ([string]::IsNullOrWhiteSpace($env:MONO_BUILD_QOBUZ_APP_SECRET)) {
+    Write-Host '    ! Qobuz App ID 만 있고 Secret 이 없습니다. 파트너 문서가 Secret 없이 쓰는 방식인지 확인하세요.' -ForegroundColor Yellow
+}
+
 # Control UI(React)를 먼저 빌드한다. 산출물은 src/Mono.Core/wwwroot 로 떨어지고,
 # Mono.Core publish 가 그걸 exe 옆으로 실어 간다. 순서가 바뀌면 빈 화면이 나간다.
 Write-Host '>>> Mono.Web (Control UI)' -ForegroundColor Cyan

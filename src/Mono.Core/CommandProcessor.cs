@@ -645,6 +645,24 @@ public sealed class CommandProcessor
             case MessageTypes.LinkStreaming:
             {
                 var provider = msg.Provider ?? StreamingProvider.Tidal;
+
+                // 연결을 끊는 것(토큰 없는 요청)은 언제나 된다. 연결하려는 요청만 막는다.
+                // 화면이 버튼을 끄는 것과 별개로 Core 가 거절해야 CLI · 다른 클라이언트도 시험용 곡을
+                // 진짜 계정처럼 연결하지 못한다.
+                var linking = string.Equals(msg.Text, "oauth", StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(msg.Text, "oauth_complete", StringComparison.OrdinalIgnoreCase)
+                              || !string.IsNullOrWhiteSpace(msg.Token);
+                if (linking && !_streaming.IsAvailable(provider))
+                {
+                    return Direct(new MonoMessage
+                    {
+                        Type = MessageTypes.LinkStreaming,
+                        Ok = false,
+                        Provider = provider,
+                        Error = $"{provider} 연동은 준비 중입니다."
+                    });
+                }
+
                 if (string.Equals(msg.Text, "oauth", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(msg.Token, "oauth", StringComparison.OrdinalIgnoreCase))
                 {

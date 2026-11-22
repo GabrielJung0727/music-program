@@ -21,8 +21,8 @@ internal sealed class TidalClient
 
     public TidalClient(HttpClient http) => _http = http;
 
-    public static string ClientId => Env("MONO_TIDAL_CLIENT_ID") ?? EmbeddedClientId;
-    public static string? ClientSecret => Env("MONO_TIDAL_CLIENT_SECRET");
+    public static string ClientId => PartnerKeys.TidalClientId;
+    public static string? ClientSecret => PartnerKeys.TidalClientSecret;
     public static string Redirect => Env("MONO_OAUTH_REDIRECT") ?? DefaultRedirect;
     public static bool DemoForced => string.Equals(Env("MONO_TIDAL_DEMO"), "1", StringComparison.OrdinalIgnoreCase);
 
@@ -222,7 +222,8 @@ internal sealed class TidalClient
                 }
 
                 var snippet = body.Length <= 200 ? body : body[..200];
-                LastError = $"{(int)res.StatusCode} {url} {snippet}";
+                // LastError 는 화면(가져오기 메모)과 로그로 나간다. 토큰이 섞여 있어도 값이 나가지 않게 한다.
+                LastError = LogRedact.Line($"{(int)res.StatusCode} {url} {snippet}");
 
                 if (res.StatusCode != HttpStatusCode.TooManyRequests)
                 {
@@ -241,7 +242,7 @@ internal sealed class TidalClient
             }
             catch (Exception ex)
             {
-                LastError = $"{url} {ex.GetType().Name}: {ex.Message}";
+                LastError = LogRedact.Line($"{url} {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
